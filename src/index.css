@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  /* doroedu.net 참고 팔레트 */
+  --color-sky-soft: #f5faff;
+  --color-sky-haze: #cfe6fa;
+  --color-sky-deep: #1e82dc;
+  --color-ink: #363636;
+  --color-ink-muted: #666666;
+  --color-coral: #cfe6fa;
+  --color-sun: #fee500;
+  --color-mint: #00e8aa;
+  --color-lavender: #e8eef5;
+  --shadow-card: 0 12px 32px rgba(30, 130, 220, 0.1);
+  --shadow-card-hover: 0 20px 42px rgba(30, 130, 220, 0.2);
+  --radius-4xl: 2rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+}
+
+.menu-card {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes cloud-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(14px, -6px, 0);
+  }
+}
+
+.cloud-float {
+  animation: cloud-drift 8s ease-in-out infinite;
+}
+
+.cloud-float-delayed {
+  animation: cloud-drift 10s ease-in-out 1.5s infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

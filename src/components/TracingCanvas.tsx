@@ -18,7 +18,8 @@ export type TracingCanvasHandle = {
 };
 
 type Props = {
-  guideSrc: string;
+  /** 준비 중이면 null */
+  guideSrc: string | null;
   width: number;
   height: number;
   guideOpacity: number;
@@ -164,14 +165,16 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
 
   return (
     <div className="relative w-full overflow-hidden rounded-3xl bg-white shadow-card" style={{ aspectRatio: `${width} / ${height}` }}>
-      <img
-        ref={guideRef}
-        src={guideSrc}
-        alt="따라 그릴 밑그림"
-        draggable={false}
-        className="pointer-events-none absolute inset-0 h-full w-full select-none transition-opacity"
-        style={{ opacity: showGuide ? guideOpacity : 0 }}
-      />
+      {guideSrc && (
+        <img
+          ref={guideRef}
+          src={guideSrc}
+          alt="따라 그릴 밑그림"
+          draggable={false}
+          className="pointer-events-none absolute inset-0 h-full w-full select-none transition-opacity"
+          style={{ opacity: showGuide ? guideOpacity : 0 }}
+        />
+      )}
       <canvas
         ref={canvasRef}
         width={width}

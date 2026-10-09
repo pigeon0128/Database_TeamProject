@@ -1,42 +1,64 @@
-// 따라 그리기 채점.
-// 밑그림을 CELL×CELL 픽셀 칸으로 나눠 "흰 선 칸"과 "회색 선 칸"을 미리 구해 두고,
-// 사용자가 칠한 칸과 비교해 점수를 낸다. 칸 단위로 비교하므로 선을 약간 벗어나도 인정된다.
+// 따라 그리기 채점 (픽셀 단위).
+// 밑그림에서 "흰 선 픽셀"과 "회색 선 픽셀"을 미리 구해 두고, 사용자가 칠한 픽셀과 비교한다.
+//   흰 선 채움(%)   = 칠한 흰 선 픽셀 / 전체 흰 선 픽셀 × 100
+//   회색 선 침범(%) = 칠한 회색 선 픽셀 / 전체 회색 선 픽셀 × 100
+//   점수            = 흰 선 채움 − 회색 선 침범  (0~100)
 
-const CELL = 4;
 /** 이 밝기 이상이면 흰 선(인물/주요 요소) */
 const WHITE_MIN = 225;
 /** 이 밝기 이하면 회색 선(배경) */
 const GRAY_MAX = 160;
-/** 흰 선에서 이 칸 수 이내의 회색 선은 침범으로 치지 않는다 */
-const GRAY_TOLERANCE = 2;
+/** 흰 선에서 이 픽셀 거리 이내의 회색 선은 침범으로 치지 않는다 (선이 맞닿는 곳) */
+const GRAY_TOLERANCE = 3;
 /** 칠한 것으로 보는 최소 알파값 */
 const PAINT_ALPHA_MIN = 40;
-/** 흰 선을 이 비율만큼 채우면 채움 점수 만점 */
-const FULL_COVERAGE = 0.9;
-/** 침범한 회색 선 칸 수(흰 선 칸 수 대비 %)에 곱하는 감점 배율 */
-const PENALTY_WEIGHT = 1.5;
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
 export type GuideMasks = {
-  cols: number;
-  rows: number;
+  width: number;
+  height: number;
   white: Uint8Array;
   gray: Uint8Array;
   whiteTotal: number;
+  grayTotal: number;
 };
 
 export type TraceScore = {
   score: number;
-  /** 흰 선을 채운 비율 (0~1) */
-  coverage: number;
-  /** 침범한 회색 선 칸 수 */
+  /** 흰 선 픽셀 중 칠한 비율 (%) */
+  whitePct: number;
+  /** 회색 선 픽셀 중 칠한 비율 (%) */
+  grayPct: number;
+  whiteHits: number;
   grayHits: number;
-  /** 감점 */
-  penalty: number;
 };
 
-export function buildGuideMasks(img: HTMLImageElement, width: number, height: number, exclude: Rect[] = []): GuideMasks {
+export const emptyScore: TraceScore = { score: 0, whitePct: 0, grayPct: 0, whiteHits: 0, grayHits: 0 };
+
+const inRects = (x: number, y: number, rects: Rect[]) => rects.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+
+/** 1차원 최대값 필터를 가로·세로로 적용해 mask를 radius만큼 두껍게 만든다. */
+function dilate(mask: Uint8Array, width: number, height: number, radius: number) {
+  const tmp = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      if (!mask[row + x]) continue;
+      for (let dx = Math.max(0, x - radius); dx <= Math.min(width - 1, x + radius); dx++) tmp[row + dx] = 1;
+    }
+  }
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!tmp[y * width + x]) continue;
+      for (let dy = Math.max(0, y - radius); dy <= Math.min(height - 1, y + radius); dy++) out[dy * width + x] = 1;
+    }
+  }
+  return out;
+}
+
+export function buildGuideMasks(img: CanvasImageSource, width: number, height: number, exclude: Rect[] = []): GuideMasks {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -44,70 +66,46 @@ export function buildGuideMasks(img: HTMLImageElement, width: number, height: nu
   ctx.drawImage(img, 0, 0, width, height);
   const data = ctx.getImageData(0, 0, width, height).data;
 
-  const cols = Math.ceil(width / CELL);
-  const rows = Math.ceil(height / CELL);
-  const white = new Uint8Array(cols * rows);
-  const rawGray = new Uint8Array(cols * rows);
-
+  const white = new Uint8Array(width * height);
+  const rawGray = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (exclude.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)) continue;
-      const i = (y * width + x) * 4;
-      const v = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      const cell = Math.floor(y / CELL) * cols + Math.floor(x / CELL);
-      if (v >= WHITE_MIN) white[cell] = 1;
-      else if (v <= GRAY_MAX) rawGray[cell] = 1;
+      if (inRects(x, y, exclude)) continue;
+      const i = y * width + x;
+      const v = (data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2]) / 3;
+      if (v >= WHITE_MIN) white[i] = 1;
+      else if (v <= GRAY_MAX) rawGray[i] = 1;
     }
   }
 
-  // 흰 선 바로 옆의 회색 선은 제외해서, 흰 선을 굵게 따라 그려도 억울하게 감점되지 않게 한다.
-  const gray = new Uint8Array(cols * rows);
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (!rawGray[r * cols + c]) continue;
-      let nearWhite = false;
-      for (let dr = -GRAY_TOLERANCE; dr <= GRAY_TOLERANCE && !nearWhite; dr++) {
-        for (let dc = -GRAY_TOLERANCE; dc <= GRAY_TOLERANCE; dc++) {
-          const rr = r + dr;
-          const cc = c + dc;
-          if (rr >= 0 && rr < rows && cc >= 0 && cc < cols && white[rr * cols + cc]) {
-            nearWhite = true;
-            break;
-          }
-        }
-      }
-      if (!nearWhite) gray[r * cols + c] = 1;
-    }
-  }
-
+  const nearWhite = dilate(white, width, height, GRAY_TOLERANCE);
+  const gray = new Uint8Array(width * height);
   let whiteTotal = 0;
-  for (const v of white) whiteTotal += v;
-  return { cols, rows, white, gray, whiteTotal };
+  let grayTotal = 0;
+  for (let i = 0; i < gray.length; i++) {
+    whiteTotal += white[i];
+    if (rawGray[i] && !nearWhite[i]) {
+      gray[i] = 1;
+      grayTotal++;
+    }
+  }
+  return { width, height, white, gray, whiteTotal, grayTotal };
 }
 
 export function scoreCanvas(canvas: HTMLCanvasElement, masks: GuideMasks): TraceScore {
-  const { width, height } = canvas;
+  const { width, height, white, gray } = masks;
   const data = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, width, height).data;
-  const painted = new Uint8Array(masks.cols * masks.rows);
-  for (let y = 0; y < height; y++) {
-    const rowBase = Math.floor(y / CELL) * masks.cols;
-    for (let x = 0; x < width; x++) {
-      if (data[(y * width + x) * 4 + 3] >= PAINT_ALPHA_MIN) painted[rowBase + Math.floor(x / CELL)] = 1;
-    }
-  }
 
   let whiteHits = 0;
   let grayHits = 0;
-  for (let i = 0; i < painted.length; i++) {
-    if (!painted[i]) continue;
-    if (masks.white[i]) whiteHits++;
-    else if (masks.gray[i]) grayHits++;
+  for (let i = 0; i < white.length; i++) {
+    if (data[i * 4 + 3] < PAINT_ALPHA_MIN) continue;
+    if (white[i]) whiteHits++;
+    else if (gray[i]) grayHits++;
   }
 
-  const total = Math.max(1, masks.whiteTotal);
-  const coverage = whiteHits / total;
-  const fillScore = Math.min(100, (coverage / FULL_COVERAGE) * 100);
-  const penalty = (grayHits / total) * 100 * PENALTY_WEIGHT;
-  const score = Math.round(Math.max(0, Math.min(100, fillScore - penalty)));
-  return { score, coverage, grayHits, penalty: Math.round(penalty) };
+  const whitePct = (whiteHits / Math.max(1, masks.whiteTotal)) * 100;
+  const grayPct = (grayHits / Math.max(1, masks.grayTotal)) * 100;
+  const score = Math.round(Math.max(0, Math.min(100, whitePct - grayPct)));
+  return { score, whitePct, grayPct, whiteHits, grayHits };
 }

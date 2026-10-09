@@ -3,7 +3,8 @@ import PageLayout from "../components/PageLayout";
 import TracingCanvas, { visibleStrokes, type DrawAction, type Stroke, type TracingCanvasHandle } from "../components/TracingCanvas";
 import forestGuide from "../assets/story/forest-guide.webp";
 import forestExample from "../assets/story/forest-example.webp";
-import { buildGuideMasks, scoreCanvas, type GuideMasks, type Rect, type TraceScore } from "../lib/traceScore";
+import { prepareGuide } from "../lib/guideImage";
+import { buildGuideMasks, emptyScore, scoreCanvas, type GuideMasks, type Rect, type TraceScore } from "../lib/traceScore";
 
 type Scene = {
   id: string;
@@ -15,6 +16,8 @@ type Scene = {
   height: number;
   /** 채점에서 뺄 영역 (밑그림 안의 안내 문구 상자 등) */
   scoreExclude: Rect[];
+  /** 이 영역의 흰 선은 따라 그리기 대상에서 빼고 회색 선(배경)으로 바꾼다 */
+  backgroundRegions: Rect[];
 };
 
 const scenes: Scene[] = [
@@ -27,6 +30,8 @@ const scenes: Scene[] = [
     width: 1500,
     height: 1049,
     scoreExclude: [{ x: 0, y: 0, w: 395, h: 115 }],
+    // 위쪽 음표 (캐릭터 손은 y 400부터 시작)
+    backgroundRegions: [{ x: 300, y: 0, w: 960, h: 370 }],
   },
 ];
 
@@ -66,8 +71,6 @@ function ToolButton({ active, onClick, children, label }: { active?: boolean; on
   );
 }
 
-const emptyScore: TraceScore = { score: 0, coverage: 0, grayHits: 0, penalty: 0 };
-
 function scoreTone(score: number) {
   if (score >= 80) return { text: "text-emerald-600", bar: "bg-emerald-500", label: "최고예요! 🎉" };
   if (score >= 50) return { text: "text-sky-deep", bar: "bg-sky-deep", label: "잘하고 있어요! 👍" };
@@ -93,11 +96,17 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
       <dl className="mt-3 space-y-1 text-sm font-semibold">
         <div className="flex justify-between">
           <dt>흰 선 채움</dt>
-          <dd className="tabular-nums text-emerald-600">{Math.round(result.coverage * 100)}%</dd>
+          <dd className="tabular-nums text-emerald-600">+{result.whitePct.toFixed(1)}%</dd>
         </div>
         <div className="flex justify-between">
           <dt>회색 선 침범</dt>
-          <dd className="tabular-nums text-red-500">−{result.penalty}점</dd>
+          <dd className="tabular-nums text-red-500">−{result.grayPct.toFixed(1)}%</dd>
+        </div>
+        <div className="flex justify-between border-t border-sky-haze pt-1 text-xs text-ink-muted">
+          <dt>칠한 픽셀</dt>
+          <dd className="tabular-nums">
+            흰 {result.whiteHits.toLocaleString()} · 회색 {result.grayHits.toLocaleString()}
+          </dd>
         </div>
       </dl>
     </section>
@@ -127,24 +136,33 @@ export default function StoryPage() {
   const [showExample, setShowExample] = useState(false);
   const [result, setResult] = useState<TraceScore>(emptyScore);
   const [scoreReady, setScoreReady] = useState(false);
+  const [guideUrl, setGuideUrl] = useState<string | null>(null);
 
   const masksRef = useRef<GuideMasks | null>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scorePending = useRef(false);
 
-  // 밑그림에서 흰 선/회색 선 위치를 한 번만 계산해 둔다.
+  // 밑그림을 손질(음표 등을 회색 선으로)하고, 흰 선/회색 선 위치를 한 번만 계산해 둔다.
   useEffect(() => {
     let cancelled = false;
+    let url: string | null = null;
     const img = new Image();
     img.onload = () => {
       if (cancelled) return;
-      masksRef.current = buildGuideMasks(img, scene.width, scene.height, scene.scoreExclude);
+      const guide = prepareGuide(img, scene.width, scene.height, scene.backgroundRegions, scene.scoreExclude);
+      masksRef.current = buildGuideMasks(guide, scene.width, scene.height, scene.scoreExclude);
       setScoreReady(true);
       if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current));
+      guide.toBlob((blob) => {
+        if (cancelled || !blob) return;
+        url = URL.createObjectURL(blob);
+        setGuideUrl(url);
+      });
     };
     img.src = scene.guide;
     return () => {
       cancelled = true;
+      if (url) URL.revokeObjectURL(url);
     };
   }, [scene]);
 
@@ -222,7 +240,7 @@ export default function StoryPage() {
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_17rem]">
         <TracingCanvas
           ref={canvasRef}
-          guideSrc={scene.guide}
+          guideSrc={guideUrl}
           width={scene.width}
           height={scene.height}
           guideOpacity={guideOpacity}

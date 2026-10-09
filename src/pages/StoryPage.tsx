@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import PageLayout from "../components/PageLayout";
 import TracingCanvas, { visibleStrokes, type DrawAction, type Stroke, type TracingCanvasHandle } from "../components/TracingCanvas";
 import forestGuide from "../assets/story/forest-guide.webp";
-import forestExample from "../assets/story/forest-example.webp";
-import { prepareGuide } from "../lib/guideImage";
+import { makeTracedExample, prepareGuide } from "../lib/guideImage";
 import { buildGuideMasks, emptyScore, scoreCanvas, type GuideMasks, type Rect, type TraceScore } from "../lib/traceScore";
 
 type Scene = {
@@ -11,7 +10,6 @@ type Scene = {
   title: string;
   line: string;
   guide: string;
-  example: string;
   width: number;
   height: number;
   /** 채점에서 뺄 영역 (밑그림 안의 안내 문구 상자 등) */
@@ -26,7 +24,6 @@ const scenes: Scene[] = [
     title: "숲속의 노래",
     line: "소리에도 생명이 있구나!!",
     guide: forestGuide,
-    example: forestExample,
     width: 1500,
     height: 1049,
     scoreExclude: [{ x: 0, y: 0, w: 395, h: 115 }],
@@ -176,15 +173,23 @@ export default function StoryPage() {
   const [result, setResult] = useState<TraceScore>(emptyScore);
   const [scoreReady, setScoreReady] = useState(false);
   const [guideUrl, setGuideUrl] = useState<string | null>(null);
+  const [exampleUrl, setExampleUrl] = useState<string | null>(null);
 
   const masksRef = useRef<GuideMasks | null>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scorePending = useRef(false);
 
-  // 밑그림을 손질(음표 등을 회색 선으로)하고, 흰 선/회색 선 위치를 한 번만 계산해 둔다.
+  // 밑그림을 손질(음표 등을 회색 선으로)하고, 흰 선/회색 선 위치와 완성 예시를 한 번만 만들어 둔다.
   useEffect(() => {
     let cancelled = false;
-    let url: string | null = null;
+    const urls: string[] = [];
+    const toUrl = (canvas: HTMLCanvasElement, set: (url: string) => void) =>
+      canvas.toBlob((blob) => {
+        if (cancelled || !blob) return;
+        const url = URL.createObjectURL(blob);
+        urls.push(url);
+        set(url);
+      });
     const img = new Image();
     img.onload = () => {
       if (cancelled) return;
@@ -192,16 +197,13 @@ export default function StoryPage() {
       masksRef.current = buildGuideMasks(guide, scene.width, scene.height, scene.scoreExclude);
       setScoreReady(true);
       if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current));
-      guide.toBlob((blob) => {
-        if (cancelled || !blob) return;
-        url = URL.createObjectURL(blob);
-        setGuideUrl(url);
-      });
+      toUrl(guide, setGuideUrl);
+      toUrl(makeTracedExample(guide, scene.scoreExclude), setExampleUrl);
     };
     img.src = scene.guide;
     return () => {
       cancelled = true;
-      if (url) URL.revokeObjectURL(url);
+      urls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [scene]);
 
@@ -461,7 +463,7 @@ export default function StoryPage() {
                 className="mt-1 w-full accent-sky-deep disabled:opacity-40"
               />
             </label>
-            <button type="button" onClick={() => setShowExample(true)} className="mt-3 w-full rounded-2xl bg-mint/30 py-2.5 text-sm font-bold hover:bg-mint/50">
+            <button type="button" onClick={() => setShowExample(true)} disabled={!exampleUrl} className="mt-3 w-full rounded-2xl bg-mint/30 py-2.5 text-sm font-bold hover:bg-mint/50">
               🖼️ 완성 예시 보기
             </button>
           </Panel>
@@ -508,7 +510,7 @@ export default function StoryPage() {
         </aside>
       </div>
 
-      {showExample && (
+      {showExample && exampleUrl && (
         <div
           role="dialog"
           aria-modal="true"
@@ -517,7 +519,7 @@ export default function StoryPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm"
         >
           <figure className="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-card-hover" onClick={(e) => e.stopPropagation()}>
-            <img src={scene.example} alt={`${scene.title} 완성 예시`} className="w-full" />
+            <img src={exampleUrl} alt={`${scene.title} 완성 예시`} className="w-full" />
             <figcaption className="flex items-center justify-between gap-3 p-4">
               <span className="text-sm font-bold">“{scene.line}”</span>
               <button type="button" onClick={() => setShowExample(false)} className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white">

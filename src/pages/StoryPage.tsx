@@ -135,7 +135,9 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
         </div>
         <div className="flex justify-between">
           <dt>회색 구역 침범</dt>
-          <dd className="tabular-nums text-red-500">−{result.grayPct.toFixed(1)}%</dd>
+          <dd className="tabular-nums text-red-500">
+            −{result.penalty.toFixed(1)}점 <span className="text-xs text-ink-muted">({result.grayPct.toFixed(2)}%)</span>
+          </dd>
         </div>
         <div className="flex justify-between border-t border-sky-haze pt-1 text-xs text-ink-muted">
           <dt>칠한 흰 픽셀</dt>

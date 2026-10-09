@@ -99,13 +99,13 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
           <dd className="tabular-nums text-emerald-600">+{result.whitePct.toFixed(1)}%</dd>
         </div>
         <div className="flex justify-between">
-          <dt>회색 선 침범</dt>
+          <dt>회색 구역 침범</dt>
           <dd className="tabular-nums text-red-500">−{result.grayPct.toFixed(1)}%</dd>
         </div>
         <div className="flex justify-between border-t border-sky-haze pt-1 text-xs text-ink-muted">
-          <dt>칠한 픽셀</dt>
+          <dt>칠한 흰 픽셀</dt>
           <dd className="tabular-nums">
-            흰 {result.whiteHits.toLocaleString()} · 회색 {result.grayHits.toLocaleString()}
+            {result.whiteHits.toLocaleString()} / {result.whiteTotal.toLocaleString()}
           </dd>
         </div>
       </dl>
@@ -232,7 +232,7 @@ export default function StoryPage() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-sun px-3 py-1 text-sm font-black">{scene.title}</span>
         <p className="text-sm font-medium text-ink-muted">
-          <b className="text-ink">흰색 선</b>을 따라 칠할수록 점수가 올라가고, <b className="text-ink">회색 선</b>을 칠하면 점수가 깎여요!
+          <b className="text-ink">흰색 선</b>을 따라 칠할수록 점수가 올라가고, <b className="text-ink">회색 부분</b>(선과 바탕)을 칠하면 점수가 깎여요!
         </p>
         <span className="ml-auto rounded-full bg-white/80 px-3 py-1 text-sm font-black tabular-nums shadow-sm lg:hidden">{result.score}점</span>
       </div>

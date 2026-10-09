@@ -1,14 +1,13 @@
 // 따라 그리기 채점 (픽셀 단위).
-// 밑그림에서 "흰 선 픽셀"과 "회색 선 픽셀"을 미리 구해 두고, 사용자가 칠한 픽셀과 비교한다.
-//   흰 선 채움(%)   = 칠한 흰 선 픽셀 / 전체 흰 선 픽셀 × 100
-//   회색 선 침범(%) = 칠한 회색 선 픽셀 / 전체 회색 선 픽셀 × 100
-//   점수            = 흰 선 채움 − 회색 선 침범  (0~100)
+// 밑그림에서 "흰 선 픽셀"과 "회색 구역 픽셀"(회색 선 + 회색 바탕, 즉 흰 선이 아닌 모든 곳)을
+// 미리 구해 두고, 사용자가 칠한 픽셀과 비교한다.
+//   흰 선 채움(%)     = 칠한 흰 선 픽셀 / 전체 흰 선 픽셀 × 100
+//   회색 구역 침범(%) = 칠한 회색 구역 픽셀 / 전체 회색 구역 픽셀 × 100
+//   점수              = 흰 선 채움 − 회색 구역 침범  (0~100)
 
 /** 이 밝기 이상이면 흰 선(인물/주요 요소) */
 const WHITE_MIN = 225;
-/** 이 밝기 이하면 회색 선(배경) */
-const GRAY_MAX = 160;
-/** 흰 선에서 이 픽셀 거리 이내의 회색 선은 침범으로 치지 않는다 (선이 맞닿는 곳) */
+/** 흰 선에서 이 픽셀 거리 이내는 침범으로 치지 않는다 (흰 선의 흐린 가장자리) */
 const GRAY_TOLERANCE = 3;
 /** 칠한 것으로 보는 최소 알파값 */
 const PAINT_ALPHA_MIN = 40;
@@ -28,13 +27,15 @@ export type TraceScore = {
   score: number;
   /** 흰 선 픽셀 중 칠한 비율 (%) */
   whitePct: number;
-  /** 회색 선 픽셀 중 칠한 비율 (%) */
+  /** 회색 구역 픽셀 중 칠한 비율 (%) */
   grayPct: number;
   whiteHits: number;
   grayHits: number;
+  /** 밑그림의 전체 흰 선 픽셀 수 */
+  whiteTotal: number;
 };
 
-export const emptyScore: TraceScore = { score: 0, whitePct: 0, grayPct: 0, whiteHits: 0, grayHits: 0 };
+export const emptyScore: TraceScore = { score: 0, whitePct: 0, grayPct: 0, whiteHits: 0, grayHits: 0, whiteTotal: 0 };
 
 const inRects = (x: number, y: number, rects: Rect[]) => rects.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
 
@@ -74,7 +75,7 @@ export function buildGuideMasks(img: CanvasImageSource, width: number, height: n
       const i = y * width + x;
       const v = (data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2]) / 3;
       if (v >= WHITE_MIN) white[i] = 1;
-      else if (v <= GRAY_MAX) rawGray[i] = 1;
+      else rawGray[i] = 1;
     }
   }
 
@@ -107,5 +108,5 @@ export function scoreCanvas(canvas: HTMLCanvasElement, masks: GuideMasks): Trace
   const whitePct = (whiteHits / Math.max(1, masks.whiteTotal)) * 100;
   const grayPct = (grayHits / Math.max(1, masks.grayTotal)) * 100;
   const score = Math.round(Math.max(0, Math.min(100, whitePct - grayPct)));
-  return { score, whitePct, grayPct, whiteHits, grayHits };
+  return { score, whitePct, grayPct, whiteHits, grayHits, whiteTotal: masks.whiteTotal };
 }

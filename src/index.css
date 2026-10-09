@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  /* doroedu.net 참고 팔레트 */
   --color-sky-soft: #f5faff;
   --color-sky-haze: #cfe6fa;
   --color-sky-deep: #1e82dc;

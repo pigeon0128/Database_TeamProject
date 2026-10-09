@@ -55,6 +55,35 @@ const sizes = [
   { name: "아주 굵게", value: 32 },
 ];
 
+const MIN_SIZE = 2;
+const MAX_SIZE = 48;
+const SIZE_STEP = 2;
+
+/** 숫자키 1~9, 0 → 팔레트 1~10번째 색 */
+const paletteKey = (index: number) => String((index + 1) % 10);
+
+const shortcuts: [keys: string[], desc: string][] = [
+  [["B"], "브러쉬"],
+  [["E"], "지우개"],
+  [["["], "굵기 줄이기"],
+  [["]"], "굵기 늘리기"],
+  [["1", "~", "0"], "색깔 고르기"],
+  [["Ctrl", "Z"], "되돌리기"],
+  [["Ctrl", "Y"], "다시 하기"],
+];
+
+function Kbd({ children, inverted }: { children: ReactNode; inverted?: boolean }) {
+  return (
+    <kbd
+      className={`inline-flex min-w-5 items-center justify-center rounded-md px-1 font-sans text-[11px] font-bold leading-5 ${
+        inverted ? "bg-white/25 text-white" : "border border-sky-haze bg-white text-ink-muted"
+      }`}
+    >
+      {children}
+    </kbd>
+  );
+}
+
 function ToolButton({ active, onClick, children, label }: { active?: boolean; onClick: () => void; children: ReactNode; label: string }) {
   return (
     <button
@@ -113,7 +142,7 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
   );
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+function Panel({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-3xl border border-white/90 bg-white/80 p-4 shadow-card">
       <h2 className="mb-3 text-sm font-extrabold text-ink-muted">{title}</h2>
@@ -211,17 +240,36 @@ export default function StoryPage() {
     a.click();
   };
 
+  // 단축키. 한글 입력 상태에서도 동작하도록 e.key 대신 물리 키(e.code)로 판단한다.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      const key = e.key.toLowerCase();
-      if (key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if (key === "y" || (key === "z" && e.shiftKey)) {
-        e.preventDefault();
-        redo();
+      const target = e.target as HTMLElement;
+      if (target.isContentEditable || (target instanceof HTMLInputElement && !["range", "checkbox"].includes(target.type))) return;
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.code === "KeyZ" && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+        } else if (e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey)) {
+          e.preventDefault();
+          redo();
+        }
+        return;
       }
+      if (e.altKey) return;
+
+      if (e.code === "KeyB") setErase(false);
+      else if (e.code === "KeyE") setErase(true);
+      else if (e.code === "BracketLeft") setSize((v) => Math.max(MIN_SIZE, v - SIZE_STEP));
+      else if (e.code === "BracketRight") setSize((v) => Math.min(MAX_SIZE, v + SIZE_STEP));
+      else if (/^(Digit|Numpad)\d$/.test(e.code)) {
+        const digit = Number(e.code.slice(-1));
+        const c = palette[(digit + 9) % 10];
+        if (!c) return;
+        setColor(c.value);
+        setErase(false);
+      } else return;
+      e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -257,11 +305,11 @@ export default function StoryPage() {
           <ScorePanel result={result} ready={scoreReady} />
           <Panel title="도구">
             <div className="flex gap-2">
-              <ToolButton label="브러쉬" active={!erase} onClick={() => setErase(false)}>
-                🖌️ 브러쉬
+              <ToolButton label="브러쉬 (B)" active={!erase} onClick={() => setErase(false)}>
+                🖌️ 브러쉬 <Kbd inverted={!erase}>B</Kbd>
               </ToolButton>
-              <ToolButton label="지우개" active={erase} onClick={() => setErase(true)}>
-                🧽 지우개
+              <ToolButton label="지우개 (E)" active={erase} onClick={() => setErase(true)}>
+                🧽 지우개 <Kbd inverted={erase}>E</Kbd>
               </ToolButton>
             </div>
             <div className="mt-2 flex gap-2">
@@ -276,22 +324,26 @@ export default function StoryPage() {
 
           <Panel title="색깔">
             <div className="grid grid-cols-5 gap-2">
-              {palette.map((c) => (
+              {palette.map((c, i) => (
                 <button
                   key={c.value}
                   type="button"
-                  title={c.name}
+                  title={`${c.name} (${paletteKey(i)})`}
                   aria-label={c.name}
                   aria-pressed={!erase && color === c.value}
                   onClick={() => {
                     setColor(c.value);
                     setErase(false);
                   }}
-                  className={`aspect-square rounded-full border-2 transition hover:scale-110 ${
+                  className={`relative aspect-square rounded-full border-2 transition hover:scale-110 ${
                     !erase && color === c.value ? "border-white ring-2 ring-sky-deep" : "border-white shadow"
                   }`}
                   style={{ backgroundColor: c.value }}
-                />
+                >
+                  <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-black text-ink-muted shadow-sm">
+                    {paletteKey(i)}
+                  </span>
+                </button>
               ))}
             </div>
             <label className="mt-3 flex items-center justify-between text-sm font-bold">
@@ -308,7 +360,17 @@ export default function StoryPage() {
             </label>
           </Panel>
 
-          <Panel title={`굵기 ${size}`}>
+          <Panel
+            title={
+              <span className="flex items-center justify-between">
+                {`${erase ? "지우개" : "브러쉬"} 굵기 ${size}`}
+                <span className="flex gap-1">
+                  <Kbd>[</Kbd>
+                  <Kbd>]</Kbd>
+                </span>
+              </span>
+            }
+          >
             <div className="grid grid-cols-4 gap-2">
               {sizes.map((s) => (
                 <button
@@ -328,8 +390,8 @@ export default function StoryPage() {
             </div>
             <input
               type="range"
-              min={2}
-              max={48}
+              min={MIN_SIZE}
+              max={MAX_SIZE}
               value={size}
               onChange={(e) => setSize(Number(e.target.value))}
               aria-label="브러쉬 굵기"
@@ -385,6 +447,19 @@ export default function StoryPage() {
           >
             밑그림과 함께 저장하기
           </button>
+
+          <Panel title="⌨️ 단축키">
+            <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5 text-sm">
+              {shortcuts.map(([keys, desc]) => (
+                <div key={desc} className="contents">
+                  <dt className="flex items-center gap-0.5">
+                    {keys.map((k) => (k === "~" ? <span key={k} className="text-xs text-ink-muted">~</span> : <Kbd key={k}>{k}</Kbd>))}
+                  </dt>
+                  <dd className="font-semibold">{desc}</dd>
+                </div>
+              ))}
+            </dl>
+          </Panel>
         </aside>
       </div>
 

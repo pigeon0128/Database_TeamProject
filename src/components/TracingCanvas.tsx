@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 export type Point = [x: number, y: number];
 
@@ -15,6 +15,9 @@ export type DrawAction = Stroke | { type: "clear" };
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */
   exportImage: (withGuide: boolean) => string | null;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
 };
 
 type Props = {
@@ -86,13 +89,63 @@ export function visibleStrokes(actions: DrawAction[]): Stroke[] {
   return actions.slice(lastClear + 1) as Stroke[];
 }
 
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 6;
+const ZOOM_STEP = 1.25;
+
+type View = { z: number; tx: number; ty: number };
+type Mode = "none" | "draw" | "pan" | "pinch" | "blocked";
+
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+const isTyping = (t: EventTarget | null) =>
+  t instanceof HTMLElement && (t.isContentEditable || (t instanceof HTMLInputElement && !["range", "checkbox"].includes(t.type)));
+
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
   { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, actions, onStrokeEnd, onChange },
   ref,
 ) {
+  const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const guideRef = useRef<HTMLImageElement>(null);
   const current = useRef<Stroke | null>(null);
+
+  // 확대/이동 상태: 캔버스를 z배로 키우고 (tx, ty)만큼 옮겨서 보여 준다. 페이지 레이아웃은 그대로다.
+  const [view, setView] = useState<View>({ z: 1, tx: 0, ty: 0 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [panning, setPanning] = useState(false);
+
+  const mode = useRef<Mode>("none");
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef({ view, x: 0, y: 0, dist: 1 });
+
+  const clampView = useCallback((v: View): View => {
+    const el = viewportRef.current;
+    const vw = el?.clientWidth ?? 0;
+    const vh = el?.clientHeight ?? 0;
+    const z = clamp(v.z, MIN_ZOOM, MAX_ZOOM);
+    return { z, tx: clamp(v.tx, vw - vw * z, 0), ty: clamp(v.ty, vh - vh * z, 0) };
+  }, []);
+
+  /** 뷰포트 안의 점 (px, py)를 기준으로 확대/축소. 점을 생략하면 가운데 기준 */
+  const zoomAt = useCallback(
+    (factor: number, px?: number, py?: number) => {
+      const el = viewportRef.current;
+      if (!el) return;
+      const x = px ?? el.clientWidth / 2;
+      const y = py ?? el.clientHeight / 2;
+      setView((v) => {
+        const z = clamp(v.z * factor, MIN_ZOOM, MAX_ZOOM);
+        const k = z / v.z;
+        return clampView({ z, tx: x - (x - v.tx) * k, ty: y - (y - v.ty) * k });
+      });
+    },
+    [clampView],
+  );
+
+  const resetZoom = useCallback(() => setView({ z: 1, tx: 0, ty: 0 }), []);
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -124,16 +177,105 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       ctx.drawImage(canvas, 0, 0);
       return out.toDataURL("image/png");
     },
+    zoomIn: () => zoomAt(ZOOM_STEP),
+    zoomOut: () => zoomAt(1 / ZOOM_STEP),
+    resetZoom,
   }));
+
+  // Ctrl+휠(트랙패드 핀치 포함): 브라우저 확대 대신 캔버스를 커서 위치 기준으로 확대.
+  // 확대된 상태의 일반 휠: 캔버스 안에서 이동. 캔버스 밖의 Ctrl+휠은 브라우저 확대만 막는다.
+  useEffect(() => {
+    const el = viewportRef.current!;
+    const onViewportWheel = (e: WheelEvent) => {
+      const rect = el.getBoundingClientRect();
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        zoomAt(Math.exp(-e.deltaY * 0.0025), e.clientX - rect.left, e.clientY - rect.top);
+      } else if (viewRef.current.z > 1) {
+        e.preventDefault();
+        setView((v) => clampView({ ...v, tx: v.tx - e.deltaX, ty: v.ty - e.deltaY }));
+      }
+    };
+    const onWindowWheel = (e: WheelEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !el.contains(e.target as Node)) e.preventDefault();
+    };
+    el.addEventListener("wheel", onViewportWheel, { passive: false });
+    window.addEventListener("wheel", onWindowWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onViewportWheel);
+      window.removeEventListener("wheel", onWindowWheel);
+    };
+  }, [zoomAt, clampView]);
+
+  // 스페이스바를 누른 채 드래그하면 화면 이동
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || isTyping(e.target)) return;
+      e.preventDefault();
+      setSpaceHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSpaceHeld(false);
+    };
+    const blur = () => setSpaceHeld(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
+
+  // 창 크기가 바뀌면 이동 범위를 다시 맞춘다.
+  useEffect(() => {
+    const ro = new ResizeObserver(() => setView((v) => clampView(v)));
+    ro.observe(viewportRef.current!);
+    return () => ro.disconnect();
+  }, [clampView]);
 
   const toCanvasPoint = (e: PointerEvent | React.PointerEvent): Point => {
     const rect = canvasRef.current!.getBoundingClientRect();
     return [((e.clientX - rect.left) * width) / rect.width, ((e.clientY - rect.top) * height) / rect.height];
   };
 
+  const pinchInfo = () => {
+    const [a, b] = [...pointers.current.values()];
+    const rect = viewportRef.current!.getBoundingClientRect();
+    return { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top, dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)) };
+  };
+
   const handleDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // 이미 끝난 포인터면 캡처 없이 진행
+    }
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // 두 손가락: 그리던 선은 취소하고 확대/이동
+    if (pointers.current.size === 2) {
+      if (current.current) {
+        current.current = null;
+        redraw();
+      }
+      mode.current = "pinch";
+      gesture.current = { view: viewRef.current, ...pinchInfo() };
+      return;
+    }
+    if (pointers.current.size > 2 || mode.current !== "none") return;
+
+    if (spaceHeld || e.button === 1) {
+      e.preventDefault();
+      mode.current = "pan";
+      setPanning(true);
+      gesture.current = { view: viewRef.current, x: e.clientX, y: e.clientY, dist: 1 };
+      return;
+    }
     if (e.button !== 0) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+
+    mode.current = "draw";
     const ctx = getCtx(e.currentTarget);
     const stroke: Stroke = { type: "stroke", color, size, erase, points: [toCanvasPoint(e)] };
     current.current = stroke;
@@ -143,8 +285,26 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   };
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (mode.current === "pinch" && pointers.current.size === 2) {
+      const g = gesture.current;
+      const now = pinchInfo();
+      const z = clamp((g.view.z * now.dist) / g.dist, MIN_ZOOM, MAX_ZOOM);
+      // 처음 두 손가락 사이에 있던 그림 위치가 지금 두 손가락 사이에 오도록
+      const cx = (g.x - g.view.tx) / g.view.z;
+      const cy = (g.y - g.view.ty) / g.view.z;
+      setView(clampView({ z, tx: now.x - cx * z, ty: now.y - cy * z }));
+      return;
+    }
+    if (mode.current === "pan") {
+      const g = gesture.current;
+      setView(clampView({ ...g.view, tx: g.view.tx + e.clientX - g.x, ty: g.view.ty + e.clientY - g.y }));
+      return;
+    }
+
     const stroke = current.current;
-    if (!stroke) return;
+    if (mode.current !== "draw" || !stroke) return;
     const ctx = getCtx(e.currentTarget);
     applyStyle(ctx, stroke);
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
@@ -156,36 +316,58 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   };
 
   const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    pointers.current.delete(e.pointerId);
     const stroke = current.current;
-    if (!stroke) return;
-    current.current = null;
-    drawTail(getCtx(e.currentTarget), stroke.points);
-    onStrokeEnd(stroke);
+    if (mode.current === "draw" && stroke) {
+      current.current = null;
+      drawTail(getCtx(e.currentTarget), stroke.points);
+      onStrokeEnd(stroke);
+    }
+    if (mode.current === "pan") setPanning(false);
+    // 핀치 후 손가락 하나가 남아 있으면, 모두 뗄 때까지 그리지 않는다.
+    mode.current = pointers.current.size ? "blocked" : "none";
   };
 
+  const zoomButton = "flex h-8 w-8 items-center justify-center rounded-full text-lg font-black text-ink hover:bg-sky-haze disabled:opacity-30";
+
   return (
-    <div className="relative w-full overflow-hidden rounded-3xl bg-white shadow-card" style={{ aspectRatio: `${width} / ${height}` }}>
-      {guideSrc && (
-        <img
-          ref={guideRef}
-          src={guideSrc}
-          alt="따라 그릴 밑그림"
-          draggable={false}
-          className="pointer-events-none absolute inset-0 h-full w-full select-none transition-opacity"
-          style={{ opacity: showGuide ? guideOpacity : 0 }}
+    <div ref={viewportRef} className="relative w-full overflow-hidden rounded-3xl bg-white shadow-card" style={{ aspectRatio: `${width} / ${height}` }}>
+      <div className="absolute inset-0 origin-top-left" style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.z})` }}>
+        {guideSrc && (
+          <img
+            ref={guideRef}
+            src={guideSrc}
+            alt="따라 그릴 밑그림"
+            draggable={false}
+            className="pointer-events-none absolute inset-0 h-full w-full select-none transition-opacity"
+            style={{ opacity: showGuide ? guideOpacity : 0 }}
+          />
+        )}
+        <canvas
+          ref={canvasRef}
+          width={width}
+          height={height}
+          onPointerDown={handleDown}
+          onPointerMove={handleMove}
+          onPointerUp={handleUp}
+          onPointerCancel={handleUp}
+          onContextMenu={(e) => e.preventDefault()}
+          className="absolute inset-0 h-full w-full touch-none"
+          style={{ cursor: panning ? "grabbing" : spaceHeld ? "grab" : "crosshair" }}
         />
-      )}
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        onPointerDown={handleDown}
-        onPointerMove={handleMove}
-        onPointerUp={handleUp}
-        onPointerCancel={handleUp}
-        className="absolute inset-0 h-full w-full touch-none"
-        style={{ cursor: "crosshair" }}
-      />
+      </div>
+
+      <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-full bg-white/90 p-1 shadow-card backdrop-blur">
+        <button type="button" title="축소 (Ctrl -)" aria-label="축소" onClick={() => zoomAt(1 / ZOOM_STEP)} disabled={view.z <= MIN_ZOOM} className={zoomButton}>
+          −
+        </button>
+        <button type="button" title="원래 크기 (Ctrl 0)" onClick={resetZoom} className="min-w-14 rounded-full px-2 py-1 text-xs font-black tabular-nums text-ink hover:bg-sky-haze">
+          {Math.round(view.z * 100)}%
+        </button>
+        <button type="button" title="확대 (Ctrl +)" aria-label="확대" onClick={() => zoomAt(ZOOM_STEP)} disabled={view.z >= MAX_ZOOM} className={zoomButton}>
+          +
+        </button>
+      </div>
     </div>
   );
 });

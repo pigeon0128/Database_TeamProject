@@ -70,6 +70,10 @@ const shortcuts: [keys: string[], desc: string][] = [
   [["1", "~", "0"], "색깔 고르기"],
   [["Ctrl", "Z"], "되돌리기"],
   [["Ctrl", "Y"], "다시 하기"],
+  [["Ctrl", "+"], "확대 (Ctrl+휠)"],
+  [["Ctrl", "−"], "축소"],
+  [["Ctrl", "0"], "원래 크기"],
+  [["Space"], "누른 채 드래그: 화면 이동"],
 ];
 
 function Kbd({ children, inverted }: { children: ReactNode; inverted?: boolean }) {
@@ -247,7 +251,17 @@ export default function StoryPage() {
       if (target.isContentEditable || (target instanceof HTMLInputElement && !["range", "checkbox"].includes(target.type))) return;
 
       if (e.ctrlKey || e.metaKey) {
-        if (e.code === "KeyZ" && !e.shiftKey) {
+        // 브라우저 확대 대신 캔버스 확대
+        if (["Equal", "NumpadAdd"].includes(e.code)) {
+          e.preventDefault();
+          canvasRef.current?.zoomIn();
+        } else if (["Minus", "NumpadSubtract"].includes(e.code)) {
+          e.preventDefault();
+          canvasRef.current?.zoomOut();
+        } else if (["Digit0", "Numpad0"].includes(e.code)) {
+          e.preventDefault();
+          canvasRef.current?.resetZoom();
+        } else if (e.code === "KeyZ" && !e.shiftKey) {
           e.preventDefault();
           undo();
         } else if (e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey)) {

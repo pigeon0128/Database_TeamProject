@@ -194,7 +194,7 @@ function ToolButton({ active, onClick, children, label }: { active?: boolean; on
       onClick={onClick}
       aria-pressed={active}
       title={label}
-      className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl px-3 text-sm font-bold transition ${
+      className={`flex h-11 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-2xl px-2 text-sm font-bold transition ${
         active ? "bg-sky-deep text-white shadow-sm" : "bg-sky-soft text-ink hover:bg-sky-haze"
       }`}
     >

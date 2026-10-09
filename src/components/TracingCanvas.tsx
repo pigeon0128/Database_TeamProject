@@ -28,7 +28,12 @@ type Props = {
   erase: boolean;
   actions: DrawAction[];
   onStrokeEnd: (stroke: Stroke) => void;
+  /** 그리는 중이거나 다시 그려질 때마다 호출 (채점용) */
+  onChange?: (canvas: HTMLCanvasElement) => void;
 };
+
+// 채점할 때 픽셀을 자주 읽으므로 willReadFrequently로 연다.
+const getCtx = (canvas: HTMLCanvasElement) => canvas.getContext("2d", { willReadFrequently: true })!;
 
 const mid = (a: Point, b: Point): Point => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 
@@ -81,7 +86,7 @@ export function visibleStrokes(actions: DrawAction[]): Stroke[] {
 }
 
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
-  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, actions, onStrokeEnd },
+  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, actions, onStrokeEnd, onChange },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -89,12 +94,14 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   const current = useRef<Stroke | null>(null);
 
   const redraw = useCallback(() => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = getCtx(canvas);
     ctx.globalCompositeOperation = "source-over";
     ctx.clearRect(0, 0, width, height);
     for (const s of visibleStrokes(actions)) drawStroke(ctx, s);
-  }, [actions, width, height]);
+    onChange?.(canvas);
+  }, [actions, width, height, onChange]);
 
   useEffect(redraw, [redraw]);
 
@@ -126,30 +133,32 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   const handleDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    const ctx = e.currentTarget.getContext("2d")!;
+    const ctx = getCtx(e.currentTarget);
     const stroke: Stroke = { type: "stroke", color, size, erase, points: [toCanvasPoint(e)] };
     current.current = stroke;
     applyStyle(ctx, stroke);
     drawDot(ctx, stroke.points[0], size);
+    onChange?.(e.currentTarget);
   };
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const stroke = current.current;
     if (!stroke) return;
-    const ctx = e.currentTarget.getContext("2d")!;
+    const ctx = getCtx(e.currentTarget);
     applyStyle(ctx, stroke);
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
     for (const ev of events.length ? events : [e.nativeEvent]) {
       stroke.points.push(toCanvasPoint(ev));
       drawSegment(ctx, stroke.points, stroke.points.length - 1);
     }
+    onChange?.(e.currentTarget);
   };
 
   const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const stroke = current.current;
     if (!stroke) return;
     current.current = null;
-    drawTail(e.currentTarget.getContext("2d")!, stroke.points);
+    drawTail(getCtx(e.currentTarget), stroke.points);
     onStrokeEnd(stroke);
   };
 

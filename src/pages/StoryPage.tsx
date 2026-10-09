@@ -3,6 +3,7 @@ import PageLayout from "../components/PageLayout";
 import TracingCanvas, { visibleStrokes, type DrawAction, type Stroke, type TracingCanvasHandle } from "../components/TracingCanvas";
 import forestGuide from "../assets/story/forest-guide.webp";
 import forestExample from "../assets/story/forest-example.webp";
+import { buildGuideMasks, scoreCanvas, type GuideMasks, type Rect, type TraceScore } from "../lib/traceScore";
 
 type Scene = {
   id: string;
@@ -12,6 +13,8 @@ type Scene = {
   example: string;
   width: number;
   height: number;
+  /** 채점에서 뺄 영역 (밑그림 안의 안내 문구 상자 등) */
+  scoreExclude: Rect[];
 };
 
 const scenes: Scene[] = [
@@ -23,6 +26,7 @@ const scenes: Scene[] = [
     example: forestExample,
     width: 1500,
     height: 1049,
+    scoreExclude: [{ x: 0, y: 0, w: 395, h: 115 }],
   },
 ];
 
@@ -62,6 +66,44 @@ function ToolButton({ active, onClick, children, label }: { active?: boolean; on
   );
 }
 
+const emptyScore: TraceScore = { score: 0, coverage: 0, grayHits: 0, penalty: 0 };
+
+function scoreTone(score: number) {
+  if (score >= 80) return { text: "text-emerald-600", bar: "bg-emerald-500", label: "최고예요! 🎉" };
+  if (score >= 50) return { text: "text-sky-deep", bar: "bg-sky-deep", label: "잘하고 있어요! 👍" };
+  if (score >= 20) return { text: "text-amber-500", bar: "bg-amber-400", label: "조금만 더! ✏️" };
+  return { text: "text-ink-muted", bar: "bg-ink-muted", label: "흰 선을 따라 그려 보세요" };
+}
+
+function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
+  const tone = scoreTone(result.score);
+  return (
+    <section className="rounded-3xl border border-white/90 bg-white/80 p-4 shadow-card" aria-live="polite">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-extrabold text-ink-muted">점수</h2>
+        <span className="text-xs font-bold text-ink-muted">{ready ? tone.label : "채점 준비 중…"}</span>
+      </div>
+      <p className={`mt-1 text-5xl font-black tabular-nums tracking-tight ${tone.text}`}>
+        {result.score}
+        <span className="ml-1 text-lg font-bold text-ink-muted">/ 100</span>
+      </p>
+      <div className="mt-3 h-3 overflow-hidden rounded-full bg-sky-soft">
+        <div className={`h-full rounded-full transition-[width] duration-300 ${tone.bar}`} style={{ width: `${result.score}%` }} />
+      </div>
+      <dl className="mt-3 space-y-1 text-sm font-semibold">
+        <div className="flex justify-between">
+          <dt>흰 선 채움</dt>
+          <dd className="tabular-nums text-emerald-600">{Math.round(result.coverage * 100)}%</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>회색 선 침범</dt>
+          <dd className="tabular-nums text-red-500">−{result.penalty}점</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-3xl border border-white/90 bg-white/80 p-4 shadow-card">
@@ -83,6 +125,39 @@ export default function StoryPage() {
   const [showGuide, setShowGuide] = useState(true);
   const [guideOpacity, setGuideOpacity] = useState(0.8);
   const [showExample, setShowExample] = useState(false);
+  const [result, setResult] = useState<TraceScore>(emptyScore);
+  const [scoreReady, setScoreReady] = useState(false);
+
+  const masksRef = useRef<GuideMasks | null>(null);
+  const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const scorePending = useRef(false);
+
+  // 밑그림에서 흰 선/회색 선 위치를 한 번만 계산해 둔다.
+  useEffect(() => {
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      masksRef.current = buildGuideMasks(img, scene.width, scene.height, scene.scoreExclude);
+      setScoreReady(true);
+      if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current));
+    };
+    img.src = scene.guide;
+    return () => {
+      cancelled = true;
+    };
+  }, [scene]);
+
+  // 그리는 동안 너무 자주 계산하지 않도록 0.12초에 한 번만 채점한다.
+  const handleCanvasChange = useCallback((canvas: HTMLCanvasElement) => {
+    drawCanvasRef.current = canvas;
+    if (scorePending.current || !masksRef.current) return;
+    scorePending.current = true;
+    setTimeout(() => {
+      scorePending.current = false;
+      if (masksRef.current && drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current));
+    }, 120);
+  }, []);
 
   const hasDrawing = visibleStrokes(actions).length > 0;
 
@@ -138,7 +213,10 @@ export default function StoryPage() {
     <PageLayout title="스토리 장면 그리기" wide>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-sun px-3 py-1 text-sm font-black">{scene.title}</span>
-        <p className="text-sm font-medium text-ink-muted">흰색 선은 인물, 회색 선은 배경이에요. 브러쉬로 윤곽선을 따라 그려 보세요!</p>
+        <p className="text-sm font-medium text-ink-muted">
+          <b className="text-ink">흰색 선</b>을 따라 칠할수록 점수가 올라가고, <b className="text-ink">회색 선</b>을 칠하면 점수가 깎여요!
+        </p>
+        <span className="ml-auto rounded-full bg-white/80 px-3 py-1 text-sm font-black tabular-nums shadow-sm lg:hidden">{result.score}점</span>
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_17rem]">
@@ -154,9 +232,11 @@ export default function StoryPage() {
           erase={erase}
           actions={actions}
           onStrokeEnd={addStroke}
+          onChange={handleCanvasChange}
         />
 
         <aside className="flex flex-col gap-3">
+          <ScorePanel result={result} ready={scoreReady} />
           <Panel title="도구">
             <div className="flex gap-2">
               <ToolButton label="브러쉬" active={!erase} onClick={() => setErase(false)}>

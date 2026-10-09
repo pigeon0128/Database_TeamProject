@@ -1,107 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PageLayout from "../components/PageLayout";
-import TracingCanvas, { visibleStrokes, type DrawAction, type Stroke, type TracingCanvasHandle } from "../components/TracingCanvas";
-import forestGuide from "../assets/story/forest-guide.webp";
-import { makeTracedExample, prepareGuide } from "../lib/guideImage";
-import { buildGuideMasks, emptyScore, scoreCanvas, type GuideMasks, type Rect, type TraceScore } from "../lib/traceScore";
+import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
+import { downloadImage, Panel, ShortcutPanel, ToolPanels, useDrawingTools } from "../components/DrawingTools";
+import { findScene, type Scene } from "../data/scenes";
+import { loadSceneAssets } from "../lib/sceneAssets";
+import { emptyScore, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
+import { navigate } from "../router";
 
-type Scene = {
-  id: string;
-  title: string;
-  line: string;
-  guide: string;
-  width: number;
-  height: number;
-  /** 채점에서 뺄 영역 (밑그림 안의 안내 문구 상자 등) */
-  scoreExclude: Rect[];
-  /** 이 영역의 흰 선은 따라 그리기 대상에서 빼고 회색 선(배경)으로 바꾼다 */
-  backgroundRegions: Rect[];
-};
-
-const scenes: Scene[] = [
-  {
-    id: "forest-music",
-    title: "숲속의 노래",
-    line: "소리에도 생명이 있구나!!",
-    guide: forestGuide,
-    width: 1500,
-    height: 1049,
-    scoreExclude: [{ x: 0, y: 0, w: 395, h: 115 }],
-    // 위쪽 음표 (캐릭터 손은 y 400부터 시작)
-    backgroundRegions: [{ x: 300, y: 0, w: 960, h: 370 }],
-  },
-];
-
-const palette = [
-  { name: "검정", value: "#363636" },
-  { name: "갈색", value: "#8b5a2b" },
-  { name: "빨강", value: "#ef4444" },
-  { name: "주황", value: "#f97316" },
-  { name: "노랑", value: "#fee500" },
-  { name: "초록", value: "#22a35a" },
-  { name: "하늘", value: "#38bdf8" },
-  { name: "파랑", value: "#1e82dc" },
-  { name: "보라", value: "#8b5cf6" },
-  { name: "분홍", value: "#f472b6" },
-];
-
-const sizes = [
-  { name: "가늘게", value: 4 },
-  { name: "보통", value: 8 },
-  { name: "굵게", value: 16 },
-  { name: "아주 굵게", value: 32 },
-];
-
-/** Fade 슬라이더 1칸 = 캔버스 3픽셀 (최대 300픽셀에 걸쳐 가늘어짐) */
-const FADE_PX_PER_STEP = 3;
-const MIN_SIZE = 2;
-const MAX_SIZE = 48;
-const SIZE_STEP = 2;
-
-/** 숫자키 1~9, 0 → 팔레트 1~10번째 색 */
-const paletteKey = (index: number) => String((index + 1) % 10);
-
-const shortcuts: [keys: string[], desc: string][] = [
-  [["B"], "브러쉬"],
-  [["E"], "지우개"],
-  [["["], "굵기 줄이기"],
-  [["]"], "굵기 늘리기"],
-  [["1", "~", "0"], "색깔 고르기"],
-  [["Ctrl", "Z"], "되돌리기"],
-  [["Ctrl", "Y"], "다시 하기"],
-  [["Ctrl", "+"], "확대 (Ctrl+휠)"],
-  [["Ctrl", "−"], "축소"],
-  [["Ctrl", "0"], "원래 크기"],
-  [["Ctrl"], "누른 채 드래그: 화면 이동"],
-];
-
-function Kbd({ children, inverted }: { children: ReactNode; inverted?: boolean }) {
-  return (
-    <kbd
-      className={`inline-flex min-w-5 items-center justify-center rounded-md px-1 font-sans text-[11px] font-bold leading-5 ${
-        inverted ? "bg-white/25 text-white" : "border border-sky-haze bg-white text-ink-muted"
-      }`}
-    >
-      {children}
-    </kbd>
-  );
-}
-
-function ToolButton({ active, onClick, children, label }: { active?: boolean; onClick: () => void; children: ReactNode; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      title={label}
-      className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-2xl px-3 text-sm font-bold transition ${
-        active ? "bg-sky-deep text-white shadow-sm" : "bg-sky-soft text-ink hover:bg-sky-haze"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
+const BACK_TO_LIST = { path: "/story", label: "장면 고르기" };
 
 function scoreTone(score: number) {
   if (score >= 80) return { text: "text-emerald-600", bar: "bg-emerald-500", label: "최고예요! 🎉" };
@@ -147,26 +53,27 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
   );
 }
 
-function Panel({ title, children }: { title: ReactNode; children: ReactNode }) {
-  return (
-    <section className="rounded-3xl border border-white/90 bg-white/80 p-4 shadow-card">
-      <h2 className="mb-3 text-sm font-extrabold text-ink-muted">{title}</h2>
-      {children}
-    </section>
-  );
+export default function StoryPage({ sceneId }: { sceneId: string }) {
+  const scene = findScene(sceneId);
+  if (!scene) {
+    return (
+      <PageLayout title="스토리 장면 그리기" back={BACK_TO_LIST}>
+        <div className="rounded-3xl bg-white/80 p-8 text-center shadow-card">
+          <p className="font-bold">찾을 수 없는 장면이에요.</p>
+          <button type="button" onClick={() => navigate("/story")} className="mt-4 rounded-full bg-sky-deep px-5 py-2 text-sm font-bold text-white">
+            장면 고르러 가기
+          </button>
+        </div>
+      </PageLayout>
+    );
+  }
+  return <SceneDrawing scene={scene} />;
 }
 
-export default function StoryPage() {
-  const scene = scenes[0];
+function SceneDrawing({ scene }: { scene: Scene }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
+  const tools = useDrawingTools(canvasRef);
 
-  const [actions, setActions] = useState<DrawAction[]>([]);
-  const [redoStack, setRedoStack] = useState<DrawAction[]>([]);
-  const [color, setColor] = useState(palette[0].value);
-  const [size, setSize] = useState(8);
-  const [erase, setErase] = useState(false);
-  const [smoothing, setSmoothing] = useState(50);
-  const [fade, setFade] = useState(30);
   const [showGuide, setShowGuide] = useState(true);
   const [guideOpacity, setGuideOpacity] = useState(0.8);
   const [showExample, setShowExample] = useState(false);
@@ -179,31 +86,22 @@ export default function StoryPage() {
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scorePending = useRef(false);
 
-  // 밑그림을 손질(음표 등을 회색 선으로)하고, 흰 선/회색 선 위치와 완성 예시를 한 번만 만들어 둔다.
+  // 손질한 밑그림, 채점용 위치, 완성 예시 (선택 화면에서 이미 만들었다면 그대로 재사용)
   useEffect(() => {
     let cancelled = false;
-    const urls: string[] = [];
-    const toUrl = (canvas: HTMLCanvasElement, set: (url: string) => void) =>
-      canvas.toBlob((blob) => {
-        if (cancelled || !blob) return;
-        const url = URL.createObjectURL(blob);
-        urls.push(url);
-        set(url);
-      });
-    const img = new Image();
-    img.onload = () => {
-      if (cancelled) return;
-      const guide = prepareGuide(img, scene.width, scene.height, scene.backgroundRegions, scene.scoreExclude);
-      masksRef.current = buildGuideMasks(guide, scene.width, scene.height, scene.scoreExclude);
-      setScoreReady(true);
-      if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current));
-      toUrl(guide, setGuideUrl);
-      toUrl(makeTracedExample(guide, scene.scoreExclude), setExampleUrl);
-    };
-    img.src = scene.guide;
+    loadSceneAssets(scene).then(
+      (assets) => {
+        if (cancelled) return;
+        masksRef.current = assets.masks;
+        setScoreReady(true);
+        if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, assets.masks));
+        setGuideUrl(assets.guideUrl);
+        setExampleUrl(assets.exampleUrl);
+      },
+      () => {},
+    );
     return () => {
       cancelled = true;
-      urls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [scene]);
 
@@ -218,87 +116,13 @@ export default function StoryPage() {
     }, 120);
   }, []);
 
-  const hasDrawing = visibleStrokes(actions).length > 0;
-
-  const addStroke = useCallback((stroke: Stroke) => {
-    setActions((prev) => [...prev, stroke]);
-    setRedoStack([]);
-  }, []);
-
-  const undo = useCallback(() => {
-    if (!actions.length) return;
-    setRedoStack((r) => [...r, actions[actions.length - 1]]);
-    setActions(actions.slice(0, -1));
-  }, [actions]);
-
-  const redo = useCallback(() => {
-    if (!redoStack.length) return;
-    setActions((prev) => [...prev, redoStack[redoStack.length - 1]]);
-    setRedoStack(redoStack.slice(0, -1));
-  }, [redoStack]);
-
-  const clearAll = () => {
-    if (!hasDrawing) return;
-    setActions((prev) => [...prev, { type: "clear" }]);
-    setRedoStack([]);
-  };
-
   const save = (withGuide: boolean) => {
     const url = canvasRef.current?.exportImage(withGuide);
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${scene.title}${withGuide ? "-밑그림포함" : ""}.png`;
-    a.click();
+    if (url) downloadImage(url, `${scene.title}${withGuide ? "-밑그림포함" : ""}.png`);
   };
 
-  // 단축키. 한글 입력 상태에서도 동작하도록 e.key 대신 물리 키(e.code)로 판단한다.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.isContentEditable || (target instanceof HTMLInputElement && !["range", "checkbox"].includes(target.type))) return;
-
-      if (e.ctrlKey || e.metaKey) {
-        // 브라우저 확대 대신 캔버스 확대
-        if (["Equal", "NumpadAdd"].includes(e.code)) {
-          e.preventDefault();
-          canvasRef.current?.zoomIn();
-        } else if (["Minus", "NumpadSubtract"].includes(e.code)) {
-          e.preventDefault();
-          canvasRef.current?.zoomOut();
-        } else if (["Digit0", "Numpad0"].includes(e.code)) {
-          e.preventDefault();
-          canvasRef.current?.resetZoom();
-        } else if (e.code === "KeyZ" && !e.shiftKey) {
-          e.preventDefault();
-          undo();
-        } else if (e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey)) {
-          e.preventDefault();
-          redo();
-        }
-        return;
-      }
-      if (e.altKey) return;
-
-      if (e.code === "KeyB") setErase(false);
-      else if (e.code === "KeyE") setErase(true);
-      else if (e.code === "BracketLeft") setSize((v) => Math.max(MIN_SIZE, v - SIZE_STEP));
-      else if (e.code === "BracketRight") setSize((v) => Math.min(MAX_SIZE, v + SIZE_STEP));
-      else if (/^(Digit|Numpad)\d$/.test(e.code)) {
-        const digit = Number(e.code.slice(-1));
-        const c = palette[(digit + 9) % 10];
-        if (!c) return;
-        setColor(c.value);
-        setErase(false);
-      } else return;
-      e.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo]);
-
   return (
-    <PageLayout title="스토리 장면 그리기" wide>
+    <PageLayout title="스토리 장면 그리기" wide back={BACK_TO_LIST}>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-sun px-3 py-1 text-sm font-black">{scene.title}</span>
         <p className="text-sm font-medium text-ink-muted">
@@ -315,136 +139,13 @@ export default function StoryPage() {
           height={scene.height}
           guideOpacity={guideOpacity}
           showGuide={showGuide}
-          color={color}
-          size={size}
-          erase={erase}
-          smoothing={smoothing / 100}
-          fade={fade * FADE_PX_PER_STEP}
-          actions={actions}
-          onStrokeEnd={addStroke}
+          {...tools.canvasProps}
           onChange={handleCanvasChange}
         />
 
         <aside className="flex flex-col gap-3">
           <ScorePanel result={result} ready={scoreReady} />
-          <Panel title="도구">
-            <div className="flex gap-2">
-              <ToolButton label="브러쉬 (B)" active={!erase} onClick={() => setErase(false)}>
-                🖌️ 브러쉬 <Kbd inverted={!erase}>B</Kbd>
-              </ToolButton>
-              <ToolButton label="지우개 (E)" active={erase} onClick={() => setErase(true)}>
-                🧽 지우개 <Kbd inverted={erase}>E</Kbd>
-              </ToolButton>
-            </div>
-            <div className="mt-2 flex gap-2">
-              <ToolButton label="되돌리기 (Ctrl+Z)" onClick={undo}>
-                ↶ 되돌리기
-              </ToolButton>
-              <ToolButton label="다시 하기 (Ctrl+Y)" onClick={redo}>
-                ↷ 다시
-              </ToolButton>
-            </div>
-          </Panel>
-
-          <Panel title="색깔">
-            <div className="grid grid-cols-5 gap-2">
-              {palette.map((c, i) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  title={`${c.name} (${paletteKey(i)})`}
-                  aria-label={c.name}
-                  aria-pressed={!erase && color === c.value}
-                  onClick={() => {
-                    setColor(c.value);
-                    setErase(false);
-                  }}
-                  className={`relative aspect-square rounded-full border-2 transition hover:scale-110 ${
-                    !erase && color === c.value ? "border-white ring-2 ring-sky-deep" : "border-white shadow"
-                  }`}
-                  style={{ backgroundColor: c.value }}
-                >
-                  <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-black text-ink-muted shadow-sm">
-                    {paletteKey(i)}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <label className="mt-3 flex items-center justify-between text-sm font-bold">
-              다른 색 고르기
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => {
-                  setColor(e.target.value);
-                  setErase(false);
-                }}
-                className="h-8 w-12 cursor-pointer rounded-lg border-0 bg-transparent"
-              />
-            </label>
-          </Panel>
-
-          <Panel
-            title={
-              <span className="flex items-center justify-between">
-                {`${erase ? "지우개" : "브러쉬"} 굵기 ${size}`}
-                <span className="flex gap-1">
-                  <Kbd>[</Kbd>
-                  <Kbd>]</Kbd>
-                </span>
-              </span>
-            }
-          >
-            <div className="grid grid-cols-4 gap-2">
-              {sizes.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  title={s.name}
-                  aria-label={s.name}
-                  aria-pressed={size === s.value}
-                  onClick={() => setSize(s.value)}
-                  className={`flex h-12 items-center justify-center rounded-2xl transition ${
-                    size === s.value ? "bg-sky-haze ring-2 ring-sky-deep" : "bg-sky-soft hover:bg-sky-haze"
-                  }`}
-                >
-                  <span className="rounded-full bg-ink" style={{ width: 4 + s.value / 1.5, height: 4 + s.value / 1.5 }} />
-                </button>
-              ))}
-            </div>
-            <input
-              type="range"
-              min={MIN_SIZE}
-              max={MAX_SIZE}
-              value={size}
-              onChange={(e) => setSize(Number(e.target.value))}
-              aria-label="브러쉬 굵기"
-              className="mt-3 w-full accent-sky-deep"
-            />
-          </Panel>
-
-          <Panel title="선 다듬기">
-            <label className="block text-sm font-bold">
-              <span className="flex justify-between">
-                손떨림 보정 <span className="tabular-nums text-ink-muted">{smoothing}%</span>
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={smoothing}
-                onChange={(e) => setSmoothing(Number(e.target.value))}
-                className="mt-1 w-full accent-sky-deep"
-              />
-            </label>
-            <label className="mt-3 block text-sm font-bold">
-              <span className="flex justify-between">
-                시작·끝 흐리기 (Fade) <span className="tabular-nums text-ink-muted">{fade === 0 ? "끔" : fade}</span>
-              </span>
-              <input type="range" min={0} max={100} value={fade} onChange={(e) => setFade(Number(e.target.value))} className="mt-1 w-full accent-sky-deep" />
-            </label>
-            <p className="mt-2 text-xs font-medium text-ink-muted">보정을 올리면 선이 부드러워지고, 흐리기를 올리면 선의 시작과 끝이 가늘어져요.</p>
-          </Panel>
+          <ToolPanels tools={tools} />
 
           <Panel title="밑그림">
             <label className="flex items-center justify-between text-sm font-bold">
@@ -471,8 +172,8 @@ export default function StoryPage() {
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={clearAll}
-              disabled={!hasDrawing}
+              onClick={tools.clearAll}
+              disabled={!tools.hasDrawing}
               className="rounded-2xl bg-white/80 py-3 text-sm font-bold text-red-500 shadow-card hover:bg-white disabled:opacity-40"
             >
               전체 지우기
@@ -480,7 +181,7 @@ export default function StoryPage() {
             <button
               type="button"
               onClick={() => save(false)}
-              disabled={!hasDrawing}
+              disabled={!tools.hasDrawing}
               className="rounded-2xl bg-sky-deep py-3 text-sm font-bold text-white shadow-card hover:brightness-110 disabled:opacity-40"
             >
               그림 저장
@@ -489,24 +190,13 @@ export default function StoryPage() {
           <button
             type="button"
             onClick={() => save(true)}
-            disabled={!hasDrawing}
+            disabled={!tools.hasDrawing}
             className="text-xs font-semibold text-ink-muted underline-offset-2 hover:underline disabled:opacity-40"
           >
             밑그림과 함께 저장하기
           </button>
 
-          <Panel title="⌨️ 단축키">
-            <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5 text-sm">
-              {shortcuts.map(([keys, desc]) => (
-                <div key={desc} className="contents">
-                  <dt className="flex items-center gap-0.5">
-                    {keys.map((k) => (k === "~" ? <span key={k} className="text-xs text-ink-muted">~</span> : <Kbd key={k}>{k}</Kbd>))}
-                  </dt>
-                  <dd className="font-semibold">{desc}</dd>
-                </div>
-              ))}
-            </dl>
-          </Panel>
+          <ShortcutPanel />
         </aside>
       </div>
 

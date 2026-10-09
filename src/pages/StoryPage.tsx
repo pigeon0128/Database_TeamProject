@@ -2,36 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
 import { downloadImage, Panel, ShortcutPanel, ToolPanels, useDrawingTools } from "../components/DrawingTools";
-import forestGuide from "../assets/story/forest-guide.webp";
-import { makeTracedExample, prepareGuide } from "../lib/guideImage";
-import { buildGuideMasks, emptyScore, scoreCanvas, type GuideMasks, type Rect, type TraceScore } from "../lib/traceScore";
+import { findScene, type Scene } from "../data/scenes";
+import { loadSceneAssets } from "../lib/sceneAssets";
+import { emptyScore, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
+import { navigate } from "../router";
 
-type Scene = {
-  id: string;
-  title: string;
-  line: string;
-  guide: string;
-  width: number;
-  height: number;
-  /** 채점에서 뺄 영역 (밑그림 안의 안내 문구 상자 등) */
-  scoreExclude: Rect[];
-  /** 이 영역의 흰 선은 따라 그리기 대상에서 빼고 회색 선(배경)으로 바꾼다 */
-  backgroundRegions: Rect[];
-};
-
-const scenes: Scene[] = [
-  {
-    id: "forest-music",
-    title: "숲속의 노래",
-    line: "소리에도 생명이 있구나!!",
-    guide: forestGuide,
-    width: 1500,
-    height: 1049,
-    scoreExclude: [{ x: 0, y: 0, w: 395, h: 115 }],
-    // 위쪽 음표 (캐릭터 손은 y 400부터 시작)
-    backgroundRegions: [{ x: 300, y: 0, w: 960, h: 370 }],
-  },
-];
+const BACK_TO_LIST = { path: "/story", label: "장면 고르기" };
 
 function scoreTone(score: number) {
   if (score >= 80) return { text: "text-emerald-600", bar: "bg-emerald-500", label: "최고예요! 🎉" };
@@ -77,8 +53,24 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
   );
 }
 
-export default function StoryPage() {
-  const scene = scenes[0];
+export default function StoryPage({ sceneId }: { sceneId: string }) {
+  const scene = findScene(sceneId);
+  if (!scene) {
+    return (
+      <PageLayout title="스토리 장면 그리기" back={BACK_TO_LIST}>
+        <div className="rounded-3xl bg-white/80 p-8 text-center shadow-card">
+          <p className="font-bold">찾을 수 없는 장면이에요.</p>
+          <button type="button" onClick={() => navigate("/story")} className="mt-4 rounded-full bg-sky-deep px-5 py-2 text-sm font-bold text-white">
+            장면 고르러 가기
+          </button>
+        </div>
+      </PageLayout>
+    );
+  }
+  return <SceneDrawing scene={scene} />;
+}
+
+function SceneDrawing({ scene }: { scene: Scene }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
   const tools = useDrawingTools(canvasRef);
 
@@ -94,31 +86,22 @@ export default function StoryPage() {
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scorePending = useRef(false);
 
-  // 밑그림을 손질(음표 등을 회색 선으로)하고, 흰 선/회색 선 위치와 완성 예시를 한 번만 만들어 둔다.
+  // 손질한 밑그림, 채점용 위치, 완성 예시 (선택 화면에서 이미 만들었다면 그대로 재사용)
   useEffect(() => {
     let cancelled = false;
-    const urls: string[] = [];
-    const toUrl = (canvas: HTMLCanvasElement, set: (url: string) => void) =>
-      canvas.toBlob((blob) => {
-        if (cancelled || !blob) return;
-        const url = URL.createObjectURL(blob);
-        urls.push(url);
-        set(url);
-      });
-    const img = new Image();
-    img.onload = () => {
-      if (cancelled) return;
-      const guide = prepareGuide(img, scene.width, scene.height, scene.backgroundRegions, scene.scoreExclude);
-      masksRef.current = buildGuideMasks(guide, scene.width, scene.height, scene.scoreExclude);
-      setScoreReady(true);
-      if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current));
-      toUrl(guide, setGuideUrl);
-      toUrl(makeTracedExample(guide, scene.scoreExclude), setExampleUrl);
-    };
-    img.src = scene.guide;
+    loadSceneAssets(scene).then(
+      (assets) => {
+        if (cancelled) return;
+        masksRef.current = assets.masks;
+        setScoreReady(true);
+        if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, assets.masks));
+        setGuideUrl(assets.guideUrl);
+        setExampleUrl(assets.exampleUrl);
+      },
+      () => {},
+    );
     return () => {
       cancelled = true;
-      urls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [scene]);
 
@@ -139,7 +122,7 @@ export default function StoryPage() {
   };
 
   return (
-    <PageLayout title="스토리 장면 그리기" wide>
+    <PageLayout title="스토리 장면 그리기" wide back={BACK_TO_LIST}>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-sun px-3 py-1 text-sm font-black">{scene.title}</span>
         <p className="text-sm font-medium text-ink-muted">

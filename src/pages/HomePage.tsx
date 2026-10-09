@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useAuth } from "../auth";
 import { navigate } from "../router";
 
 type MenuItem = {
@@ -79,12 +80,28 @@ function Cloud({ className }: { className: string }) {
   );
 }
 
+function UserBar() {
+  const { user, logout } = useAuth();
+  if (!user) return null;
+  return (
+    <div className="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full border border-white/80 bg-white/70 py-1 pl-4 pr-1 text-sm font-bold shadow-sm backdrop-blur sm:right-8 sm:top-6">
+      <span className="mr-2">
+        👤 <span className="text-sky-deep">{user.loginId}</span> 님
+      </span>
+      <button type="button" onClick={logout} className="rounded-full px-3 py-1.5 text-ink-muted transition hover:bg-white hover:text-ink">
+        로그아웃
+      </button>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-sky-soft px-5 py-8 text-ink sm:px-8 sm:py-10">
       <div className="absolute inset-x-0 bottom-0 h-1/3 bg-[linear-gradient(to_top,var(--color-sky-haze),transparent)]" />
       <Cloud className="cloud-float absolute -left-12 top-12 w-44 text-white sm:left-8 sm:w-52" />
       <Cloud className="cloud-float-delayed absolute -right-16 top-40 w-56 text-white/80 sm:right-5 sm:top-24 sm:w-64" />
+      <UserBar />
       <div className="absolute left-[8%] top-[42%] h-3 w-3 rounded-full bg-white/70" />
       <div className="absolute right-[9%] top-[55%] h-2 w-2 rounded-full bg-white/70" />
 

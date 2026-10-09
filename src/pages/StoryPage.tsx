@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
 import { downloadImage, Panel, ShortcutPanel, ToolPanels, useDrawingTools } from "../components/DrawingTools";
+import { useAuth } from "../auth";
 import { findScene, type Scene } from "../data/scenes";
+import { api, ApiError } from "../lib/api";
+import { formatClock, formatDuration, formatScore } from "../lib/format";
 import { loadSceneAssets } from "../lib/sceneAssets";
 import { emptyScore, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
 import { navigate } from "../router";
@@ -16,7 +19,20 @@ function scoreTone(score: number) {
   return { text: "text-ink-muted", bar: "bg-ink-muted", label: "흰 선을 따라 그려 보세요" };
 }
 
-function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
+/** 소수 둘째 자리까지의 정확한 점수 (기록 저장용). 화면의 큰 숫자는 반올림한 정수다. */
+const exactScore = (r: TraceScore) => Math.round(Math.max(0, Math.min(100, r.whitePct - r.penalty)) * 100) / 100;
+
+type ScorePanelProps = {
+  result: TraceScore;
+  ready: boolean;
+  elapsedMs: number;
+  timerRunning: boolean;
+  onComplete: () => void;
+  /** 완료할 수 없는 이유 (없으면 완료 가능) */
+  blockedReason: string | null;
+};
+
+function ScorePanel({ result, ready, elapsedMs, timerRunning, onComplete, blockedReason }: ScorePanelProps) {
   const tone = scoreTone(result.score);
   return (
     // 그림 아래에 가로로 길게 놓이는 점수판: 왼쪽 큰 점수, 오른쪽 진행 막대와 세부 항목
@@ -29,6 +45,9 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
         <p className={`text-6xl font-black tabular-nums tracking-tight ${tone.text}`}>
           {result.score}
           <span className="ml-1 text-lg font-bold text-ink-muted">/ 100</span>
+        </p>
+        <p className="mt-1 text-sm font-bold tabular-nums text-ink-muted" title="첫 획을 그을 때 시작해서 완료하면 멈춰요">
+          ⏱ {formatClock(elapsedMs)} {!timerRunning && elapsedMs === 0 && <span className="text-xs font-semibold">(첫 획부터)</span>}
         </p>
       </div>
 
@@ -53,6 +72,16 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
             <dd className="text-[11px] font-semibold tabular-nums text-ink-muted">/ {result.whiteTotal.toLocaleString()}</dd>
           </div>
         </dl>
+        <button
+          type="button"
+          onClick={onComplete}
+          disabled={!!blockedReason}
+          title={blockedReason ?? "지금 점수와 걸린 시간을 기록으로 저장해요"}
+          className="mt-3 w-full rounded-2xl bg-emerald-500 py-3 text-base font-extrabold text-white shadow-card transition hover:brightness-110 disabled:bg-ink-muted/40"
+        >
+          ✅ 완료하고 기록 저장
+        </button>
+        {blockedReason && <p className="mt-1.5 text-center text-xs font-semibold text-ink-muted">{blockedReason}</p>}
       </div>
     </section>
   );
@@ -72,12 +101,38 @@ export default function StoryPage({ sceneId }: { sceneId: string }) {
       </PageLayout>
     );
   }
-  return <SceneDrawing scene={scene} />;
+  return <SceneAttempts scene={scene} />;
 }
 
-function SceneDrawing({ scene }: { scene: Scene }) {
+/** "다시 도전"하면 그리기 화면을 통째로 새로 시작한다. */
+function SceneAttempts({ scene }: { scene: Scene }) {
+  const [attempt, setAttempt] = useState(0);
+  return <SceneDrawing key={attempt} scene={scene} onRetry={() => setAttempt((a) => a + 1)} />;
+}
+
+type Submission =
+  | { status: "saving"; score: number; durationMs: number }
+  | { status: "saved"; score: number; durationMs: number }
+  | { status: "error"; score: number; durationMs: number; message: string; expired: boolean };
+
+function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
   const tools = useDrawingTools(canvasRef);
+  const { expire } = useAuth();
+
+  // 타이머: 첫 획을 그을 때 시작, 완료하면 멈춘다.
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [submission, setSubmission] = useState<Submission | null>(null);
+  const timerRunning = startedAt !== null && submission === null;
+
+  const startTimer = useCallback(() => setStartedAt((t) => t ?? Date.now()), []);
+
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = setInterval(() => setElapsedMs(Date.now() - startedAt), 250);
+    return () => clearInterval(id);
+  }, [timerRunning, startedAt]);
 
   const [showGuide, setShowGuide] = useState(true);
   const [guideOpacity, setGuideOpacity] = useState(0.8);
@@ -126,6 +181,42 @@ function SceneDrawing({ scene }: { scene: Scene }) {
     if (url) downloadImage(url, `${scene.title}${withGuide ? "-밑그림포함" : ""}.png`);
   };
 
+  const send = (score: number, durationMs: number) => {
+    if (scene.drawingId === undefined) return;
+    setSubmission({ status: "saving", score, durationMs });
+    api.savePlayRecord(scene.drawingId, score, durationMs).then(
+      () => setSubmission({ status: "saved", score, durationMs }),
+      (e: unknown) =>
+        setSubmission({
+          status: "error",
+          score,
+          durationMs,
+          message: e instanceof ApiError ? e.message : "기록을 저장하지 못했어요.",
+          expired: e instanceof ApiError && e.status === 401,
+        }),
+    );
+  };
+
+  /** 완료: 지금 점수와 걸린 시간을 고정해서 저장한다. */
+  const complete = () => {
+    if (startedAt === null) return;
+    // 마지막 획까지 반영된 점수로 저장
+    const latest = masksRef.current && drawCanvasRef.current ? scoreCanvas(drawCanvasRef.current, masksRef.current) : result;
+    setResult(latest);
+    const durationMs = Date.now() - startedAt;
+    setElapsedMs(durationMs);
+    send(exactScore(latest), durationMs);
+  };
+
+  const blockedReason =
+    scene.drawingId === undefined
+      ? "이 장면은 아직 데이터베이스에 등록되지 않아 기록을 저장할 수 없어요."
+      : !scoreReady
+        ? "채점 준비 중이에요."
+        : !tools.hasDrawing
+          ? "그림을 그린 뒤에 완료할 수 있어요."
+          : null;
+
   return (
     <PageLayout title="스토리 장면 그리기" wide back={BACK_TO_LIST}>
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -146,9 +237,17 @@ function SceneDrawing({ scene }: { scene: Scene }) {
             guideOpacity={guideOpacity}
             showGuide={showGuide}
             {...tools.canvasProps}
+            onStrokeStart={startTimer}
             onChange={handleCanvasChange}
           />
-          <ScorePanel result={result} ready={scoreReady} />
+          <ScorePanel
+            result={result}
+            ready={scoreReady}
+            elapsedMs={elapsedMs}
+            timerRunning={timerRunning}
+            onComplete={complete}
+            blockedReason={blockedReason}
+          />
         </div>
 
         <div className="relative">
@@ -208,6 +307,63 @@ function SceneDrawing({ scene }: { scene: Scene }) {
           </aside>
         </div>
       </div>
+
+      {submission && (
+        <div role="dialog" aria-modal="true" aria-label="기록 저장" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-4xl bg-white p-7 text-center shadow-card-hover">
+            <p className="text-sm font-extrabold text-ink-muted">{scene.title}</p>
+            <p className={`mt-2 text-6xl font-black tabular-nums tracking-tight ${scoreTone(submission.score).text}`}>
+              {formatScore(submission.score)}
+              <span className="ml-1 text-xl font-bold text-ink-muted">점</span>
+            </p>
+            <p className="mt-1 text-sm font-bold text-ink-muted">⏱ {formatDuration(submission.durationMs)}</p>
+
+            {submission.status === "saving" && <p className="mt-5 text-sm font-bold text-ink-muted">기록을 저장하는 중…</p>}
+            {submission.status === "saved" && <p className="mt-5 text-base font-extrabold text-emerald-600">기록이 저장됐어요! 🎉</p>}
+            {submission.status === "error" && (
+              <p role="alert" className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+                {submission.message}
+              </p>
+            )}
+
+            <div className="mt-6 grid gap-2">
+              {submission.status === "saved" && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/leaderboard?drawing=${scene.drawingId}`)}
+                  className="rounded-2xl bg-sky-deep py-3 text-sm font-extrabold text-white hover:brightness-110"
+                >
+                  🏆 리더보드 보기
+                </button>
+              )}
+              {submission.status === "error" &&
+                (submission.expired ? (
+                  <button type="button" onClick={expire} className="rounded-2xl bg-sky-deep py-3 text-sm font-extrabold text-white hover:brightness-110">
+                    다시 로그인하기
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => send(submission.score, submission.durationMs)}
+                    className="rounded-2xl bg-sky-deep py-3 text-sm font-extrabold text-white hover:brightness-110"
+                  >
+                    다시 저장하기
+                  </button>
+                ))}
+              {submission.status !== "saving" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={onRetry} className="rounded-2xl bg-sky-soft py-3 text-sm font-extrabold hover:bg-sky-haze">
+                    🔁 다시 도전
+                  </button>
+                  <button type="button" onClick={() => navigate("/story")} className="rounded-2xl bg-sky-soft py-3 text-sm font-extrabold hover:bg-sky-haze">
+                    장면 고르기
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showExample && exampleUrl && (
         <div

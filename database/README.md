@@ -70,7 +70,8 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 2. `doroland_drawing` 데이터베이스를 생성합니다.
 3. 해당 DB에서 `migrations/001_initial.sql`을 실행합니다.
 4. 개발용 데이터가 필요하면 `seeds/dev_seed.sql`을 실행합니다.
-5. `queries/leaderboard.sql`로 리더보드 결과를 확인합니다.
+5. `migrations/002_auth.sql`을 실행합니다. (로그인용 `users.password_hash` 추가, 시드 사용자는 비밀번호가 없어 로그인할 수 없음)
+6. `queries/leaderboard.sql`로 리더보드 결과를 확인합니다.
 
 초기 마이그레이션 및 시드 파일은 빈 개발 DB에서 각각 한 번씩 실행하는 용도입니다.
 

@@ -75,7 +75,7 @@ const shortcuts: [keys: string[], desc: string][] = [
   [["Ctrl", "+"], "확대 (Ctrl+휠)"],
   [["Ctrl", "−"], "축소"],
   [["Ctrl", "0"], "원래 크기"],
-  [["Space"], "누른 채 드래그: 화면 이동"],
+  [["Ctrl"], "누른 채 드래그: 화면 이동"],
 ];
 
 function Kbd({ children, inverted }: { children: ReactNode; inverted?: boolean }) {

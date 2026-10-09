@@ -132,9 +132,6 @@ type Mode = "none" | "draw" | "pan" | "pinch" | "blocked";
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-const isTyping = (t: EventTarget | null) =>
-  t instanceof HTMLElement && (t.isContentEditable || (t instanceof HTMLInputElement && !["range", "checkbox"].includes(t.type)));
-
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
   { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onChange },
   ref,
@@ -153,7 +150,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   const [view, setView] = useState<View>({ z: 1, tx: 0, ty: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
-  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [panKeyHeld, setPanKeyHeld] = useState(false);
   const [panning, setPanning] = useState(false);
 
   const mode = useRef<Mode>("none");
@@ -246,17 +243,16 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     };
   }, [zoomAt, clampView]);
 
-  // 스페이스바를 누른 채 드래그하면 화면 이동
+  // Ctrl(맥은 Cmd)을 누른 채 드래그하면 화면 이동. 누르고 있는 동안 커서를 손 모양으로 바꾼다.
   useEffect(() => {
+    const isPanKey = (e: KeyboardEvent) => e.key === "Control" || e.key === "Meta";
     const down = (e: KeyboardEvent) => {
-      if (e.code !== "Space" || isTyping(e.target)) return;
-      e.preventDefault();
-      setSpaceHeld(true);
+      if (isPanKey(e)) setPanKeyHeld(true);
     };
     const up = (e: KeyboardEvent) => {
-      if (e.code === "Space") setSpaceHeld(false);
+      if (isPanKey(e)) setPanKeyHeld(false);
     };
-    const blur = () => setSpaceHeld(false);
+    const blur = () => setPanKeyHeld(false);
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
@@ -305,7 +301,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     }
     if (pointers.current.size > 2 || mode.current !== "none") return;
 
-    if (spaceHeld || e.button === 1) {
+    if (e.ctrlKey || e.metaKey || e.button === 1) {
       e.preventDefault();
       mode.current = "pan";
       setPanning(true);
@@ -421,7 +417,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
           onPointerCancel={handleUp}
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 h-full w-full touch-none"
-          style={{ cursor: panning ? "grabbing" : spaceHeld ? "grab" : "crosshair" }}
+          style={{ cursor: panning ? "grabbing" : panKeyHeld ? "grab" : "crosshair" }}
         />
       </div>
 

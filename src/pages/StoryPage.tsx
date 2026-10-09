@@ -55,6 +55,8 @@ const sizes = [
   { name: "아주 굵게", value: 32 },
 ];
 
+/** Fade 슬라이더 1칸 = 캔버스 3픽셀 (최대 300픽셀에 걸쳐 가늘어짐) */
+const FADE_PX_PER_STEP = 3;
 const MIN_SIZE = 2;
 const MAX_SIZE = 48;
 const SIZE_STEP = 2;
@@ -164,6 +166,8 @@ export default function StoryPage() {
   const [color, setColor] = useState(palette[0].value);
   const [size, setSize] = useState(8);
   const [erase, setErase] = useState(false);
+  const [smoothing, setSmoothing] = useState(50);
+  const [fade, setFade] = useState(30);
   const [showGuide, setShowGuide] = useState(true);
   const [guideOpacity, setGuideOpacity] = useState(0.8);
   const [showExample, setShowExample] = useState(false);
@@ -310,6 +314,8 @@ export default function StoryPage() {
           color={color}
           size={size}
           erase={erase}
+          smoothing={smoothing / 100}
+          fade={fade * FADE_PX_PER_STEP}
           actions={actions}
           onStrokeEnd={addStroke}
           onChange={handleCanvasChange}
@@ -411,6 +417,29 @@ export default function StoryPage() {
               aria-label="브러쉬 굵기"
               className="mt-3 w-full accent-sky-deep"
             />
+          </Panel>
+
+          <Panel title="선 다듬기">
+            <label className="block text-sm font-bold">
+              <span className="flex justify-between">
+                손떨림 보정 <span className="tabular-nums text-ink-muted">{smoothing}%</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={smoothing}
+                onChange={(e) => setSmoothing(Number(e.target.value))}
+                className="mt-1 w-full accent-sky-deep"
+              />
+            </label>
+            <label className="mt-3 block text-sm font-bold">
+              <span className="flex justify-between">
+                시작·끝 흐리기 (Fade) <span className="tabular-nums text-ink-muted">{fade === 0 ? "끔" : fade}</span>
+              </span>
+              <input type="range" min={0} max={100} value={fade} onChange={(e) => setFade(Number(e.target.value))} className="mt-1 w-full accent-sky-deep" />
+            </label>
+            <p className="mt-2 text-xs font-medium text-ink-muted">보정을 올리면 선이 부드러워지고, 흐리기를 올리면 선의 시작과 끝이 가늘어져요.</p>
           </Panel>
 
           <Panel title="밑그림">

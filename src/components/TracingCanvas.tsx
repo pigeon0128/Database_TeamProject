@@ -7,6 +7,8 @@ export type Stroke = {
   color: string;
   size: number;
   erase: boolean;
+  /** 시작·끝이 가늘어지는 길이(캔버스 픽셀). 0이면 끔 */
+  fade: number;
   points: Point[];
 };
 
@@ -30,6 +32,10 @@ type Props = {
   color: string;
   size: number;
   erase: boolean;
+  /** 손떨림 보정 세기 (0~1) */
+  smoothing: number;
+  /** 시작·끝 흐리기 길이(캔버스 픽셀) */
+  fade: number;
   actions: DrawAction[];
   onStrokeEnd: (stroke: Stroke) => void;
   /** 그리는 중이거나 다시 그려질 때마다 호출 (채점용) */
@@ -56,20 +62,42 @@ function drawDot(ctx: CanvasRenderingContext2D, p: Point, size: number) {
   ctx.fill();
 }
 
+/** 페이드 끝부분의 최소 굵기 비율 */
+const FADE_MIN = 0.12;
+
+/**
+ * 획의 시작에서 d만큼 떨어진 곳의 굵기 비율.
+ * 시작과 끝에서 fade 길이 안쪽은 점점 가늘어진다. 그리는 중에는 끝을 모르므로 total = Infinity.
+ */
+function taper(d: number, total: number, fade: number) {
+  if (fade <= 0) return 1;
+  const t = Math.min(1, Math.max(0, Math.min(d, total - d) / fade));
+  return FADE_MIN + (1 - FADE_MIN) * t;
+}
+
+/** 각 점까지의 누적 길이 */
+function lengths(pts: Point[]) {
+  const d = [0];
+  for (let i = 1; i < pts.length; i++) d.push(d[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return d;
+}
+
 // 점 i-1 → i 구간을 중간점 사이의 2차 곡선으로 그려 선을 부드럽게 만든다.
-function drawSegment(ctx: CanvasRenderingContext2D, pts: Point[], i: number) {
+function drawSegment(ctx: CanvasRenderingContext2D, pts: Point[], i: number, width: number) {
   const from = i === 1 ? pts[0] : mid(pts[i - 2], pts[i - 1]);
   const to = mid(pts[i - 1], pts[i]);
+  ctx.lineWidth = width;
   ctx.beginPath();
   ctx.moveTo(from[0], from[1]);
   ctx.quadraticCurveTo(pts[i - 1][0], pts[i - 1][1], to[0], to[1]);
   ctx.stroke();
 }
 
-function drawTail(ctx: CanvasRenderingContext2D, pts: Point[]) {
+function drawTail(ctx: CanvasRenderingContext2D, pts: Point[], width: number) {
   const n = pts.length;
   if (n < 2) return;
   const from = mid(pts[n - 2], pts[n - 1]);
+  ctx.lineWidth = width;
   ctx.beginPath();
   ctx.moveTo(from[0], from[1]);
   ctx.lineTo(pts[n - 1][0], pts[n - 1][1]);
@@ -78,9 +106,15 @@ function drawTail(ctx: CanvasRenderingContext2D, pts: Point[]) {
 
 function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke) {
   applyStyle(ctx, s);
-  drawDot(ctx, s.points[0], s.size);
-  for (let i = 1; i < s.points.length; i++) drawSegment(ctx, s.points, i);
-  drawTail(ctx, s.points);
+  const pts = s.points;
+  // 한 번 콕 찍은 점은 페이드 없이 원래 굵기로
+  if (pts.length === 1) return drawDot(ctx, pts[0], s.size);
+  const d = lengths(pts);
+  const total = d[d.length - 1];
+  const w = (at: number) => s.size * taper(at, total, s.fade);
+  drawDot(ctx, pts[0], w(0));
+  for (let i = 1; i < pts.length; i++) drawSegment(ctx, pts, i, w(d[i - 1]));
+  drawTail(ctx, pts, w((d[pts.length - 2] + total) / 2));
 }
 
 /** 마지막 "전체 지우기" 이후의 획만 다시 그린다. */
@@ -102,13 +136,18 @@ const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || (t instanceof HTMLInputElement && !["range", "checkbox"].includes(t.type)));
 
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
-  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, actions, onStrokeEnd, onChange },
+  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onChange },
   ref,
 ) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const guideRef = useRef<HTMLImageElement>(null);
   const current = useRef<Stroke | null>(null);
+  /** 그리는 중인 획의 누적 길이 */
+  const dists = useRef<number[]>([0]);
+  /** 손떨림 보정이 적용된 펜 위치와 실제 마지막 입력 위치 */
+  const smoothed = useRef<Point>([0, 0]);
+  const rawLast = useRef<Point>([0, 0]);
 
   // 확대/이동 상태: 캔버스를 z배로 키우고 (tx, ty)만큼 옮겨서 보여 준다. 페이지 레이아웃은 그대로다.
   const [view, setView] = useState<View>({ z: 1, tx: 0, ty: 0 });
@@ -277,11 +316,28 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
 
     mode.current = "draw";
     const ctx = getCtx(e.currentTarget);
-    const stroke: Stroke = { type: "stroke", color, size, erase, points: [toCanvasPoint(e)] };
+    const start = toCanvasPoint(e);
+    const stroke: Stroke = { type: "stroke", color, size, erase, fade, points: [start] };
     current.current = stroke;
+    dists.current = [0];
+    smoothed.current = start;
+    rawLast.current = start;
     applyStyle(ctx, stroke);
-    drawDot(ctx, stroke.points[0], size);
+    drawDot(ctx, start, size * taper(0, Infinity, fade));
     onChange?.(e.currentTarget);
+  };
+
+  /** 보정된 점 p를 획에 붙이고 그 구간을 바로 그린다. 너무 가까운 점은 건너뛴다. */
+  const addPoint = (ctx: CanvasRenderingContext2D, stroke: Stroke, p: Point) => {
+    smoothed.current = p;
+    const pts = stroke.points;
+    const last = pts[pts.length - 1];
+    const step = Math.hypot(p[0] - last[0], p[1] - last[1]);
+    if (step < 0.5) return;
+    pts.push(p);
+    dists.current.push(dists.current[dists.current.length - 1] + step);
+    const i = pts.length - 1;
+    drawSegment(ctx, pts, i, stroke.size * taper(dists.current[i - 1], Infinity, stroke.fade));
   };
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -307,10 +363,14 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     if (mode.current !== "draw" || !stroke) return;
     const ctx = getCtx(e.currentTarget);
     applyStyle(ctx, stroke);
+    // 손떨림 보정: 펜이 실제 커서를 천천히 따라오게 해서(지수 이동 평균) 흔들림을 걸러낸다.
+    const follow = 1 - smoothing * 0.9;
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
     for (const ev of events.length ? events : [e.nativeEvent]) {
-      stroke.points.push(toCanvasPoint(ev));
-      drawSegment(ctx, stroke.points, stroke.points.length - 1);
+      const raw = toCanvasPoint(ev);
+      rawLast.current = raw;
+      const s = smoothed.current;
+      addPoint(ctx, stroke, [s[0] + (raw[0] - s[0]) * follow, s[1] + (raw[1] - s[1]) * follow]);
     }
     onChange?.(e.currentTarget);
   };
@@ -320,7 +380,15 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     const stroke = current.current;
     if (mode.current === "draw" && stroke) {
       current.current = null;
-      drawTail(getCtx(e.currentTarget), stroke.points);
+      // 보정 때문에 뒤처진 펜을 손을 뗀 위치까지 마저 끌어온다.
+      const ctx = getCtx(e.currentTarget);
+      const raw = rawLast.current;
+      for (let n = 0; n < 30; n++) {
+        const s = smoothed.current;
+        if (Math.hypot(raw[0] - s[0], raw[1] - s[1]) < 1) break;
+        addPoint(ctx, stroke, [s[0] + (raw[0] - s[0]) * 0.5, s[1] + (raw[1] - s[1]) * 0.5]);
+      }
+      // 끝부분 페이드까지 반영된 모양은 onStrokeEnd → 다시 그리기에서 그려진다.
       onStrokeEnd(stroke);
     }
     if (mode.current === "pan") setPanning(false);

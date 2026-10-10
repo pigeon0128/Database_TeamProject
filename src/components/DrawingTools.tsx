@@ -1,4 +1,7 @@
 // 그리기 화면(스토리 장면, 캐릭터) 공통: 브러쉬 상태·되돌리기·단축키와 도구 패널.
+// - useDrawingTools: 색·굵기·지우개·획 목록·되돌리기 상태를 관리하고 단축키를 등록하는 훅
+// - ToolPanels / ShortcutPanel: 오른쪽 사이드바에 들어가는 도구·색깔·굵기·선 다듬기·단축키 패널
+// - downloadImage: 그린 그림을 PNG 파일로 내려받기
 import { useCallback, useEffect, useState, type ReactNode, type RefObject } from "react";
 import { visibleStrokes, type DrawAction, type Stroke, type TracingCanvasHandle } from "./TracingCanvas";
 
@@ -45,15 +48,23 @@ const shortcuts: [keys: string[], desc: string][] = [
   [["Ctrl"], "누른 채 드래그: 화면 이동"],
 ];
 
-/** 그리기 상태와 동작을 한데 묶은 훅. 키보드 단축키도 여기서 등록한다. */
-export function useDrawingTools(canvasRef: RefObject<TracingCanvasHandle | null>) {
+/**
+ * 그리기 상태와 동작을 한데 묶은 훅. 키보드 단축키도 여기서 등록한다.
+ * maxBrushSize: 브러쉬 최대 굵기 (따라 그리기에서 굵은 브러쉬로 선을 덮어 버리지 못하게). 지우개에는 적용하지 않는다.
+ */
+export function useDrawingTools(canvasRef: RefObject<TracingCanvasHandle | null>, { maxBrushSize = MAX_SIZE }: { maxBrushSize?: number } = {}) {
   const [actions, setActions] = useState<DrawAction[]>([]);
   const [redoStack, setRedoStack] = useState<DrawAction[]>([]);
   const [color, setColor] = useState(palette[0].value);
-  const [size, setSize] = useState(8);
+  const [rawSize, setRawSize] = useState(8);
   const [erase, setErase] = useState(false);
   const [smoothing, setSmoothing] = useState(50);
   const [fade, setFade] = useState(30);
+
+  // 브러쉬와 지우개가 굵기를 같이 쓰므로, 저장된 값은 두고 쓸 때만 상한으로 자른다.
+  const sizeMax = erase ? MAX_SIZE : Math.min(MAX_SIZE, maxBrushSize);
+  const size = Math.min(rawSize, sizeMax);
+  const setSize = useCallback((v: number) => setRawSize(Math.max(MIN_SIZE, Math.min(sizeMax, v))), [sizeMax]);
 
   const hasDrawing = visibleStrokes(actions).length > 0;
 
@@ -115,8 +126,8 @@ export function useDrawingTools(canvasRef: RefObject<TracingCanvasHandle | null>
 
       if (e.code === "KeyB") setErase(false);
       else if (e.code === "KeyE") setErase(true);
-      else if (e.code === "BracketLeft") setSize((v) => Math.max(MIN_SIZE, v - SIZE_STEP));
-      else if (e.code === "BracketRight") setSize((v) => Math.min(MAX_SIZE, v + SIZE_STEP));
+      else if (e.code === "BracketLeft") setSize(size - SIZE_STEP);
+      else if (e.code === "BracketRight") setSize(size + SIZE_STEP);
       else if (/^(Digit|Numpad)\d$/.test(e.code)) {
         const c = palette[(Number(e.code.slice(-1)) + 9) % 10];
         if (!c) return;
@@ -126,11 +137,12 @@ export function useDrawingTools(canvasRef: RefObject<TracingCanvasHandle | null>
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, canvasRef]);
+  }, [undo, redo, canvasRef, size, setSize]);
 
   return {
     color,
     size,
+    sizeMax,
     erase,
     smoothing,
     fade,
@@ -205,7 +217,7 @@ function ToolButton({ active, onClick, children, label }: { active?: boolean; on
 
 /** 도구 · 색깔 · 굵기 · 선 다듬기 패널 */
 export function ToolPanels({ tools }: { tools: DrawingTools }) {
-  const { color, size, erase, smoothing, fade } = tools;
+  const { color, size, sizeMax, erase, smoothing, fade } = tools;
   return (
     <>
       <Panel title="도구">
@@ -279,8 +291,9 @@ export function ToolPanels({ tools }: { tools: DrawingTools }) {
               aria-label={s.name}
               aria-pressed={size === s.value}
               onClick={() => tools.setSize(s.value)}
-              className={`flex h-12 items-center justify-center rounded-2xl transition ${
-                size === s.value ? "bg-sky-haze ring-2 ring-sky-deep" : "bg-sky-soft hover:bg-sky-haze"
+              disabled={s.value > sizeMax}
+              className={`flex h-12 items-center justify-center rounded-2xl transition disabled:opacity-30 ${
+                size === s.value ? "bg-sky-haze ring-2 ring-sky-deep" : "bg-sky-soft enabled:hover:bg-sky-haze"
               }`}
             >
               <span className="rounded-full bg-ink" style={{ width: 4 + s.value / 1.5, height: 4 + s.value / 1.5 }} />
@@ -290,12 +303,13 @@ export function ToolPanels({ tools }: { tools: DrawingTools }) {
         <input
           type="range"
           min={MIN_SIZE}
-          max={MAX_SIZE}
+          max={sizeMax}
           value={size}
           onChange={(e) => tools.setSize(Number(e.target.value))}
           aria-label="브러쉬 굵기"
           className="mt-3 w-full accent-sky-deep"
         />
+        {sizeMax < MAX_SIZE && <p className="mt-2 text-xs font-medium text-ink-muted">흰 선 두께에 맞춰 브러쉬는 {sizeMax}까지만 굵게 할 수 있어요.</p>}
       </Panel>
 
       <Panel title="선 다듬기">

@@ -1,10 +1,12 @@
+// 스토리 장면 그리기 화면 (#/story/<id>). 밑그림의 흰 선을 따라 그리면 실시간으로 채점한다.
+// 왼쪽: 그림판 + 점수판(흰 선 채움, 회색 구역 침범, 덧칠 감점) / 오른쪽: 도구·밑그림 설정·저장 버튼.
 import { useCallback, useEffect, useRef, useState } from "react";
 import PageLayout from "../components/PageLayout";
-import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
+import TracingCanvas, { visibleStrokes, type TracingCanvasHandle } from "../components/TracingCanvas";
 import { downloadImage, Panel, ShortcutPanel, ToolPanels, useDrawingTools } from "../components/DrawingTools";
 import { findScene, type Scene } from "../data/scenes";
 import { loadSceneAssets } from "../lib/sceneAssets";
-import { emptyScore, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
+import { emptyScore, maxBrushSize, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
 import { navigate } from "../router";
 
 const BACK_TO_LIST = { path: "/story", label: "장면 고르기" };
@@ -37,7 +39,7 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
         <div className="h-4 overflow-hidden rounded-full bg-sky-soft">
           <div className={`h-full rounded-full transition-[width] duration-300 ${tone.bar}`} style={{ width: `${result.score}%` }} />
         </div>
-        <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <dl className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
           <div className="rounded-2xl bg-emerald-50 px-2 py-2.5">
             <dt className="text-xs font-bold text-ink-muted">흰 선 채움</dt>
             <dd className="text-lg font-black tabular-nums text-emerald-600">+{result.whitePct.toFixed(1)}%</dd>
@@ -46,6 +48,11 @@ function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
             <dt className="text-xs font-bold text-ink-muted">회색 구역 침범</dt>
             <dd className="text-lg font-black tabular-nums text-red-500">−{result.penalty.toFixed(1)}점</dd>
             <dd className="text-[11px] font-semibold tabular-nums text-ink-muted">({result.grayPct.toFixed(2)}%)</dd>
+          </div>
+          <div className="rounded-2xl bg-amber-50 px-2 py-2.5">
+            <dt className="text-xs font-bold text-ink-muted">덧칠</dt>
+            <dd className="text-lg font-black tabular-nums text-amber-600">−{result.inkPenalty.toFixed(1)}점</dd>
+            <dd className="text-[11px] font-semibold tabular-nums text-ink-muted">(선 길이의 {result.inkRatio.toFixed(2)}배)</dd>
           </div>
           <div className="rounded-2xl bg-sky-soft px-2 py-2.5">
             <dt className="text-xs font-bold text-ink-muted">칠한 흰 픽셀</dt>
@@ -77,7 +84,8 @@ export default function StoryPage({ sceneId }: { sceneId: string }) {
 
 function SceneDrawing({ scene }: { scene: Scene }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
-  const tools = useDrawingTools(canvasRef);
+  const [brushMax, setBrushMax] = useState<number | undefined>();
+  const tools = useDrawingTools(canvasRef, { maxBrushSize: brushMax });
 
   const [showGuide, setShowGuide] = useState(true);
   const [guideOpacity, setGuideOpacity] = useState(0.8);
@@ -90,6 +98,9 @@ function SceneDrawing({ scene }: { scene: Scene }) {
   const masksRef = useRef<GuideMasks | null>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scorePending = useRef(false);
+  // 덧칠 채점에 쓰는 지금 보이는 획 (캔버스가 다시 그려지기 전에 갱신된다)
+  const strokesRef = useRef(visibleStrokes(tools.canvasProps.actions));
+  strokesRef.current = visibleStrokes(tools.canvasProps.actions);
 
   // 손질한 밑그림, 채점용 위치, 완성 예시 (선택 화면에서 이미 만들었다면 그대로 재사용)
   useEffect(() => {
@@ -98,8 +109,9 @@ function SceneDrawing({ scene }: { scene: Scene }) {
       (assets) => {
         if (cancelled) return;
         masksRef.current = assets.masks;
+        setBrushMax(maxBrushSize(assets.masks));
         setScoreReady(true);
-        if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, assets.masks));
+        if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, assets.masks, strokesRef.current));
         setGuideUrl(assets.guideUrl);
         setExampleUrl(assets.exampleUrl);
       },
@@ -117,7 +129,7 @@ function SceneDrawing({ scene }: { scene: Scene }) {
     scorePending.current = true;
     setTimeout(() => {
       scorePending.current = false;
-      if (masksRef.current && drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current));
+      if (masksRef.current && drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current, strokesRef.current));
     }, 120);
   }, []);
 
@@ -131,7 +143,8 @@ function SceneDrawing({ scene }: { scene: Scene }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-sun px-3 py-1 text-sm font-black">{scene.title}</span>
         <p className="text-sm font-medium text-ink-muted">
-          <b className="text-ink">흰색 선</b>을 따라 칠할수록 점수가 올라가고, <b className="text-ink">회색 부분</b>(선과 바탕)을 칠하면 점수가 깎여요!
+          <b className="text-ink">흰색 선</b>을 따라 칠할수록 점수가 올라가고, <b className="text-ink">회색 부분</b>(선과 바탕)을 칠하거나{" "}
+          <b className="text-ink">같은 곳을 여러 번 덧칠</b>하면 점수가 깎여요! 한 번에 깔끔하게 그어 보세요.
         </p>
       </div>
 

@@ -1,3 +1,4 @@
+/* 전역 스타일. Tailwind를 불러오고, 앱 전체에서 쓰는 색·그림자·모서리 값(bg-sky-deep, shadow-card 등)을 정의한다. */
 @import "tailwindcss";
 
 @theme {

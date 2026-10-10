@@ -1,3 +1,4 @@
+// 메인 화면 (#/). 캐릭터 그리기, 스토리 장면 그리기, 리더보드, 설정으로 가는 메뉴 카드를 보여 준다.
 import type { ReactNode } from "react";
 import { navigate } from "../router";
 

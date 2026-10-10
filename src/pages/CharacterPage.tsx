@@ -1,3 +1,4 @@
+// 캐릭터 그리기 화면 (#/character). 밑그림·채점 없이 흰 도화지에 자유롭게 그리고, 이름을 붙여 PNG로 저장한다.
 import { useRef, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";

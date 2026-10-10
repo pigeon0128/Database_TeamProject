@@ -1,3 +1,5 @@
+// 최상위 컴포넌트. 현재 주소(#/...)를 보고 어떤 페이지를 보여 줄지 고른다.
+// #/story/<장면 id>는 해당 장면의 그리기 화면, 나머지는 routes 표대로 연결하고 모르는 주소는 메인으로 보낸다.
 import type { ComponentType } from "react";
 import { usePath } from "./router";
 import HomePage from "./pages/HomePage";

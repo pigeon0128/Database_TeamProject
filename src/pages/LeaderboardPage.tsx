@@ -1,3 +1,4 @@
+// 리더보드 화면 (#/leaderboard). 장면별 점수 순위를 보여 줄 자리 (아직 구현 전).
 import PageLayout from "../components/PageLayout";
 
 export default function LeaderboardPage() {

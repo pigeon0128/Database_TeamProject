@@ -1,3 +1,5 @@
+// 장면 하나에 필요한 준비물(손질한 밑그림, 완성 예시, 채점용 마스크)을 한 번에 만들고 캐시한다.
+// 무거운 픽셀 계산이라 장면마다 한 번만 하고, 선택 화면과 그리기 화면이 결과를 같이 쓴다.
 import type { Scene } from "../data/scenes";
 import { makeTracedExample, prepareGuide } from "./guideImage";
 import { buildGuideMasks, type GuideMasks } from "./traceScore";

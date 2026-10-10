@@ -1,3 +1,5 @@
+// 스토리 장면 고르기 화면 (#/story). scenes.ts의 장면들을 완성 예시 미리보기 카드로 보여 주고,
+// 누르면 그 장면의 그리기 화면(#/story/<id>)으로 이동한다.
 import { useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { scenes, type Scene } from "../data/scenes";

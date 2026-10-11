@@ -133,5 +133,6 @@ pnpm dev
 | `psql` 을 인식할 수 없습니다 | PostgreSQL 설치 여부, 4단계의 `$env:Path` 명령을 이 터미널에서 실행했는지 |
 | API 서버에 연결할 수 없어요 | 터미널 1에서 `pnpm dev:server` 가 켜져 있는지 |
 | 데이터베이스에 연결할 수 없어요 | PostgreSQL 서비스가 켜져 있는지, `.env` 의 `DATABASE_URL` 비밀번호·DB 이름 |
+| 데이터베이스 테이블이 없어요 | 4단계의 SQL을 다 실행했는지. 예전에 DB를 만들었다면 새로 생긴 `003_user_settings.sql` 만 실행 |
 | `Port 8443 is already in use` | 다른 터미널에서 이미 `pnpm dev` 가 실행 중입니다. 그 창을 쓰거나 `Ctrl + C` 로 끄고 다시 실행 |
 | `bad option: --env-file-if-exists` | Node.js 버전이 낮습니다. 22.9 이상으로 업데이트 |

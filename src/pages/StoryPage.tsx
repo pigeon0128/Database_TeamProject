@@ -1,11 +1,23 @@
 // 스토리 장면 그리기 화면 (#/story/<id>). 밑그림의 흰 선을 따라 그리면 실시간으로 채점한다.
-// 왼쪽: 그림판 + 점수판(흰 선 채움, 회색 구역 침범, 덧칠 감점) / 오른쪽: 도구·밑그림 설정·저장 버튼.
+// 위: 툴바 (굵기·밑그림 메뉴, 되돌리기, 도움말, 전체 지우기, 저장) / 가운데: 그림판 / 아래: 점수 막대.
 import { useCallback, useEffect, useRef, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import TracingCanvas, { visibleStrokes, type TracingCanvasHandle } from "../components/TracingCanvas";
-import { downloadImage, Panel, ShortcutPanel, ToolPanels, useDrawingTools } from "../components/DrawingTools";
+import {
+  downloadImage,
+  DrawingShell,
+  HistoryButtons,
+  MenuItem,
+  ShortcutList,
+  SizeMenu,
+  ToolbarButton,
+  ToolbarDivider,
+  ToolbarMenu,
+  useDrawingTools,
+} from "../components/DrawingTools";
 import { findScene, type Scene } from "../data/scenes";
 import { loadSceneAssets } from "../lib/sceneAssets";
+import { useSavedSetting } from "../lib/userSettings";
 import { emptyScore, maxBrushSize, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
 import { navigate } from "../router";
 
@@ -18,50 +30,47 @@ function scoreTone(score: number) {
   return { text: "text-ink-muted", bar: "bg-ink-muted", label: "흰 선을 따라 그려 보세요" };
 }
 
-function ScorePanel({ result, ready }: { result: TraceScore; ready: boolean }) {
+/** 아래 상태 막대에 한 줄로 놓이는 점수: 큰 점수, 진행 막대, 세부 항목 */
+function ScoreBar({ result, ready }: { result: TraceScore; ready: boolean }) {
   const tone = scoreTone(result.score);
+  const item = "flex items-baseline gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold text-ink-muted";
   return (
-    // 그림 아래에 가로로 길게 놓이는 점수판: 왼쪽 큰 점수, 오른쪽 진행 막대와 세부 항목
-    <section
-      className="flex flex-col gap-4 rounded-3xl border border-white/90 bg-white/80 p-5 shadow-card sm:flex-row sm:items-center sm:gap-6"
-      aria-live="polite"
-    >
-      <div className="shrink-0 sm:w-40">
-        <h2 className="text-sm font-extrabold text-ink-muted">점수</h2>
-        <p className={`text-6xl font-black tabular-nums tracking-tight ${tone.text}`}>
+    <>
+      <div className="flex items-center gap-3" aria-live="polite">
+        <span className="text-sm font-extrabold text-ink-muted">점수</span>
+        <span className={`text-3xl font-black tabular-nums leading-none tracking-tight ${tone.text}`}>
           {result.score}
-          <span className="ml-1 text-lg font-bold text-ink-muted">/ 100</span>
-        </p>
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="mb-1.5 flex justify-end text-sm font-bold text-ink-muted">{ready ? tone.label : "채점 준비 중…"}</div>
-        <div className="h-4 overflow-hidden rounded-full bg-sky-soft">
-          <div className={`h-full rounded-full transition-[width] duration-300 ${tone.bar}`} style={{ width: `${result.score}%` }} />
+          <span className="ml-0.5 text-sm font-bold text-ink-muted">/100</span>
+        </span>
+        <div className="w-28 sm:w-40">
+          <div className="h-2.5 overflow-hidden rounded-full bg-sky-soft">
+            <div className={`h-full rounded-full transition-[width] duration-300 ${tone.bar}`} style={{ width: `${result.score}%` }} />
+          </div>
+          <div className="mt-0.5 text-[11px] font-bold text-ink-muted">{ready ? tone.label : "채점 준비 중…"}</div>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
-          <div className="rounded-2xl bg-emerald-50 px-2 py-2.5">
-            <dt className="text-xs font-bold text-ink-muted">흰 선 채움</dt>
-            <dd className="text-lg font-black tabular-nums text-emerald-600">+{result.whitePct.toFixed(1)}%</dd>
-          </div>
-          <div className="rounded-2xl bg-red-50 px-2 py-2.5">
-            <dt className="text-xs font-bold text-ink-muted">회색 구역 침범</dt>
-            <dd className="text-lg font-black tabular-nums text-red-500">−{result.penalty.toFixed(1)}점</dd>
-            <dd className="text-[11px] font-semibold tabular-nums text-ink-muted">({result.grayPct.toFixed(2)}%)</dd>
-          </div>
-          <div className="rounded-2xl bg-amber-50 px-2 py-2.5">
-            <dt className="text-xs font-bold text-ink-muted">덧칠</dt>
-            <dd className="text-lg font-black tabular-nums text-amber-600">−{result.inkPenalty.toFixed(1)}점</dd>
-            <dd className="text-[11px] font-semibold tabular-nums text-ink-muted">(선 길이의 {result.inkRatio.toFixed(2)}배)</dd>
-          </div>
-          <div className="rounded-2xl bg-sky-soft px-2 py-2.5">
-            <dt className="text-xs font-bold text-ink-muted">칠한 흰 픽셀</dt>
-            <dd className="text-sm font-black tabular-nums">{result.whiteHits.toLocaleString()}</dd>
-            <dd className="text-[11px] font-semibold tabular-nums text-ink-muted">/ {result.whiteTotal.toLocaleString()}</dd>
-          </div>
-        </dl>
       </div>
-    </section>
+      <dl className="flex flex-wrap items-center gap-2 sm:ml-auto">
+        <div className={`${item} bg-emerald-50`}>
+          <dt>흰 선 채움</dt>
+          <dd className="text-sm font-black tabular-nums text-emerald-600">+{result.whitePct.toFixed(1)}%</dd>
+        </div>
+        <div className={`${item} bg-red-50`}>
+          <dt>회색 침범</dt>
+          <dd className="text-sm font-black tabular-nums text-red-500">−{result.penalty.toFixed(1)}점</dd>
+          <dd className="tabular-nums">({result.grayPct.toFixed(2)}%)</dd>
+        </div>
+        <div className={`${item} bg-amber-50`} title="같은 곳을 다시 칠하거나(덧칠) 짧게 끊어 겹쳐 그은(털선) 만큼 깎여요">
+          <dt>겹쳐 그리기</dt>
+          <dd className="text-sm font-black tabular-nums text-amber-600">−{result.overlapPenalty.toFixed(1)}점</dd>
+          <dd className="tabular-nums">({result.overlapPct.toFixed(1)}%)</dd>
+        </div>
+        <div className={`${item} bg-sky-soft`}>
+          <dt>칠한 흰 픽셀</dt>
+          <dd className="font-black tabular-nums text-ink">{result.whiteHits.toLocaleString()}</dd>
+          <dd className="tabular-nums">/ {result.whiteTotal.toLocaleString()}</dd>
+        </div>
+      </dl>
+    </>
   );
 }
 
@@ -87,8 +96,10 @@ function SceneDrawing({ scene }: { scene: Scene }) {
   const [brushMax, setBrushMax] = useState<number | undefined>();
   const tools = useDrawingTools(canvasRef, { maxBrushSize: brushMax });
 
-  const [showGuide, setShowGuide] = useState(true);
-  const [guideOpacity, setGuideOpacity] = useState(0.8);
+  // 밑그림 설정은 다른 장면을 그릴 때도 이어지도록 저장해 둔다 (lib/userSettings).
+  const [showGuide, setShowGuide] = useSavedSetting("guideVisible");
+  const [guideOpacityPct, setGuideOpacityPct] = useSavedSetting("guideOpacity");
+  const guideOpacity = guideOpacityPct / 100;
   const [showExample, setShowExample] = useState(false);
   const [result, setResult] = useState<TraceScore>(emptyScore);
   const [scoreReady, setScoreReady] = useState(false);
@@ -139,88 +150,111 @@ function SceneDrawing({ scene }: { scene: Scene }) {
   };
 
   return (
-    <PageLayout title="스토리 장면 그리기" wide back={BACK_TO_LIST}>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <span className="rounded-full bg-sun px-3 py-1 text-sm font-black">{scene.title}</span>
-        <p className="text-sm font-medium text-ink-muted">
-          <b className="text-ink">흰색 선</b>을 따라 칠할수록 점수가 올라가고, <b className="text-ink">회색 부분</b>(선과 바탕)을 칠하거나{" "}
-          <b className="text-ink">같은 곳을 여러 번 덧칠</b>하면 점수가 깎여요! 한 번에 깔끔하게 그어 보세요.
-        </p>
-      </div>
-
-      {/* 왼쪽: 그림 위, 점수 아래 / 오른쪽: 도구 등 기타 (왼쪽 높이에 맞추고 넘치면 스크롤) */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <TracingCanvas
-            ref={canvasRef}
-            guideSrc={guideUrl}
-            width={scene.width}
-            height={scene.height}
-            guideOpacity={guideOpacity}
-            showGuide={showGuide}
-            {...tools.canvasProps}
-            onChange={handleCanvasChange}
-          />
-          <ScorePanel result={result} ready={scoreReady} />
-        </div>
-
-        <div className="relative">
-          <aside className="flex flex-col gap-3 rounded-3xl lg:absolute lg:inset-0 lg:overflow-y-auto lg:pr-1">
-            <ToolPanels tools={tools} />
-
-            <Panel title="밑그림">
-              <label className="flex items-center justify-between text-sm font-bold">
-                밑그림 보이기
-                <input type="checkbox" checked={showGuide} onChange={(e) => setShowGuide(e.target.checked)} className="h-5 w-5 accent-sky-deep" />
-              </label>
-              <label className="mt-3 block text-sm font-bold">
-                진하기 {Math.round(guideOpacity * 100)}%
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  value={Math.round(guideOpacity * 100)}
-                  disabled={!showGuide}
-                  onChange={(e) => setGuideOpacity(Number(e.target.value) / 100)}
-                  className="mt-1 w-full accent-sky-deep disabled:opacity-40"
-                />
-              </label>
-              <button type="button" onClick={() => setShowExample(true)} disabled={!exampleUrl} className="mt-3 w-full rounded-2xl bg-mint/30 py-2.5 text-sm font-bold hover:bg-mint/50">
-                🖼️ 완성 예시 보기
-              </button>
-            </Panel>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={tools.clearAll}
-                disabled={!tools.hasDrawing}
-                className="rounded-2xl bg-white/80 py-3 text-sm font-bold text-red-500 shadow-card hover:bg-white disabled:opacity-40"
-              >
-                전체 지우기
-              </button>
-              <button
-                type="button"
-                onClick={() => save(false)}
-                disabled={!tools.hasDrawing}
-                className="rounded-2xl bg-sky-deep py-3 text-sm font-bold text-white shadow-card hover:brightness-110 disabled:opacity-40"
-              >
-                그림 저장
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => save(true)}
-              disabled={!tools.hasDrawing}
-              className="text-xs font-semibold text-ink-muted underline-offset-2 hover:underline disabled:opacity-40"
-            >
-              밑그림과 함께 저장하기
-            </button>
-
-            <ShortcutPanel />
-          </aside>
-        </div>
-      </div>
+    <>
+      <DrawingShell
+        tools={tools}
+        back={BACK_TO_LIST}
+        aspect={scene.width / scene.height}
+        toolbarStart={
+          <>
+            <span className="mr-1 rounded-full bg-sun px-3 py-1 text-sm font-black text-ink">{scene.title}</span>
+            <ToolbarDivider />
+            <SizeMenu tools={tools} />
+            <ToolbarMenu title="밑그림 설정" label="🖼️ 밑그림">
+              {(close) => (
+                <>
+                  <label className="flex items-center justify-between text-sm font-bold">
+                    밑그림 보이기
+                    <input type="checkbox" checked={showGuide} onChange={(e) => setShowGuide(e.target.checked)} className="h-5 w-5 accent-sky-deep" />
+                  </label>
+                  <label className="mt-3 block text-sm font-bold">
+                    진하기 {guideOpacityPct}%
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      value={guideOpacityPct}
+                      disabled={!showGuide}
+                      onChange={(e) => setGuideOpacityPct(Number(e.target.value))}
+                      className="mt-2 w-full accent-sky-deep disabled:opacity-40"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      setShowExample(true);
+                    }}
+                    disabled={!exampleUrl}
+                    className="mt-3 w-full rounded-xl bg-mint/30 py-2 text-sm font-bold hover:bg-mint/50 disabled:opacity-40"
+                  >
+                    완성 예시 보기
+                  </button>
+                </>
+              )}
+            </ToolbarMenu>
+            <ToolbarDivider />
+            <HistoryButtons tools={tools} />
+          </>
+        }
+        toolbarEnd={
+          <>
+            <ToolbarMenu title="채점 방법과 단축키" label="❓ 도움말" alignRight>
+              {() => (
+                <>
+                  <h2 className="mb-2 text-sm font-extrabold text-ink-muted">✏️ 이렇게 그려요</h2>
+                  <p className="mb-4 text-sm font-medium leading-relaxed">
+                    <b>흰색 선</b>을 따라 칠할수록 점수가 올라가요. <b>회색 부분</b>(선과 바탕)을 칠하거나 <b>같은 곳을 여러 번 덧칠</b>하거나 <b>짧게 끊어서 사각사각</b>
+                    그으면 점수가 깎여요. 선 하나는 한 번에 쭉 그어 보세요!
+                  </p>
+                  <h2 className="mb-2 text-sm font-extrabold text-ink-muted">⌨️ 단축키</h2>
+                  <ShortcutList />
+                </>
+              )}
+            </ToolbarMenu>
+            <ToolbarButton title="전체 지우기" onClick={tools.clearAll} disabled={!tools.hasDrawing}>
+              🗑️ <span className="hidden md:inline">전체 지우기</span>
+            </ToolbarButton>
+            <ToolbarMenu title="그림 저장" label="💾 저장" alignRight primary>
+              {(close) => (
+                <>
+                  <MenuItem
+                    disabled={!tools.hasDrawing}
+                    onClick={() => {
+                      close();
+                      save(false);
+                    }}
+                  >
+                    그림만 저장
+                  </MenuItem>
+                  <MenuItem
+                    disabled={!tools.hasDrawing}
+                    onClick={() => {
+                      close();
+                      save(true);
+                    }}
+                  >
+                    밑그림과 함께 저장
+                  </MenuItem>
+                  {!tools.hasDrawing && <p className="px-3 pt-1 text-xs font-medium text-ink-muted">먼저 그림을 그려 주세요.</p>}
+                </>
+              )}
+            </ToolbarMenu>
+          </>
+        }
+        footer={<ScoreBar result={result} ready={scoreReady} />}
+      >
+        <TracingCanvas
+          ref={canvasRef}
+          guideSrc={guideUrl}
+          width={scene.width}
+          height={scene.height}
+          guideOpacity={guideOpacity}
+          showGuide={showGuide}
+          {...tools.canvasProps}
+          onChange={handleCanvasChange}
+        />
+      </DrawingShell>
 
       {showExample && exampleUrl && (
         <div
@@ -241,6 +275,6 @@ function SceneDrawing({ scene }: { scene: Scene }) {
           </figure>
         </div>
       )}
-    </PageLayout>
+    </>
   );
 }

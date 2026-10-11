@@ -40,6 +40,13 @@ if (!process.env.DATABASE_URL) {
 const url = new URL(process.env.DATABASE_URL);
 const dbName = decodeURIComponent(url.pathname.slice(1));
 
+// .env.example 의 자리표시 글자를 그대로 둔 경우 (가장 흔한 실수)
+if (decodeURIComponent(url.password) === "비밀번호") {
+  console.error("오류: .env 의 DATABASE_URL 에 아직 '비밀번호' 라는 글자가 그대로 있어요.");
+  console.error("  notepad .env 로 열어 그 자리에 PostgreSQL 설치 때 정한 비밀번호를 넣고 다시 실행하세요.");
+  process.exit(1);
+}
+
 async function connect(connectionString) {
   const client = new pg.Client({ connectionString });
   await client.connect();

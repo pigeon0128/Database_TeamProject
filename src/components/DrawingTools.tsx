@@ -3,11 +3,12 @@
 // - DrawingShell: 위 툴바 / 왼쪽 도구 막대 + 가운데 그림판 / 아래 상태 막대로 된 화면 틀
 // - ToolbarButton, ToolbarMenu, MenuItem: 툴바 버튼과 눌렀을 때 펼쳐지는 메뉴
 // - SizeMenu, LineMenu, HistoryButtons, ShortcutList: 굵기 조절 바, 선 다듬기(손떨림 보정·선 끝 얇게), 되돌리기/다시, 단축키 목록
-// - useDrawingDraft, ResumeDialog: 이어서 그리기 (그리던 그림을 저장해 두고 다시 열면 이어 그릴지 묻는다)
+// - useDrawingDraft, ResumeDialog: 이어서 그리기 (그리던 그림을 DB에 저장해 두고 다시 열면 이어 그릴지 묻는다)
 // - downloadImage: 그린 그림을 PNG 파일로 내려받기
 // 선화 연습이 목적이라 색은 검정 하나만 쓴다. 굵기·손떨림 보정·선 끝 얇게는 저장해 두고 다음에도 이어 쓴다.
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { loadDraft, removeDraft, saveDraft, type Draft } from "../lib/drawingDraft";
+import { compactStrokes, loadDraft, type Draft } from "../lib/drawingDraft";
+import { api } from "../lib/api";
 import { useSavedSetting } from "../lib/userSettings";
 import { navigate } from "../router";
 import { visibleStrokes, type DrawAction, type Stroke, type TracingCanvasHandle } from "./TracingCanvas";
@@ -38,7 +39,7 @@ const shortcuts: [keys: string[], desc: string][] = [
 
 /**
  * 그리기 상태와 동작을 한데 묶은 훅. 키보드 단축키도 여기서 등록한다.
- * maxBrushSize: 브러쉬 최대 굵기를 BRUSH_MAX_SIZE보다 더 낮출 때 (따라 그리기에서 흰 선 두께에 맞출 때). 지우개에는 적용하지 않는다.
+ * maxBrushSize: 브러쉬 최대 굵기를 BRUSH_MAX_SIZE보다 더 낮출 때 (장면의 흰 선이 아주 가늘 때, scenes.ts). 지우개에는 적용하지 않는다.
  * fade: false면 선 끝 얇게를 쓰지 않는다 (따라 그리기: 선 끝이 뾰족하면 짧게 끊어 그린 털선이 서로 안 겹쳐 감점을 피해 간다).
  *       저장된 선 끝 얇게 값은 그대로 두므로 캐릭터 그리기에서는 계속 쓴다.
  */
@@ -361,39 +362,90 @@ export function LineMenu({ tools }: { tools: DrawingTools }) {
   );
 }
 
+/** 그림이 바뀐 뒤 이만큼 기다렸다가 DB에 저장한다 (획을 연달아 그을 때 요청이 몰리지 않게) */
+const DRAFT_SAVE_DELAY_MS = 1000;
+/** 불러오기에 실패하면 이만큼 기다렸다가 다시 시도한다 (ms). 마지막 값으로 계속 시도한다 */
+const DRAFT_LOAD_RETRY_DELAYS = [1000, 3000, 7000, 15000, 30000];
+/** 창을 닫는 중에 보내는 요청(keepalive)은 본문이 64KB를 넘으면 브라우저가 거절하므로, 이보다 작을 때만 keepalive로 보낸다 */
+const KEEPALIVE_MAX_CHARS = 60000;
+
 /**
- * 이어서 그리기. key마다(그림마다) 그리던 획을 저장해 둔다.
- *  - 처음 열 때 저장된 그림이 있으면 pending에 담아 두고, ResumeDialog로 이어 그릴지 묻는다.
- *  - 고르기 전에는 저장하지 않는다 (빈 그림으로 덮어쓰지 않게).
- *  - 그림이 바뀌면 잠깐 뒤에 저장하고, 화면을 나가거나 창을 닫을 때도 바로 저장한다. 다 지우면 저장된 그림도 지운다.
+ * 이어서 그리기. key마다(그림마다) 그리던 획을 DB에 저장해 둔다.
+ *  - 처음 열 때 DB에서 그리던 그림을 불러오고, 있으면 pending에 담아 ResumeDialog로 이어 그릴지 묻는다.
+ *  - 불러오기 전이나 고르기 전에는 저장하지 않는다 (빈 그림으로 DB의 그림을 덮어쓰지 않게).
+ *    불러오기에 실패하면 간격을 늘려 가며 다시 시도한다.
+ *  - 그림이 바뀌면 1초 뒤에 저장하고, 화면을 나가거나 창을 닫을 때도 바로 저장한다. 다 지우면 저장된 그림도 지운다.
+ *    바뀐 것이 없으면 다시 보내지 않는다.
  *  - finish(): 다 그린 그림(기록으로 저장함)은 저장된 그림을 지우고 더는 저장하지 않는다.
  * name: 캐릭터 이름처럼 그림과 같이 저장할 값
  */
 export function useDrawingDraft(key: string, tools: DrawingTools, name?: string) {
-  const [pending, setPending] = useState<Draft | null>(() => loadDraft(key));
+  const [pending, setPending] = useState<Draft | null>(null);
+  /** DB에서 불러오기를 마쳤는지 (마치기 전에는 저장하지 않는다) */
+  const [loaded, setLoaded] = useState(false);
   const actions = tools.canvasProps.actions;
-  const latest = useRef({ actions, name, pending });
-  latest.current = { actions, name, pending };
+  const latest = useRef({ actions, name, pending, loaded });
+  latest.current = { actions, name, pending, loaded };
   const finished = useRef(false);
+  /** 마지막으로 DB에 보낸 내용 ("": DB에 없음). 같으면 다시 보내지 않는다 */
+  const lastSent = useRef("");
 
-  const flush = useCallback(() => {
-    const { actions, name, pending } = latest.current;
-    if (pending || finished.current) return;
-    const strokes = visibleStrokes(actions);
-    if (strokes.length) saveDraft(key, strokes, name);
-    else removeDraft(key);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (let attempt = 0; alive; attempt++) {
+        if (attempt) await new Promise((r) => setTimeout(r, DRAFT_LOAD_RETRY_DELAYS[Math.min(attempt, DRAFT_LOAD_RETRY_DELAYS.length) - 1]));
+        if (!alive) return;
+        try {
+          const draft = await loadDraft(key);
+          if (!alive) return;
+          if (draft) {
+            lastSent.current = JSON.stringify({ strokes: draft.strokes, name: draft.name ?? null });
+            setPending(draft);
+          }
+          setLoaded(true);
+          return;
+        } catch {
+          // 서버에 연결하지 못하면 잠시 뒤 다시 시도한다. 그동안 그린 것은 불러온 뒤에 저장된다.
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, [key]);
 
-  useEffect(() => {
-    if (pending) return;
-    const t = setTimeout(flush, 400);
-    return () => clearTimeout(t);
-  }, [pending, actions, name, flush]);
+  const flush = useCallback(
+    ({ keepalive = false } = {}) => {
+      const { actions, name, pending, loaded } = latest.current;
+      if (!loaded || pending || finished.current) return;
+      const strokes = compactStrokes(visibleStrokes(actions));
+      const body = strokes.length ? JSON.stringify({ strokes, name: name ?? null }) : "";
+      if (body === lastSent.current) return;
+      const previous = lastSent.current;
+      lastSent.current = body;
+      const request = strokes.length
+        ? api.saveDraft(key, strokes, name, { keepalive: keepalive && body.length < KEEPALIVE_MAX_CHARS })
+        : api.deleteDraft(key);
+      // 실패하면 다음에 다시 보내도록 되돌린다.
+      request.catch(() => {
+        if (lastSent.current === body) lastSent.current = previous;
+      });
+    },
+    [key],
+  );
 
   useEffect(() => {
-    window.addEventListener("beforeunload", flush);
+    if (!loaded || pending) return;
+    const t = setTimeout(flush, DRAFT_SAVE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [loaded, pending, actions, name, flush]);
+
+  useEffect(() => {
+    const onHide = () => flush({ keepalive: true });
+    window.addEventListener("pagehide", onHide);
     return () => {
-      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", onHide);
       flush();
     };
   }, [flush]);
@@ -408,13 +460,15 @@ export function useDrawingDraft(key: string, tools: DrawingTools, name?: string)
   }, [pending, replaceActions]);
 
   const startNew = useCallback(() => {
-    removeDraft(key);
+    lastSent.current = "";
+    api.deleteDraft(key).catch(() => {});
     setPending(null);
   }, [key]);
 
   const finish = useCallback(() => {
     finished.current = true;
-    removeDraft(key);
+    lastSent.current = "";
+    api.deleteDraft(key).catch(() => {});
   }, [key]);
 
   return { pending, resume, startNew, finish };

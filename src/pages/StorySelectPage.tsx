@@ -3,17 +3,17 @@
 import { useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { scenes, type Scene } from "../data/scenes";
-import { hasDraft } from "../lib/drawingDraft";
-import { loadSceneAssets } from "../lib/sceneAssets";
+import { draftKeys } from "../lib/drawingDraft";
+import { loadScenePreview } from "../lib/sceneAssets";
 import { navigate } from "../router";
 
-function SceneCard({ scene, index }: { scene: Scene; index: number }) {
+function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; inProgress: boolean }) {
   const [preview, setPreview] = useState<string | null>(null);
-  const [inProgress] = useState(() => hasDraft(`story:${scene.id}`));
 
   useEffect(() => {
     let cancelled = false;
-    loadSceneAssets(scene).then(
+    // 미리보기 이미지만 만든다 (채점용 계산은 그리기 화면에서)
+    loadScenePreview(scene).then(
       (a) => !cancelled && setPreview(a.exampleUrl),
       () => {},
     );
@@ -52,12 +52,18 @@ function SceneCard({ scene, index }: { scene: Scene; index: number }) {
 }
 
 export default function StorySelectPage() {
+  // 그리던 그림이 DB에 있는 장면들 (한 번에 불러온다. 못 불러오면 표시만 안 할 뿐 그리기에는 지장 없다)
+  const [drafts, setDrafts] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    draftKeys().then(setDrafts, () => {});
+  }, []);
+
   return (
     <PageLayout title="스토리 장면 그리기" wide>
       <p className="mb-5 text-sm font-medium text-ink-muted">따라 그릴 장면을 골라 보세요. 그림을 누르면 바로 그리기를 시작해요!</p>
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {scenes.map((scene, i) => (
-          <SceneCard key={scene.id} scene={scene} index={i} />
+          <SceneCard key={scene.id} scene={scene} index={i} inProgress={drafts.has(`story:${scene.id}`)} />
         ))}
         <div className="flex min-h-48 items-center justify-center rounded-4xl border-2 border-dashed border-sky-haze p-6 text-center text-sm font-bold text-ink-muted">
           새로운 장면이 곧 추가돼요 ✏️

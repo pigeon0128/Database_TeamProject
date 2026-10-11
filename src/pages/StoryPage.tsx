@@ -25,7 +25,7 @@ import { api, ApiError } from "../lib/api";
 import { formatClock, formatDuration, formatScore } from "../lib/format";
 import { loadSceneAssets } from "../lib/sceneAssets";
 import { useSavedSetting } from "../lib/userSettings";
-import { emptyScore, maxBrushSize, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
+import { emptyScore, scoreCanvas, type GuideMasks, type TraceScore } from "../lib/traceScore";
 import { navigate } from "../router";
 
 const BACK_TO_LIST = { path: "/story", label: "장면 고르기" };
@@ -36,9 +36,6 @@ function scoreTone(score: number) {
   if (score >= 20) return { text: "text-amber-500", bar: "bg-amber-400", label: "조금만 더! ✏️" };
   return { text: "text-ink-muted", bar: "bg-ink-muted", label: "흰 선을 따라 그려 보세요" };
 }
-
-/** 소수 둘째 자리까지의 정확한 점수 (기록 저장용). 화면의 큰 숫자는 반올림한 정수다. */
-const exactScore = (r: TraceScore) => Math.round(Math.max(0, Math.min(100, r.whitePct - r.penalty - r.overlapPenalty)) * 100) / 100;
 
 type ScoreBarProps = {
   result: TraceScore;
@@ -137,9 +134,8 @@ type Submission =
 
 function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
-  const [brushMax, setBrushMax] = useState<number | undefined>();
   // 따라 그리기는 채점하므로 선 끝 얇게를 쓰지 않는다 (손떨림 보정만).
-  const tools = useDrawingTools(canvasRef, { maxBrushSize: brushMax, fade: false });
+  const tools = useDrawingTools(canvasRef, { maxBrushSize: scene.maxBrushSize, fade: false });
   // 이어서 그리기: 장면마다 그리던 그림을 따로 저장한다.
   const draft = useDrawingDraft(`story:${scene.id}`, tools);
   const { expire } = useAuth();
@@ -170,7 +166,6 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
 
   const masksRef = useRef<GuideMasks | null>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const scorePending = useRef(false);
   // 덧칠 채점에 쓰는 지금 보이는 획 (캔버스가 다시 그려지기 전에 갱신된다)
   const strokesRef = useRef(visibleStrokes(tools.canvasProps.actions));
   strokesRef.current = visibleStrokes(tools.canvasProps.actions);
@@ -182,7 +177,6 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
       (assets) => {
         if (cancelled) return;
         masksRef.current = assets.masks;
-        setBrushMax(maxBrushSize(assets.masks));
         setScoreReady(true);
         if (drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, assets.masks, strokesRef.current));
         setGuideUrl(assets.guideUrl);
@@ -195,15 +189,11 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
     };
   }, [scene]);
 
-  // 그리는 동안 너무 자주 계산하지 않도록 0.12초에 한 번만 채점한다.
+  // 획을 다 그었을 때(또는 되돌리기·지우기로 그림이 바뀌었을 때) 한 번 채점한다.
+  // 그리는 중에는 채점하지 않아서 펜 움직임이 느려지지 않는다.
   const handleCanvasChange = useCallback((canvas: HTMLCanvasElement) => {
     drawCanvasRef.current = canvas;
-    if (scorePending.current || !masksRef.current) return;
-    scorePending.current = true;
-    setTimeout(() => {
-      scorePending.current = false;
-      if (masksRef.current && drawCanvasRef.current) setResult(scoreCanvas(drawCanvasRef.current, masksRef.current, strokesRef.current));
-    }, 120);
+    if (masksRef.current) setResult(scoreCanvas(canvas, masksRef.current, strokesRef.current));
   }, []);
 
   const save = (withGuide: boolean) => {
@@ -236,7 +226,7 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
     const durationMs = Date.now() - startedAt;
     setElapsedMs(durationMs);
     draft.finish();
-    send(exactScore(latest), durationMs);
+    send(latest.exactScore, durationMs);
   };
 
   const blockedReason =

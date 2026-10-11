@@ -5,7 +5,10 @@ import { pool } from "./db.js";
 import { clearSessionCookie, hashPassword, requireUser, sessionUserId, setSessionCookie, verifyPassword } from "./auth.js";
 
 const app = express();
-app.use(express.json({ limit: "100kb" }));
+// 요청 본문(JSON) 크기 제한. 그리던 그림(획 목록)만 크게 받는다.
+const smallJson = express.json({ limit: "100kb" });
+const draftJson = express.json({ limit: "5mb" });
+app.use((req, res, next) => (req.path.startsWith("/api/drafts/") ? draftJson : smallJson)(req, res, next));
 
 /** 400 오류를 낼 때 쓰는 예외 */
 class BadRequest extends Error {
@@ -169,6 +172,61 @@ app.put("/api/settings", requireUser, async (req, res) => {
   res.json({ settings: toSettings(rows[0]) });
 });
 
+// ── 그리던 그림 (이어서 그리기) ───────────────────────────
+// 사용자마다 그림 하나당 한 행(drawing_drafts). 그림 이름: 'story:<장면 id>' 또는 'character'
+const DRAFT_KEY_RULE = /^(story:[a-z0-9-]{1,80}|character)$/;
+
+function readDraftKey(req) {
+  const key = String(req.params.key ?? "");
+  if (!DRAFT_KEY_RULE.test(key)) throw new BadRequest("그림 이름이 올바르지 않아요.");
+  return key;
+}
+
+// 그리던 그림 목록 (장면 고르기 화면의 "이어 그리기" 표시)
+app.get("/api/drafts", requireUser, async (req, res) => {
+  const { rows } = await pool.query(
+    "SELECT draft_key, saved_at, jsonb_array_length(strokes) AS stroke_count FROM drawing_drafts WHERE user_id = $1 ORDER BY saved_at DESC",
+    [req.userId],
+  );
+  res.json({ drafts: rows.map((r) => ({ key: r.draft_key, savedAt: r.saved_at, strokeCount: r.stroke_count })) });
+});
+
+// 그림 하나 불러오기. 없으면 draft: null
+app.get("/api/drafts/:key", requireUser, async (req, res) => {
+  const key = readDraftKey(req);
+  const { rows } = await pool.query("SELECT strokes, name, saved_at FROM drawing_drafts WHERE user_id = $1 AND draft_key = $2", [
+    req.userId,
+    key,
+  ]);
+  res.json({ draft: rows.length ? { strokes: rows[0].strokes, name: rows[0].name, savedAt: rows[0].saved_at } : null });
+});
+
+// 저장하기: 처음이면 INSERT, 이미 있으면 UPDATE
+app.put("/api/drafts/:key", requireUser, async (req, res) => {
+  const key = readDraftKey(req);
+  const strokes = req.body?.strokes;
+  if (!Array.isArray(strokes) || !strokes.every((s) => s && typeof s === "object" && Array.isArray(s.points))) {
+    throw new BadRequest("그림 데이터가 올바르지 않아요.");
+  }
+  const name = req.body?.name == null ? null : String(req.body.name).slice(0, 20);
+  const { rows } = await pool.query(
+    `INSERT INTO drawing_drafts (user_id, draft_key, strokes, name)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (user_id, draft_key) DO UPDATE
+     SET strokes = EXCLUDED.strokes, name = EXCLUDED.name, saved_at = NOW()
+     RETURNING saved_at`,
+    [req.userId, key, JSON.stringify(strokes), name],
+  );
+  res.json({ savedAt: rows[0].saved_at });
+});
+
+// 다 그렸거나(기록 저장) 새로 그리기를 고르면 지운다
+app.delete("/api/drafts/:key", requireUser, async (req, res) => {
+  const key = readDraftKey(req);
+  await pool.query("DELETE FROM drawing_drafts WHERE user_id = $1 AND draft_key = $2", [req.userId, key]);
+  res.json({ ok: true });
+});
+
 // ── 리더보드 ──────────────────────────────────────────────
 // database/queries/leaderboard.sql 과 같은 규칙(사용자별 최고 기록 1건, 일치율↓ 시간↑ 완료시각↑ 기록ID↑)에
 // 그림 ID·개수를 매개변수로 받고, 상위 N명 밖에 있는 내 순위도 함께 돌려준다.
@@ -220,6 +278,8 @@ app.get("/api/leaderboard", async (req, res) => {
 app.use("/api", (_req, res) => res.status(404).json({ error: "없는 API 주소예요." }));
 
 app.use((err, _req, res, _next) => {
+  // 요청 본문이 너무 큼 (express.json 의 limit)
+  if (err.type === "entity.too.large") return res.status(413).json({ error: "그림이 너무 커서 저장하지 못했어요." });
   if (err.status && err.status < 500) return res.status(err.status).json({ error: err.message });
   // 외래키 위반: 없는 그림/사용자를 가리킬 때
   if (err.code === "23503") return res.status(400).json({ error: "존재하지 않는 그림이거나 사용자예요." });

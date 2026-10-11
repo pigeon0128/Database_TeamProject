@@ -1,4 +1,5 @@
 // API 서버(server/index.js) 호출. 개발 중에는 Vite가 /api 요청을 API 서버로 넘긴다.
+import type { Stroke } from "../components/TracingCanvas";
 import type { DrawingSettings } from "./userSettings";
 
 export type User = { id: number; loginId: string };
@@ -66,4 +67,12 @@ export const api = {
   getSettings: () => request<{ settings: DrawingSettings | null }>("GET", "/settings"),
   saveSettings: (settings: DrawingSettings, opts?: { keepalive?: boolean }) =>
     request<{ settings: DrawingSettings }>("PUT", "/settings", settings, opts),
+  /** 그리던 그림 목록 (그림 이름, 저장 시각, 획 수) */
+  drafts: () => request<{ drafts: { key: string; savedAt: string; strokeCount: number }[] }>("GET", "/drafts"),
+  /** 없으면 draft: null */
+  getDraft: (key: string) =>
+    request<{ draft: { strokes: Stroke[]; name: string | null; savedAt: string } | null }>("GET", `/drafts/${encodeURIComponent(key)}`),
+  saveDraft: (key: string, strokes: Stroke[], name: string | undefined, opts?: { keepalive?: boolean }) =>
+    request<{ savedAt: string }>("PUT", `/drafts/${encodeURIComponent(key)}`, { strokes, name: name ?? null }, opts),
+  deleteDraft: (key: string) => request<{ ok: true }>("DELETE", `/drafts/${encodeURIComponent(key)}`),
 };

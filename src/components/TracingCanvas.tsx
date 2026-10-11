@@ -44,7 +44,7 @@ type Props = {
   onStrokeEnd: (stroke: Stroke) => void;
   /** 획을 긋기 시작할 때 (타이머용) */
   onStrokeStart?: () => void;
-  /** 그리는 중이거나 다시 그려질 때마다 호출 (채점용) */
+  /** 획 목록이 바뀌어 다시 그린 뒤 호출 (획을 다 그었을 때, 되돌리기·지우기 등). 그리는 중에는 부르지 않는다 (채점용) */
   onChange?: (canvas: HTMLCanvasElement) => void;
 };
 
@@ -327,7 +327,6 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     rawLast.current = start;
     applyStyle(ctx, stroke);
     drawDot(ctx, start, size * taper(0, Infinity, fade));
-    onChange?.(e.currentTarget);
   };
 
   /** 보정된 점 p를 획에 붙이고 그 구간을 바로 그린다. 너무 가까운 점은 건너뛴다. */
@@ -375,7 +374,6 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       const s = smoothed.current;
       addPoint(ctx, stroke, [s[0] + (raw[0] - s[0]) * follow, s[1] + (raw[1] - s[1]) * follow]);
     }
-    onChange?.(e.currentTarget);
   };
 
   const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {

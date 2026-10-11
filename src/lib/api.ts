@@ -23,6 +23,8 @@ export type DrawingSettings = {
   smoothing: number;
   /** 선 끝 얇게(시작·끝 흐리기) 단계. 0~100, 0이면 끔 */
   fade: number;
+  /** 사용자가 바꾼 단축키만 {동작: 키 조합}. 나머지는 기본 키 (lib/shortcuts.ts) */
+  shortcuts: Partial<Record<string, string>>;
 };
 
 
@@ -79,6 +81,9 @@ export const api = {
   login: (loginId: string, password: string) => request<{ user: User }>("POST", "/auth/login", { loginId, password }),
   register: (loginId: string, password: string) => request<{ user: User }>("POST", "/auth/register", { loginId, password }),
   logout: () => request<{ ok: true }>("POST", "/auth/logout"),
+  /** 지금 비밀번호가 맞아야 바뀐다 (틀리면 400) */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ ok: true }>("POST", "/auth/password", { currentPassword, newPassword }),
   drawings: () => request<{ drawings: Drawing[] }>("GET", "/drawings"),
   /** image: 완성 그림 (PNG data URL). 기록과 함께 한 번에 저장된다 */
   savePlayRecord: (drawingId: number, similarityScore: number, durationMs: number, image: string | null) =>

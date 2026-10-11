@@ -63,7 +63,7 @@ export default function CharacterPage() {
                     </li>
                   </ul>
                   <h2 className="mb-2 text-sm font-extrabold text-ink-muted">⌨️ 단축키</h2>
-                  <ShortcutList />
+                  <ShortcutList keys={tools.keys} />
                 </>
               )}
             </ToolbarMenu>

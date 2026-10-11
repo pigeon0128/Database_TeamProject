@@ -1,39 +1,10 @@
+// 로그인·회원가입 화면. 로그인 전에는 어느 주소로 들어와도 이 화면을 보여 준다 (App.tsx).
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
+import TextField from "../components/TextField";
 import { ApiError } from "../lib/api";
 
 type Mode = "login" | "register";
-
-function Field({
-  label,
-  type,
-  value,
-  onChange,
-  autoComplete,
-  hint,
-}: {
-  label: string;
-  type: string;
-  value: string;
-  onChange: (v: string) => void;
-  autoComplete: string;
-  hint?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-extrabold">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete={autoComplete}
-        required
-        className="w-full rounded-2xl border border-sky-haze bg-white px-4 py-3 text-base font-semibold outline-none transition focus:border-sky-deep focus:ring-3 focus:ring-sky-deep/20"
-      />
-      {hint && <span className="mt-1 block text-xs font-medium text-ink-muted">{hint}</span>}
-    </label>
-  );
-}
 
 export default function LoginPage() {
   const { login, register, serverError, recheck, checking } = useAuth();
@@ -94,7 +65,7 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={submit} className="space-y-4">
-            <Field
+            <TextField
               label="아이디"
               type="text"
               value={loginId}
@@ -102,7 +73,7 @@ export default function LoginPage() {
               autoComplete="username"
               hint={mode === "register" ? "2~20자, 한글·영문·숫자·_·- 사용 가능. 리더보드에 이 아이디가 보여요." : undefined}
             />
-            <Field
+            <TextField
               label="비밀번호"
               type="password"
               value={password}
@@ -110,7 +81,7 @@ export default function LoginPage() {
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               hint={mode === "register" ? "4자 이상" : undefined}
             />
-            {mode === "register" && <Field label="비밀번호 확인" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" />}
+            {mode === "register" && <TextField label="비밀번호 확인" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" />}
 
             {(error ?? serverError) && (
               <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">

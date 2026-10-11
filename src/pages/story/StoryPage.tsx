@@ -148,7 +148,7 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
                     그으면 점수가 깎여요. 선 하나는 한 번에 쭉 그어 보세요!
                   </p>
                   <h2 className="mb-2 text-sm font-extrabold text-ink-muted">⌨️ 단축키</h2>
-                  <ShortcutList />
+                  <ShortcutList keys={tools.keys} />
                 </>
               )}
             </ToolbarMenu>

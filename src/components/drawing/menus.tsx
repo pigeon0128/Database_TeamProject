@@ -1,10 +1,12 @@
 // 그리기 툴바의 메뉴들: 굵기, 선 다듬기(손떨림 보정·선 끝 얇게), 되돌리기/다시 하기, 단축키 목록.
+// 단축키 표시는 사용자가 바꾼 키(tools.keys)를 따른다.
 import { Kbd, ToolbarButton, ToolbarMenu } from "../toolbar";
-import { BRUSH_MAX_SIZE, MIN_SIZE, SHORTCUTS, type DrawingTools } from "./useDrawingTools";
+import { comboKeys, comboText, SHORTCUT_ACTIONS, SHORTCUT_LABELS, type ShortcutMap } from "../../lib/shortcuts";
+import { BRUSH_MAX_SIZE, MIN_SIZE, type DrawingTools } from "./useDrawingTools";
 
 /** 툴바의 굵기 메뉴: 누르면 굵기 조절 바가 나온다 */
 export function SizeMenu({ tools }: { tools: DrawingTools }) {
-  const { size, sizeMax, erase } = tools;
+  const { size, sizeMax, erase, keys } = tools;
   const name = erase ? "지우개" : "브러쉬";
   return (
     <ToolbarMenu
@@ -21,8 +23,8 @@ export function SizeMenu({ tools }: { tools: DrawingTools }) {
           <span className="flex items-center justify-between">
             {name} 굵기 {size}
             <span className="flex gap-1">
-              <Kbd>[</Kbd>
-              <Kbd>]</Kbd>
+              <Kbd>{comboText(keys.sizeDown)}</Kbd>
+              <Kbd>{comboText(keys.sizeUp)}</Kbd>
             </span>
           </span>
           <input
@@ -90,29 +92,34 @@ export function LineMenu({ tools }: { tools: DrawingTools }) {
 export function HistoryButtons({ tools }: { tools: DrawingTools }) {
   return (
     <>
-      <ToolbarButton title="되돌리기 (Ctrl+Z)" onClick={tools.undo}>
+      <ToolbarButton title={`되돌리기 (${comboText(tools.keys.undo)})`} onClick={tools.undo}>
         <span className="text-lg leading-none">↶</span>
       </ToolbarButton>
-      <ToolbarButton title="다시 하기 (Ctrl+Y)" onClick={tools.redo}>
+      <ToolbarButton title={`다시 하기 (${comboText(tools.keys.redo)})`} onClick={tools.redo}>
         <span className="text-lg leading-none">↷</span>
       </ToolbarButton>
     </>
   );
 }
 
-export function ShortcutList() {
+/** 도움말 메뉴의 단축키 목록. 키는 설정 및 방법 화면에서 바꾼다 */
+export function ShortcutList({ keys }: { keys: ShortcutMap }) {
+  const rows: [string[], string][] = [...SHORTCUT_ACTIONS.map((a) => [comboKeys(keys[a]), SHORTCUT_LABELS[a]] as [string[], string]), [["Ctrl"], "+드래그: 이동"]];
   return (
-    <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
-      {SHORTCUTS.map(([keys, desc]) => (
-        <div key={desc} className="flex items-center gap-1.5">
-          <dt className="flex shrink-0 items-center gap-0.5">
-            {keys.map((k) => (
-              <Kbd key={k}>{k}</Kbd>
-            ))}
-          </dt>
-          <dd className="font-semibold">{desc}</dd>
-        </div>
-      ))}
-    </dl>
+    <>
+      <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
+        {rows.map(([parts, desc]) => (
+          <div key={desc} className="flex items-center gap-1.5">
+            <dt className="flex shrink-0 items-center gap-0.5">
+              {parts.map((k) => (
+                <Kbd key={k}>{k}</Kbd>
+              ))}
+            </dt>
+            <dd className="font-semibold">{desc}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-xs font-medium text-ink-muted">단축키는 메인의 "설정 및 방법"에서 바꿀 수 있어요.</p>
+    </>
   );
 }

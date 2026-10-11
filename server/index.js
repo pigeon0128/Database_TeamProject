@@ -1,9 +1,9 @@
 // DOROLAND 그림 그리기 API 서버: 앱 설정과 API 경로 연결만 한다. 각 기능은 routes/ 에 있다.
 // 실행: pnpm dev:server  (기본 포트 3001, 개발 중에는 Vite가 /api 요청을 이 서버로 넘긴다)
-//   routes/auth.js      /api/auth/*      가입·로그인·로그아웃·내 정보
+//   routes/auth.js      /api/auth/*      가입·로그인·로그아웃·내 정보·비밀번호 바꾸기
 //   routes/drawings.js  /api/drawings    장면 목록
 //   routes/records.js   /api/play-records, /api/artworks/:id, /api/leaderboard   기록·완성 그림·리더보드
-//   routes/settings.js  /api/settings    그리기 설정
+//   routes/settings.js  /api/settings    그리기 설정·단축키
 //   routes/drafts.js    /api/drafts/*    그리던 그림 (이어서 그리기)
 import express from "express";
 import { pool } from "./db.js";

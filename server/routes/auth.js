@@ -1,7 +1,7 @@
-// 로그인 API (/api/auth): 가입, 로그인, 로그아웃, 지금 로그인한 사용자. 아이디는 users.nickname 을 그대로 쓴다.
+// 로그인 API (/api/auth): 가입, 로그인, 로그아웃, 지금 로그인한 사용자, 비밀번호 바꾸기. 아이디는 users.nickname 을 그대로 쓴다.
 // 비밀번호 해시와 세션 쿠키는 ../auth.js 가 맡는다.
 import { Router } from "express";
-import { clearSessionCookie, hashPassword, sessionUserId, setSessionCookie, verifyPassword } from "../auth.js";
+import { clearSessionCookie, hashPassword, requireUser, sessionUserId, setSessionCookie, verifyPassword } from "../auth.js";
 import { pool } from "../db.js";
 import { BadRequest } from "../errors.js";
 
@@ -9,12 +9,16 @@ const LOGIN_ID_RULE = /^[\p{L}\p{N}_-]{2,20}$/u;
 const MIN_PASSWORD = 4;
 const MAX_PASSWORD = 72;
 
+function checkPasswordLength(password, name = "비밀번호") {
+  if (password.length < MIN_PASSWORD || password.length > MAX_PASSWORD)
+    throw new BadRequest(`${name}는 ${MIN_PASSWORD}~${MAX_PASSWORD}자로 입력해 주세요.`);
+}
+
 function readCredentials(body) {
   const loginId = String(body?.loginId ?? "").trim();
   const password = String(body?.password ?? "");
   if (!LOGIN_ID_RULE.test(loginId)) throw new BadRequest("아이디는 2~20자의 한글·영문·숫자·_·- 만 쓸 수 있어요.");
-  if (password.length < MIN_PASSWORD || password.length > MAX_PASSWORD)
-    throw new BadRequest(`비밀번호는 ${MIN_PASSWORD}~${MAX_PASSWORD}자로 입력해 주세요.`);
+  checkPasswordLength(password);
   return { loginId, password };
 }
 
@@ -61,4 +65,21 @@ authRoutes.get("/me", async (req, res) => {
     return res.json({ user: null });
   }
   res.json({ user: toUser(rows[0]) });
+});
+
+// 비밀번호 바꾸기: 지금 비밀번호가 맞아야 바꾼다. 틀리면 400 (401은 앱이 "로그인이 끝났다"로 받아들이므로 쓰지 않는다)
+authRoutes.post("/password", requireUser, async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword ?? "");
+  const newPassword = String(req.body?.newPassword ?? "");
+  if (!currentPassword) throw new BadRequest("지금 비밀번호를 입력해 주세요.");
+  checkPasswordLength(newPassword, "새 비밀번호");
+  if (newPassword === currentPassword) throw new BadRequest("새 비밀번호가 지금 비밀번호와 같아요.");
+
+  const { rows } = await pool.query("SELECT password_hash FROM users WHERE user_id = $1", [req.userId]);
+  if (!rows.length) return res.status(401).json({ error: "로그인이 필요합니다." });
+  if (!(await verifyPassword(currentPassword, rows[0].password_hash))) {
+    throw new BadRequest("지금 비밀번호가 맞지 않아요.");
+  }
+  await pool.query("UPDATE users SET password_hash = $1 WHERE user_id = $2", [await hashPassword(newPassword), req.userId]);
+  res.json({ ok: true });
 });

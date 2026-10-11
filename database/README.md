@@ -35,7 +35,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 | drawings | 챕터별 원본 그림 |
 | play_records | 사용자별 그림 플레이 기록 |
 | user_artworks | 사용자가 완성한 작품 — 그림 자체(PNG, `image_data`) 또는 다른 저장소의 경로(`image_key`) (`migrations/005_artwork_images.sql`) |
-| user_settings | 사용자가 마지막으로 바꾼 그리기 설정 (`migrations/003_user_settings.sql`) |
+| user_settings | 사용자가 마지막으로 바꾼 그리기 설정과 단축키 (`migrations/003_user_settings.sql`, 단축키 `006_shortcut_settings.sql`) |
 | drawing_drafts | 다 그리기 전의 그림(획 목록, JSONB) — 이어서 그리기용 (`migrations/004_drawing_drafts.sql`) |
 | schema_migrations | 실행한 마이그레이션 파일 목록 (`pnpm db:migrate` 가 만들고 관리) |
 
@@ -72,6 +72,10 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 값의 범위는 앱의 조절 범위와 같은 CHECK 제약조건으로 제한합니다. 조회·저장 SQL: `queries/user_settings.sql`
 앱은 로그인한 사용자의 설정을 API(`GET`/`PUT /api/settings`, `server/routes/settings.js`)로 불러오고 저장하며, 브라우저에는 저장하지 않습니다.
 불러오기에 실패한 동안에는 DB에 저장하지 않아서, 기본값이 DB의 설정을 덮어쓰지 않습니다.
+
+단축키(`shortcuts`, `006_shortcut_settings.sql`)는 사용자가 바꾼 동작만 JSONB 객체로 저장합니다 (예: `{"brush": "KeyP"}`).
+동작이 몇 개 안 되고 항상 통째로 읽고 쓰므로 표를 따로 나누지 않았습니다. 없는 동작은 앱의 기본 키를 쓰므로, 앱에 동작이 늘어나도 DB를 바꿀 필요가 없습니다.
+DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서버가 검사합니다.
 
 ### Drawing Drafts
 그림을 다 그리기 전에 화면을 나가거나 다른 기기에서 로그인해도 이어서 그릴 수 있도록, 그리던 획 목록을 사용자·그림마다 한 행으로 보관합니다.

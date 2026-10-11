@@ -1,6 +1,8 @@
 // 그리기 상태 훅 (스토리 장면, 캐릭터 그리기 공용): 굵기·지우개·획 목록·되돌리기 상태를 관리하고 키보드 단축키를 등록한다.
+// 단축키는 사용자가 설정 화면에서 바꾼 키를 쓴다 (lib/shortcuts.ts, 저장은 lib/userSettings).
 // 선화 연습이 목적이라 색은 검정 하나만 쓴다. 굵기·손떨림 보정·선 끝 얇게는 저장해 두고 다음에도 이어 쓴다 (lib/userSettings).
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
+import { actionForEvent, resolveShortcuts } from "../../lib/shortcuts";
 import { visibleStrokes, type DrawAction, type Stroke } from "../../lib/strokes";
 import { useSavedSetting } from "../../lib/userSettings";
 import type { TracingCanvasHandle } from "../TracingCanvas";
@@ -15,20 +17,6 @@ export const BRUSH_MAX_SIZE = 6;
 /** 지우개 최대 굵기 */
 const ERASER_MAX_SIZE = 48;
 const SIZE_STEP = 2;
-
-/** 단축키 목록 (아래 useDrawingTools 의 키 처리와 맞춘다. 도움말 메뉴에 보여 준다) */
-export const SHORTCUTS: [keys: string[], desc: string][] = [
-  [["B"], "브러쉬"],
-  [["E"], "지우개"],
-  [["["], "굵기 줄이기"],
-  [["]"], "굵기 늘리기"],
-  [["Ctrl", "Z"], "되돌리기"],
-  [["Ctrl", "Y"], "다시 하기"],
-  [["Ctrl", "+"], "확대"],
-  [["Ctrl", "−"], "축소"],
-  [["Ctrl", "0"], "원래 크기"],
-  [["Ctrl"], "+드래그: 이동"],
-];
 
 /**
  * 그리기 상태와 동작을 한데 묶은 훅. 키보드 단축키도 여기서 등록한다.
@@ -46,6 +34,8 @@ export function useDrawingTools(
   const [rawSize, setRawSize] = useSavedSetting("brushSize");
   const [smoothing, setSmoothing] = useSavedSetting("smoothing");
   const [fade, setFade] = useSavedSetting("fade");
+  const [savedShortcuts] = useSavedSetting("shortcuts");
+  const keys = useMemo(() => resolveShortcuts(savedShortcuts), [savedShortcuts]);
   const [erase, setErase] = useState(false);
 
   // 브러쉬와 지우개가 굵기를 같이 쓰므로, 저장된 값은 두고 쓸 때만 상한으로 자른다.
@@ -84,44 +74,28 @@ export function useDrawingTools(
     setRedoStack([]);
   };
 
-  // 단축키. 한글 입력 상태에서도 동작하도록 e.key 대신 물리 키(e.code)로 판단한다.
+  // 단축키. 한글 입력 상태에서도 동작하도록 e.key 대신 물리 키(e.code)로 판단한다 (lib/shortcuts.ts).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.isContentEditable || (target instanceof HTMLInputElement && !["range", "checkbox"].includes(target.type))) return;
 
-      if (e.ctrlKey || e.metaKey) {
-        // 브라우저 확대 대신 캔버스 확대
-        if (["Equal", "NumpadAdd"].includes(e.code)) {
-          e.preventDefault();
-          canvasRef.current?.zoomIn();
-        } else if (["Minus", "NumpadSubtract"].includes(e.code)) {
-          e.preventDefault();
-          canvasRef.current?.zoomOut();
-        } else if (["Digit0", "Numpad0"].includes(e.code)) {
-          e.preventDefault();
-          canvasRef.current?.resetZoom();
-        } else if (e.code === "KeyZ" && !e.shiftKey) {
-          e.preventDefault();
-          undo();
-        } else if (e.code === "KeyY" || (e.code === "KeyZ" && e.shiftKey)) {
-          e.preventDefault();
-          redo();
-        }
-        return;
-      }
-      if (e.altKey) return;
-
-      if (e.code === "KeyB") setErase(false);
-      else if (e.code === "KeyE") setErase(true);
-      else if (e.code === "BracketLeft") setSize(size - SIZE_STEP);
-      else if (e.code === "BracketRight") setSize(size + SIZE_STEP);
-      else return;
-      e.preventDefault();
+      const action = actionForEvent(e, keys);
+      if (!action) return;
+      e.preventDefault(); // 브라우저 확대(Ctrl + +) 대신 캔버스 확대 등
+      if (action === "brush") setErase(false);
+      else if (action === "eraser") setErase(true);
+      else if (action === "sizeDown") setSize(size - SIZE_STEP);
+      else if (action === "sizeUp") setSize(size + SIZE_STEP);
+      else if (action === "undo") undo();
+      else if (action === "redo") redo();
+      else if (action === "zoomIn") canvasRef.current?.zoomIn();
+      else if (action === "zoomOut") canvasRef.current?.zoomOut();
+      else if (action === "zoomReset") canvasRef.current?.resetZoom();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, canvasRef, size, setSize]);
+  }, [keys, undo, redo, canvasRef, size, setSize]);
 
   return {
     size,
@@ -131,6 +105,8 @@ export function useDrawingTools(
     fade,
     fadeEnabled,
     hasDrawing,
+    /** 지금 쓰는 단축키 (동작별 키 조합) */
+    keys,
     setSize,
     setErase,
     setSmoothing,

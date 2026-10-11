@@ -2,7 +2,7 @@
 // 그림(장면)을 새로 고르거나 다시 들어와도, 다른 기기에서 로그인해도 사용자가 마지막으로 바꾼 설정을 이어서 쓴다.
 // 필드는 DB의 user_settings 테이블(database/migrations/003_user_settings.sql)과 1:1로 맞춘다.
 //   brushSize ↔ brush_size, guideVisible ↔ guide_visible, guideOpacity ↔ guide_opacity,
-//   smoothing ↔ smoothing, fade ↔ fade
+//   smoothing ↔ smoothing, fade ↔ fade, shortcuts ↔ shortcuts (바꾼 단축키만, JSONB)
 //
 // DB(API 서버의 GET/PUT /api/settings)에만 저장한다. 바꾸고 잠깐 뒤에 저장한다.
 // 로그인하면 DB의 설정을 불러와 바로 적용하고, 불러오기 전까지는 기본값을 쓴다.
@@ -13,7 +13,7 @@ import { api, type DrawingSettings } from "./api";
 export type { DrawingSettings };
 
 /** user_settings 테이블의 DEFAULT와 같은 값 */
-export const DEFAULT_SETTINGS: DrawingSettings = { brushSize: 6, guideVisible: true, guideOpacity: 80, smoothing: 50, fade: 0 };
+export const DEFAULT_SETTINGS: DrawingSettings = { brushSize: 6, guideVisible: true, guideOpacity: 80, smoothing: 50, fade: 0, shortcuts: {} };
 
 /** 마지막으로 바꾼 뒤 이만큼 기다렸다가 DB에 저장한다 (조절 바를 끄는 동안 요청이 몰리지 않게) */
 const SAVE_DELAY_MS = 600;
@@ -29,6 +29,8 @@ function sanitize(raw: unknown): DrawingSettings {
     guideOpacity: inRange(s.guideOpacity, 10, 100) ? s.guideOpacity : DEFAULT_SETTINGS.guideOpacity,
     smoothing: inRange(s.smoothing, 0, 100) ? s.smoothing : DEFAULT_SETTINGS.smoothing,
     fade: inRange(s.fade, 0, 100) ? s.fade : DEFAULT_SETTINGS.fade,
+    // 키 조합 검사와 기본값 채우기는 쓰는 쪽(lib/shortcuts.ts 의 resolveShortcuts)에서 한다
+    shortcuts: s.shortcuts && typeof s.shortcuts === "object" && !Array.isArray(s.shortcuts) ? (s.shortcuts as Record<string, string>) : {},
   };
 }
 

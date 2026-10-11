@@ -1,5 +1,6 @@
 // 그리기 화면 틀: 위 툴바 / 왼쪽 도구 막대(브러쉬·지우개) + 가운데 그림판 / 아래 상태 막대.
 import type { ReactNode } from "react";
+import { comboText } from "../../lib/shortcuts";
 import { navigate } from "../../router";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
 import type { DrawingTools } from "./useDrawingTools";
@@ -62,10 +63,10 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
 
       <div className="flex min-h-0 flex-1 gap-3">
         <nav aria-label="그리기 도구" className="flex flex-col gap-1 self-start rounded-3xl border border-white/90 bg-white/76 p-1.5 shadow-card backdrop-blur-sm">
-          <RailButton label="브러쉬" shortcut="B" active={!tools.erase} onClick={() => tools.setErase(false)}>
+          <RailButton label="브러쉬" shortcut={comboText(tools.keys.brush)} active={!tools.erase} onClick={() => tools.setErase(false)}>
             🖌️
           </RailButton>
-          <RailButton label="지우개" shortcut="E" active={tools.erase} onClick={() => tools.setErase(true)}>
+          <RailButton label="지우개" shortcut={comboText(tools.keys.eraser)} active={tools.erase} onClick={() => tools.setErase(true)}>
             🧽
           </RailButton>
         </nav>

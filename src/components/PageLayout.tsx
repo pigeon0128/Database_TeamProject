@@ -1,3 +1,4 @@
+// 모든 하위 페이지가 같이 쓰는 틀: 배경, 가운데 정렬된 본문 폭, 상단의 "← 뒤로" 버튼과 제목.
 import type { ReactNode } from "react";
 import { navigate } from "../router";
 

@@ -1,3 +1,5 @@
+// 리더보드 화면 (#/leaderboard?drawing=<id>). 그림(장면)별로 사람마다 최고 기록 1개를 순위로 보여 준다.
+// 일치율이 높은 순, 같으면 빨리 그린 순. 내 기록이 10위 밖이면 표 아래에 따로 보여 준다. 데이터는 API 서버(server/)에서 받는다.
 import { useCallback, useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../auth";

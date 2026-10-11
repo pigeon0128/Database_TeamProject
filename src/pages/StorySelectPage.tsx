@@ -1,11 +1,15 @@
+// 스토리 장면 고르기 화면 (#/story). scenes.ts의 장면들을 완성 예시 미리보기 카드로 보여 주고,
+// 누르면 그 장면의 그리기 화면(#/story/<id>)으로 이동한다. 그리던 그림이 저장된 장면은 "이어 그리기"로 표시한다.
 import { useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { scenes, type Scene } from "../data/scenes";
+import { hasDraft } from "../lib/drawingDraft";
 import { loadSceneAssets } from "../lib/sceneAssets";
 import { navigate } from "../router";
 
 function SceneCard({ scene, index }: { scene: Scene; index: number }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [inProgress] = useState(() => hasDraft(`story:${scene.id}`));
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +44,7 @@ function SceneCard({ scene, index }: { scene: Scene; index: number }) {
           <span className="mt-1 block text-sm font-medium text-ink-muted">“{scene.line}”</span>
         </span>
         <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-deep px-4 py-2 text-sm font-bold text-white transition group-hover:translate-x-1">
-          그리기 →
+          {inProgress ? "이어 그리기 →" : "그리기 →"}
         </span>
       </span>
     </button>

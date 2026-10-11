@@ -72,10 +72,11 @@ psql -U postgres -c "CREATE DATABASE doroland_drawing;"
 psql -U postgres -d doroland_drawing -v ON_ERROR_STOP=1 -f database/migrations/001_initial.sql
 psql -U postgres -d doroland_drawing -v ON_ERROR_STOP=1 -f database/seeds/dev_seed.sql
 psql -U postgres -d doroland_drawing -v ON_ERROR_STOP=1 -f database/migrations/002_auth.sql
+psql -U postgres -d doroland_drawing -v ON_ERROR_STOP=1 -f database/migrations/003_user_settings.sql
 ```
 
 - `dev_seed.sql` 은 개발용 예시 데이터(사용자·기록)라서 빼도 됩니다. 예시 사용자는 비밀번호가 없어 로그인할 수 없습니다.
-- 확인: 아래 명령으로 `users`, `chapters`, `drawings`, `play_records`, `user_artworks` 5개 테이블이 보이면 성공입니다.
+- 확인: 아래 명령으로 `users`, `chapters`, `drawings`, `play_records`, `user_artworks`, `user_settings` 6개 테이블이 보이면 성공입니다.
 
 ```powershell
 psql -U postgres -d doroland_drawing -c "\dt"

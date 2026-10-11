@@ -8,20 +8,9 @@
 // 로그인하면 DB의 설정을 불러와 바로 적용하고, 불러오기 전까지는 기본값을 쓴다.
 // DB에 아직 설정이 없으면(처음 로그인) 지금 설정을 올린다.
 import { useCallback, useSyncExternalStore } from "react";
-import { api } from "./api";
+import { api, type DrawingSettings } from "./api";
 
-export type DrawingSettings = {
-  /** 브러쉬(지우개) 굵기. 2~48 */
-  brushSize: number;
-  /** 밑그림 보이기 */
-  guideVisible: boolean;
-  /** 밑그림 진하기 (%). 10~100 */
-  guideOpacity: number;
-  /** 손떨림 보정 세기 (%). 0~100 */
-  smoothing: number;
-  /** 선 끝 얇게(시작·끝 흐리기) 단계. 0~100, 0이면 끔 */
-  fade: number;
-};
+export type { DrawingSettings };
 
 /** user_settings 테이블의 DEFAULT와 같은 값 */
 export const DEFAULT_SETTINGS: DrawingSettings = { brushSize: 6, guideVisible: true, guideOpacity: 80, smoothing: 50, fade: 0 };
@@ -29,7 +18,7 @@ export const DEFAULT_SETTINGS: DrawingSettings = { brushSize: 6, guideVisible: t
 /** 마지막으로 바꾼 뒤 이만큼 기다렸다가 DB에 저장한다 (조절 바를 끄는 동안 요청이 몰리지 않게) */
 const SAVE_DELAY_MS = 600;
 
-/** 범위를 벗어나거나 깨진 값은 기본값으로 (DB의 CHECK 제약조건과 같은 범위) */
+/** 범위를 벗어나거나 깨진 값은 기본값으로. 범위는 서버 server/routes/settings.js, DB migrations/003_user_settings.sql 의 CHECK 와 같다 */
 const inRange = (v: unknown, min: number, max: number): v is number => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
 function sanitize(raw: unknown): DrawingSettings {

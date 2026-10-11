@@ -3,20 +3,7 @@
 // - 획은 점 배열(Stroke)로 저장해 두고, 되돌리기 등으로 목록이 바뀌면 처음부터 다시 그린다.
 // - 손떨림 보정, 시작·끝 흐리기(Fade), 확대/이동(Ctrl+휠, 두 손가락), 이미지 내보내기를 담당한다.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-
-export type Point = [x: number, y: number];
-
-export type Stroke = {
-  type: "stroke";
-  color: string;
-  size: number;
-  erase: boolean;
-  /** 시작·끝이 가늘어지는 길이(캔버스 픽셀). 0이면 끔 */
-  fade: number;
-  points: Point[];
-};
-
-export type DrawAction = Stroke | { type: "clear" };
+import { taper, visibleStrokes, type DrawAction, type Point, type Stroke } from "../lib/strokes";
 
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */
@@ -70,19 +57,6 @@ function drawDot(ctx: CanvasRenderingContext2D, p: Point, size: number) {
   ctx.fill();
 }
 
-/** 페이드 끝부분의 최소 굵기 비율 */
-const FADE_MIN = 0.12;
-
-/**
- * 획의 시작에서 d만큼 떨어진 곳의 굵기 비율.
- * 시작과 끝에서 fade 길이 안쪽은 점점 가늘어진다. 그리는 중에는 끝을 모르므로 total = Infinity.
- */
-export function taper(d: number, total: number, fade: number) {
-  if (fade <= 0) return 1;
-  const t = Math.min(1, Math.max(0, Math.min(d, total - d) / fade));
-  return FADE_MIN + (1 - FADE_MIN) * t;
-}
-
 /** 각 점까지의 누적 길이 */
 function lengths(pts: Point[]) {
   const d = [0];
@@ -123,12 +97,6 @@ function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke) {
   drawDot(ctx, pts[0], w(0));
   for (let i = 1; i < pts.length; i++) drawSegment(ctx, pts, i, w(d[i - 1]));
   drawTail(ctx, pts, w((d[pts.length - 2] + total) / 2));
-}
-
-/** 마지막 "전체 지우기" 이후의 획만 다시 그린다. */
-export function visibleStrokes(actions: DrawAction[]): Stroke[] {
-  const lastClear = actions.map((a) => a.type).lastIndexOf("clear");
-  return actions.slice(lastClear + 1) as Stroke[];
 }
 
 const MIN_ZOOM = 1;

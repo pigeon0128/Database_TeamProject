@@ -1,7 +1,7 @@
 // 스토리 장면 목록. 장면을 새로 추가하려면 밑그림 이미지를 assets/story에 넣고 여기에 항목을 하나 더 적는다.
 // 장면마다 밑그림, 크기, 채점에서 뺄 영역, 따라 그리기 대상에서 뺄 영역을 정한다.
 import forestGuide from "../assets/story/forest-guide.webp";
-import type { Rect } from "../lib/traceScore";
+import type { Rect } from "../lib/strokes";
 
 export type Scene = {
   /** 주소에 쓰이는 이름 (#/story/<id>) */

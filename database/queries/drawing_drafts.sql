@@ -1,5 +1,5 @@
 -- 그리던 그림 (이어서 그리기) 불러오기 / 저장하기 / 지우기
--- 앱(src/lib/drawingDraft.ts)과 API(server/index.js 의 /api/drafts)가 쓰는 쿼리와 같다.
+-- 앱(src/lib/drawingDraft.ts)과 API(server/routes/drafts.js 의 /api/drafts)가 쓰는 쿼리와 같다.
 
 -- 1) 그리던 그림 목록 (장면 고르기 화면의 "이어 그리기" 표시)
 SELECT d.draft_key, d.saved_at, jsonb_array_length(d.strokes) AS stroke_count

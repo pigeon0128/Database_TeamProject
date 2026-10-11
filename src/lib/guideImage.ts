@@ -1,14 +1,12 @@
 // 밑그림 이미지 가공.
 // - prepareGuide: 원본 밑그림에서 따라 그리지 않을 흰 선(음표 등)을 회색으로 바꾼 "손질한 밑그림"을 만든다.
 // - makeTracedExample: 흰 선을 검게 칠한 "완성 예시" 그림을 만든다 (장면 선택 화면 미리보기, 예시 보기 버튼).
-import type { Rect } from "./traceScore";
+import { inRects, type Rect } from "./strokes";
 
 /** 밑그림 바탕 회색의 밝기 */
 const BG = 182;
 /** 이 밝기 이상이면 흰 선 (채점 기준과 같음) */
 const WHITE = 225;
-
-const inRects = (x: number, y: number, rects: Rect[]) => rects.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
 
 /**
  * 밑그림을 캔버스에 그리고, backgroundRegions 안의 흰 선을 회색 선(배경)으로 바꾼다.

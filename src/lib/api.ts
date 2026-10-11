@@ -1,6 +1,5 @@
-// API 서버(server/index.js) 호출. 개발 중에는 Vite가 /api 요청을 API 서버로 넘긴다.
-import type { Stroke } from "../components/TracingCanvas";
-import type { DrawingSettings } from "./userSettings";
+// API 서버(server/, 경로별 코드는 server/routes/) 호출. 개발 중에는 Vite가 /api 요청을 API 서버로 넘긴다.
+import type { Stroke } from "./strokes";
 
 export type User = { id: number; loginId: string };
 
@@ -11,6 +10,21 @@ export type Drawing = {
   order: number;
   chapter: { id: number; title: string; order: number };
 };
+
+/** 그리기 설정 (DB user_settings 한 행과 같은 모양. 값 범위는 서버 readSettings, DB CHECK 와 같다) */
+export type DrawingSettings = {
+  /** 브러쉬(지우개) 굵기. 2~48 */
+  brushSize: number;
+  /** 밑그림 보이기 */
+  guideVisible: boolean;
+  /** 밑그림 진하기 (%). 10~100 */
+  guideOpacity: number;
+  /** 손떨림 보정 세기 (%). 0~100 */
+  smoothing: number;
+  /** 선 끝 얇게(시작·끝 흐리기) 단계. 0~100, 0이면 끔 */
+  fade: number;
+};
+
 
 export type LeaderboardEntry = {
   ranking: number;

@@ -16,7 +16,7 @@
 //  - 펜을 떼지 않고 왔다 갔다 문지르면 같은 획의 앞부분과 겹친다.
 // 흰 선을 가로지르기만 한 획은 겹치지 않는다. 회색 구역(선 밖)은 침범 감점이 맡으므로 겹침에서 뺀다.
 
-import { taper, type Stroke } from "../components/TracingCanvas";
+import { inRects, taper, type Rect, type Stroke } from "./strokes";
 
 /** 이 밝기 이상이면 흰 선(인물/주요 요소) */
 const WHITE_MIN = 225;
@@ -43,8 +43,6 @@ const OVERLAP_PENALTY_WEIGHT = 0.6;
 const SELF_RETURN_BRUSH = 0.5;
 /** 겹침의 분모 최솟값(칠한 횟수). 막 그리기 시작했을 때 값이 튀지 않게 한다 (굵기 6으로 약 300픽셀) */
 const OVERLAP_MIN_PASSES = 2000;
-
-export type Rect = { x: number; y: number; w: number; h: number };
 
 export type GuideMasks = {
   width: number;
@@ -88,8 +86,6 @@ export const emptyScore: TraceScore = {
   grayHits: 0,
   whiteTotal: 0,
 };
-
-const inRects = (x: number, y: number, rects: Rect[]) => rects.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
 
 /** 1차원 최대값 필터를 가로·세로로 적용해 mask를 radius만큼 두껍게 만든다. */
 function dilate(mask: Uint8Array, width: number, height: number, radius: number) {

@@ -70,7 +70,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 그림을 새로 고를 때마다 설정이 기본값으로 초기화되지 않도록 사용자당 한 행으로 마지막 설정을 저장합니다.
 행이 없으면 앱의 기본값(굵기 6, 밑그림 보이기, 진하기 80%, 손떨림 보정 50%, 선 끝 얇게 끔)을 씁니다. 저장은 `ON CONFLICT ... DO UPDATE`(UPSERT)로 처리하고,
 값의 범위는 앱의 조절 범위와 같은 CHECK 제약조건으로 제한합니다. 조회·저장 SQL: `queries/user_settings.sql`
-앱은 로그인한 사용자의 설정을 API(`GET`/`PUT /api/settings`, `server/index.js`)로 불러오고 저장하며, 브라우저에는 저장하지 않습니다.
+앱은 로그인한 사용자의 설정을 API(`GET`/`PUT /api/settings`, `server/routes/settings.js`)로 불러오고 저장하며, 브라우저에는 저장하지 않습니다.
 불러오기에 실패한 동안에는 DB에 저장하지 않아서, 기본값이 DB의 설정을 덮어쓰지 않습니다.
 
 ### Drawing Drafts

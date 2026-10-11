@@ -1,20 +1,13 @@
 // 캐릭터 그리기 화면 (#/character). 밑그림·채점 없이 흰 도화지에 자유롭게 그리고, 이름을 붙여 PNG로 저장한다.
 import { useRef, useState } from "react";
 import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
-import {
-  downloadImage,
-  DrawingShell,
-  HistoryButtons,
-  LineMenu,
-  ResumeDialog,
-  ShortcutList,
-  SizeMenu,
-  ToolbarButton,
-  ToolbarDivider,
-  ToolbarMenu,
-  useDrawingDraft,
-  useDrawingTools,
-} from "../components/DrawingTools";
+import { DrawingShell } from "../components/drawing/DrawingShell";
+import { HistoryButtons, LineMenu, ShortcutList, SizeMenu } from "../components/drawing/menus";
+import { ResumeDialog } from "../components/drawing/ResumeDialog";
+import { useDrawingTools } from "../components/drawing/useDrawingTools";
+import { ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
+import { downloadImage } from "../lib/download";
+import { useDrawingDraft } from "../lib/drawingDraft";
 
 /** 정사각형 도화지 (캔버스 픽셀) */
 const CANVAS_SIZE = 1200;
@@ -26,7 +19,7 @@ export default function CharacterPage() {
   const tools = useDrawingTools(canvasRef);
   const [name, setName] = useState("");
   // 이어서 그리기: 그리던 캐릭터와 이름을 저장해 둔다.
-  const draft = useDrawingDraft("character", tools, name);
+  const draft = useDrawingDraft("character", { actions: tools.canvasProps.actions, replaceActions: tools.replaceActions }, name);
 
   const save = () => {
     const url = canvasRef.current?.exportImage(false);

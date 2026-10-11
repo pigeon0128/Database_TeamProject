@@ -1,6 +1,6 @@
 // 사용자 그리기 설정 보존 (TODO2).
 // 그림(장면)을 새로 고르거나 다시 들어와도 사용자가 마지막으로 바꾼 설정을 이어서 쓴다.
-// 필드는 DB의 user_settings 테이블(database/migrations/002_user_settings.sql)과 1:1로 맞춘다.
+// 필드는 DB의 user_settings 테이블(database/migrations/003_user_settings.sql)과 1:1로 맞춘다.
 //   brushSize ↔ brush_size, guideVisible ↔ guide_visible, guideOpacity ↔ guide_opacity,
 //   smoothing ↔ smoothing, fade ↔ fade
 // 아직 서버(REST API)가 없어서 브라우저(localStorage)에 저장한다.

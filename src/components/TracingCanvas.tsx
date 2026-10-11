@@ -42,6 +42,8 @@ type Props = {
   fade: number;
   actions: DrawAction[];
   onStrokeEnd: (stroke: Stroke) => void;
+  /** 획을 긋기 시작할 때 (타이머용) */
+  onStrokeStart?: () => void;
   /** 그리는 중이거나 다시 그려질 때마다 호출 (채점용) */
   onChange?: (canvas: HTMLCanvasElement) => void;
 };
@@ -137,7 +139,7 @@ type Mode = "none" | "draw" | "pan" | "pinch" | "blocked";
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
-  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onChange },
+  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onStrokeStart, onChange },
   ref,
 ) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -315,6 +317,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     if (e.button !== 0) return;
 
     mode.current = "draw";
+    onStrokeStart?.();
     const ctx = getCtx(e.currentTarget);
     const start = toCanvasPoint(e);
     const stroke: Stroke = { type: "stroke", color, size, erase, fade, points: [start] };

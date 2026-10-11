@@ -6,6 +6,8 @@ import type { Rect } from "../lib/traceScore";
 export type Scene = {
   /** 주소에 쓰이는 이름 (#/story/<id>) */
   id: string;
+  /** DB drawings.drawing_id (기록 저장·리더보드용). 아직 DB에 없는 장면이면 비워 둔다. */
+  drawingId?: number;
   title: string;
   line: string;
   guide: string;
@@ -20,6 +22,7 @@ export type Scene = {
 export const scenes: Scene[] = [
   {
     id: "forest-music",
+    drawingId: 1,
     title: "숲속의 노래",
     line: "소리에도 생명이 있구나!!",
     guide: forestGuide,
@@ -32,3 +35,4 @@ export const scenes: Scene[] = [
 ];
 
 export const findScene = (id: string) => scenes.find((s) => s.id === id);
+export const findSceneByDrawing = (drawingId: number) => scenes.find((s) => s.drawingId === drawingId);

@@ -366,6 +366,7 @@ export function LineMenu({ tools }: { tools: DrawingTools }) {
  *  - 처음 열 때 저장된 그림이 있으면 pending에 담아 두고, ResumeDialog로 이어 그릴지 묻는다.
  *  - 고르기 전에는 저장하지 않는다 (빈 그림으로 덮어쓰지 않게).
  *  - 그림이 바뀌면 잠깐 뒤에 저장하고, 화면을 나가거나 창을 닫을 때도 바로 저장한다. 다 지우면 저장된 그림도 지운다.
+ *  - finish(): 다 그린 그림(기록으로 저장함)은 저장된 그림을 지우고 더는 저장하지 않는다.
  * name: 캐릭터 이름처럼 그림과 같이 저장할 값
  */
 export function useDrawingDraft(key: string, tools: DrawingTools, name?: string) {
@@ -373,10 +374,11 @@ export function useDrawingDraft(key: string, tools: DrawingTools, name?: string)
   const actions = tools.canvasProps.actions;
   const latest = useRef({ actions, name, pending });
   latest.current = { actions, name, pending };
+  const finished = useRef(false);
 
   const flush = useCallback(() => {
     const { actions, name, pending } = latest.current;
-    if (pending) return;
+    if (pending || finished.current) return;
     const strokes = visibleStrokes(actions);
     if (strokes.length) saveDraft(key, strokes, name);
     else removeDraft(key);
@@ -410,7 +412,12 @@ export function useDrawingDraft(key: string, tools: DrawingTools, name?: string)
     setPending(null);
   }, [key]);
 
-  return { pending, resume, startNew };
+  const finish = useCallback(() => {
+    finished.current = true;
+    removeDraft(key);
+  }, [key]);
+
+  return { pending, resume, startNew, finish };
 }
 
 /** 저장된 그림이 있을 때 이어 그릴지 새로 그릴지 묻는 창 */

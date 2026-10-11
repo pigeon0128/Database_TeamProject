@@ -1,6 +1,7 @@
 // 로그인 상태. 앱을 열면 서버에 현재 로그인한 사용자를 물어보고, 로그인 전에는 로그인 화면만 보여 준다.
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, ApiError, type User } from "./lib/api";
+import { syncSettingsForUser } from "./lib/userSettings";
 
 type AuthContextValue = {
   user: User | null;
@@ -36,6 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(recheck, [recheck]);
+
+  // 로그인한 사용자가 바뀌면 그 사용자의 그리기 설정을 DB에서 불러온다.
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    void syncSettingsForUser(userId);
+  }, [userId]);
 
   const value: AuthContextValue = {
     user,

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "node scripts/dev-all.js",
     "dev:server": "node --watch --env-file-if-exists=.env server/index.js",
+    "db:migrate": "node --env-file-if-exists=.env scripts/db-migrate.js",
     "start:server": "node --env-file-if-exists=.env server/index.js",
     "build": "vite build",
     "preview": "vite preview",

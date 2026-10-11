@@ -6,7 +6,7 @@ import { AuthProvider, useAuth } from "./auth";
 import HomePage from "./pages/HomePage";
 import CharacterPage from "./pages/CharacterPage";
 import LoginPage from "./pages/LoginPage";
-import StoryPage from "./pages/StoryPage";
+import StoryPage from "./pages/story/StoryPage";
 import StorySelectPage from "./pages/StorySelectPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import SettingsPage from "./pages/SettingsPage";

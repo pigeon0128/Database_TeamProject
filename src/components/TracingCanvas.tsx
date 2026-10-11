@@ -3,24 +3,13 @@
 // - 획은 점 배열(Stroke)로 저장해 두고, 되돌리기 등으로 목록이 바뀌면 처음부터 다시 그린다.
 // - 손떨림 보정, 시작·끝 흐리기(Fade), 확대/이동(Ctrl+휠, 두 손가락), 이미지 내보내기를 담당한다.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-
-export type Point = [x: number, y: number];
-
-export type Stroke = {
-  type: "stroke";
-  color: string;
-  size: number;
-  erase: boolean;
-  /** 시작·끝이 가늘어지는 길이(캔버스 픽셀). 0이면 끔 */
-  fade: number;
-  points: Point[];
-};
-
-export type DrawAction = Stroke | { type: "clear" };
+import { taper, visibleStrokes, type DrawAction, type Point, type Stroke } from "../lib/strokes";
 
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */
   exportImage: (withGuide: boolean) => string | null;
+  /** 사용자가 그린 선만, 투명 배경 PNG data URL (리더보드에 올리는 완성 그림) */
+  exportDrawing: () => string | null;
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
@@ -44,7 +33,7 @@ type Props = {
   onStrokeEnd: (stroke: Stroke) => void;
   /** 획을 긋기 시작할 때 (타이머용) */
   onStrokeStart?: () => void;
-  /** 그리는 중이거나 다시 그려질 때마다 호출 (채점용) */
+  /** 획 목록이 바뀌어 다시 그린 뒤 호출 (획을 다 그었을 때, 되돌리기·지우기 등). 그리는 중에는 부르지 않는다 (채점용) */
   onChange?: (canvas: HTMLCanvasElement) => void;
 };
 
@@ -66,19 +55,6 @@ function drawDot(ctx: CanvasRenderingContext2D, p: Point, size: number) {
   ctx.beginPath();
   ctx.arc(p[0], p[1], size / 2, 0, Math.PI * 2);
   ctx.fill();
-}
-
-/** 페이드 끝부분의 최소 굵기 비율 */
-const FADE_MIN = 0.12;
-
-/**
- * 획의 시작에서 d만큼 떨어진 곳의 굵기 비율.
- * 시작과 끝에서 fade 길이 안쪽은 점점 가늘어진다. 그리는 중에는 끝을 모르므로 total = Infinity.
- */
-export function taper(d: number, total: number, fade: number) {
-  if (fade <= 0) return 1;
-  const t = Math.min(1, Math.max(0, Math.min(d, total - d) / fade));
-  return FADE_MIN + (1 - FADE_MIN) * t;
 }
 
 /** 각 점까지의 누적 길이 */
@@ -121,12 +97,6 @@ function drawStroke(ctx: CanvasRenderingContext2D, s: Stroke) {
   drawDot(ctx, pts[0], w(0));
   for (let i = 1; i < pts.length; i++) drawSegment(ctx, pts, i, w(d[i - 1]));
   drawTail(ctx, pts, w((d[pts.length - 2] + total) / 2));
-}
-
-/** 마지막 "전체 지우기" 이후의 획만 다시 그린다. */
-export function visibleStrokes(actions: DrawAction[]): Stroke[] {
-  const lastClear = actions.map((a) => a.type).lastIndexOf("clear");
-  return actions.slice(lastClear + 1) as Stroke[];
 }
 
 const MIN_ZOOM = 1;
@@ -218,6 +188,9 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       }
       ctx.drawImage(canvas, 0, 0);
       return out.toDataURL("image/png");
+    },
+    exportDrawing() {
+      return canvasRef.current?.toDataURL("image/png") ?? null;
     },
     zoomIn: () => zoomAt(ZOOM_STEP),
     zoomOut: () => zoomAt(1 / ZOOM_STEP),
@@ -327,7 +300,6 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     rawLast.current = start;
     applyStyle(ctx, stroke);
     drawDot(ctx, start, size * taper(0, Infinity, fade));
-    onChange?.(e.currentTarget);
   };
 
   /** 보정된 점 p를 획에 붙이고 그 구간을 바로 그린다. 너무 가까운 점은 건너뛴다. */
@@ -375,7 +347,6 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       const s = smoothed.current;
       addPoint(ctx, stroke, [s[0] + (raw[0] - s[0]) * follow, s[1] + (raw[1] - s[1]) * follow]);
     }
-    onChange?.(e.currentTarget);
   };
 
   const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {

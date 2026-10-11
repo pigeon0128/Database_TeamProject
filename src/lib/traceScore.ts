@@ -1,7 +1,6 @@
 // 따라 그리기 채점 (픽셀 단위).
 // - buildGuideMasks: 밑그림에서 흰 선·회색 구역을 미리 구한다 (장면마다 한 번).
 // - scoreCanvas: 사용자가 그린 캔버스와 획을 마스크와 비교해 점수를 낸다 (그리는 동안 계속).
-// - maxBrushSize: 흰 선 두께에 맞춘 브러쉬 최대 굵기.
 //
 // 밑그림에서 "흰 선 픽셀"과 "회색 구역 픽셀"(회색 선 + 회색 바탕, 즉 흰 선이 아닌 모든 곳)을
 // 미리 구해 두고, 사용자가 칠한 픽셀과 비교한다.
@@ -17,7 +16,7 @@
 //  - 펜을 떼지 않고 왔다 갔다 문지르면 같은 획의 앞부분과 겹친다.
 // 흰 선을 가로지르기만 한 획은 겹치지 않는다. 회색 구역(선 밖)은 침범 감점이 맡으므로 겹침에서 뺀다.
 
-import { taper, type Stroke } from "../components/TracingCanvas";
+import { inRects, taper, type Rect, type Stroke } from "./strokes";
 
 /** 이 밝기 이상이면 흰 선(인물/주요 요소) */
 const WHITE_MIN = 225;
@@ -30,8 +29,6 @@ const GRAY_TOLERANCE = 3;
 const GRAY_PENALTY_WEIGHT = 10;
 /** 칠한 것으로 보는 최소 알파값 */
 const PAINT_ALPHA_MIN = 40;
-/** 브러쉬 최대 굵기 = 흰 선 평균 두께 × 이 값 */
-const BRUSH_WIDTH_RATIO = 1.2;
 /** 칠한 픽셀로 보이는 브러쉬 가장자리 (안티앨리어싱으로 반지름보다 조금 더 칠해진다) */
 const BRUSH_EDGE = 0.5;
 /** 겹침이 이 %까지는 감점하지 않는다 (획을 이어 그린 곳, 선이 만나는 곳 등) */
@@ -47,8 +44,6 @@ const SELF_RETURN_BRUSH = 0.5;
 /** 겹침의 분모 최솟값(칠한 횟수). 막 그리기 시작했을 때 값이 튀지 않게 한다 (굵기 6으로 약 300픽셀) */
 const OVERLAP_MIN_PASSES = 2000;
 
-export type Rect = { x: number; y: number; w: number; h: number };
-
 export type GuideMasks = {
   width: number;
   height: number;
@@ -56,12 +51,13 @@ export type GuideMasks = {
   gray: Uint8Array;
   whiteTotal: number;
   grayTotal: number;
-  /** 흰 선 평균 두께(픽셀) = 흰 선 넓이 / 중심선 길이 */
-  lineWidth: number;
 };
 
 export type TraceScore = {
+  /** 화면에 보이는 점수 (정수) */
   score: number;
+  /** 반올림 전 점수, 소수 둘째 자리까지 (기록 저장용). score는 이것을 반올림한 값이다 */
+  exactScore: number;
   /** 흰 선 픽셀 중 칠한 비율 (%) */
   whitePct: number;
   /** 회색 구역 픽셀 중 칠한 비율 (%) */
@@ -80,6 +76,7 @@ export type TraceScore = {
 
 export const emptyScore: TraceScore = {
   score: 0,
+  exactScore: 0,
   whitePct: 0,
   grayPct: 0,
   penalty: 0,
@@ -89,11 +86,6 @@ export const emptyScore: TraceScore = {
   grayHits: 0,
   whiteTotal: 0,
 };
-
-/** 흰 선 두께에 맞춘 브러쉬 최대 굵기 (짝수, 2 이상) */
-export const maxBrushSize = (masks: GuideMasks) => Math.max(2, Math.ceil((masks.lineWidth * BRUSH_WIDTH_RATIO) / 2) * 2);
-
-const inRects = (x: number, y: number, rects: Rect[]) => rects.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
 
 /** 1차원 최대값 필터를 가로·세로로 적용해 mask를 radius만큼 두껍게 만든다. */
 function dilate(mask: Uint8Array, width: number, height: number, radius: number) {
@@ -113,73 +105,6 @@ function dilate(mask: Uint8Array, width: number, height: number, radius: number)
     }
   }
   return out;
-}
-
-/**
- * Zhang-Suen 세선화: mask를 가운데 1픽셀 두께의 중심선만 남을 때까지 깎는다.
- * 가장자리 1픽셀은 이웃을 볼 수 없으므로 중심선에서 뺀다.
- */
-function thin(mask: Uint8Array, width: number, height: number) {
-  const img = new Uint8Array(mask.length);
-  let cand: number[] = [];
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const i = y * width + x;
-      if (mask[i]) {
-        img[i] = 1;
-        cand.push(i);
-      }
-    }
-  }
-
-  const w = width;
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let step = 0; step < 2; step++) {
-      const remove: number[] = [];
-      for (const i of cand) {
-        // 위부터 시계 방향: p2(N) p3(NE) p4(E) p5(SE) p6(S) p7(SW) p8(W) p9(NW)
-        const p2 = img[i - w], p3 = img[i - w + 1], p4 = img[i + 1], p5 = img[i + w + 1];
-        const p6 = img[i + w], p7 = img[i + w - 1], p8 = img[i - 1], p9 = img[i - w - 1];
-        const b = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
-        if (b < 2 || b > 6) continue;
-        // 한 바퀴 돌면서 0 → 1로 바뀌는 횟수가 1이어야 지워도 선이 끊기지 않는다.
-        const ring = [p2, p3, p4, p5, p6, p7, p8, p9, p2];
-        let a = 0;
-        for (let k = 0; k < 8; k++) if (!ring[k] && ring[k + 1]) a++;
-        if (a !== 1) continue;
-        if (step === 0 ? p2 * p4 * p6 || p4 * p6 * p8 : p2 * p4 * p8 || p2 * p6 * p8) continue;
-        remove.push(i);
-      }
-      for (const i of remove) img[i] = 0;
-      if (remove.length) {
-        changed = true;
-        cand = cand.filter((i) => img[i]);
-      }
-    }
-  }
-  return { img, pixels: cand };
-}
-
-/**
- * 중심선 전체 길이. 이웃한 중심선 픽셀과의 연결 길이(가로·세로 1, 대각선 √2)를 양쪽 픽셀이 반씩 나눠 가진다.
- * 대각선은 가로·세로로 이미 이어져 있으면 세지 않는다. 그냥 픽셀 수를 세면 대각선 선이 실제보다 짧게 잡힌다.
- */
-function skeletonLength(img: Uint8Array, pixels: number[], width: number) {
-  const half = Math.SQRT2 / 2;
-  let total = 0;
-  for (const i of pixels) {
-    const n = img[i - width], s = img[i + width], e = img[i + 1], wst = img[i - 1];
-    let len = (n + s + e + wst) * 0.5;
-    if (img[i - width + 1] && !n && !e) len += half;
-    if (img[i + width + 1] && !s && !e) len += half;
-    if (img[i + width - 1] && !s && !wst) len += half;
-    if (img[i - width - 1] && !n && !wst) len += half;
-    // 혼자 떨어진 점도 길이 1로 친다.
-    total += len || 1;
-  }
-  return total;
 }
 
 export function buildGuideMasks(img: CanvasImageSource, width: number, height: number, exclude: Rect[] = []): GuideMasks {
@@ -213,11 +138,7 @@ export function buildGuideMasks(img: CanvasImageSource, width: number, height: n
       grayTotal++;
     }
   }
-  // 브러쉬 최대 굵기를 정하려고 흰 선 평균 두께를 잰다 (넓이 / 중심선 길이).
-  const { img: skeletonMask, pixels } = thin(white, width, height);
-  const lineLength = skeletonLength(skeletonMask, pixels, width);
-
-  return { width, height, white, gray, whiteTotal, grayTotal, lineWidth: whiteTotal / Math.max(1, lineLength) };
+  return { width, height, white, gray, whiteTotal, grayTotal };
 }
 
 /** 겹침 계산에 쓰는 픽셀별 기록. 밑그림마다 한 벌 만들어 두고 채점할 때마다 다시 쓴다. */
@@ -352,6 +273,6 @@ export function scoreCanvas(canvas: HTMLCanvasElement, masks: GuideMasks, stroke
   const penalty = grayPct * GRAY_PENALTY_WEIGHT;
   const overlapPct = countOverlap(masks, strokes);
   const overlapPenalty = Math.max(0, overlapPct - OVERLAP_FREE_PCT) * OVERLAP_PENALTY_WEIGHT;
-  const score = Math.round(Math.max(0, Math.min(100, whitePct - penalty - overlapPenalty)));
-  return { score, whitePct, grayPct, penalty, overlapPct, overlapPenalty, whiteHits, grayHits, whiteTotal: masks.whiteTotal };
+  const exactScore = Math.round(Math.max(0, Math.min(100, whitePct - penalty - overlapPenalty)) * 100) / 100;
+  return { score: Math.round(exactScore), exactScore, whitePct, grayPct, penalty, overlapPct, overlapPenalty, whiteHits, grayHits, whiteTotal: masks.whiteTotal };
 }

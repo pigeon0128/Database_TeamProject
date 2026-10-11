@@ -1,7 +1,7 @@
 // 스토리 장면 목록. 장면을 새로 추가하려면 밑그림 이미지를 assets/story에 넣고 여기에 항목을 하나 더 적는다.
 // 장면마다 밑그림, 크기, 채점에서 뺄 영역, 따라 그리기 대상에서 뺄 영역을 정한다.
 import forestGuide from "../assets/story/forest-guide.webp";
-import type { Rect } from "../lib/traceScore";
+import type { Rect } from "../lib/strokes";
 
 export type Scene = {
   /** 주소에 쓰이는 이름 (#/story/<id>) */
@@ -17,6 +17,11 @@ export type Scene = {
   scoreExclude: Rect[];
   /** 이 영역의 흰 선은 따라 그리기 대상에서 빼고 회색 선(배경)으로 바꾼다 */
   backgroundRegions: Rect[];
+  /**
+   * 브러쉬 최대 굵기를 기본(6)보다 낮출 때. 흰 선이 아주 가는 밑그림이면 굵은 브러쉬로 선을 덮어 버리지 않게 줄인다.
+   * 흰 선 평균 두께 × 1.2 정도가 알맞다 (숲속의 노래: 흰 선 약 4.2픽셀 → 6이라 기본값 그대로).
+   */
+  maxBrushSize?: number;
 };
 
 export const scenes: Scene[] = [

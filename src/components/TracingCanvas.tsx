@@ -73,7 +73,7 @@ const FADE_MIN = 0.12;
  * 획의 시작에서 d만큼 떨어진 곳의 굵기 비율.
  * 시작과 끝에서 fade 길이 안쪽은 점점 가늘어진다. 그리는 중에는 끝을 모르므로 total = Infinity.
  */
-function taper(d: number, total: number, fade: number) {
+export function taper(d: number, total: number, fade: number) {
   if (fade <= 0) return 1;
   const t = Math.min(1, Math.max(0, Math.min(d, total - d) / fade));
   return FADE_MIN + (1 - FADE_MIN) * t;

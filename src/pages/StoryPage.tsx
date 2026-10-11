@@ -7,12 +7,15 @@ import {
   downloadImage,
   DrawingShell,
   HistoryButtons,
+  LineMenu,
   MenuItem,
+  ResumeDialog,
   ShortcutList,
   SizeMenu,
   ToolbarButton,
   ToolbarDivider,
   ToolbarMenu,
+  useDrawingDraft,
   useDrawingTools,
 } from "../components/DrawingTools";
 import { findScene, type Scene } from "../data/scenes";
@@ -94,7 +97,10 @@ export default function StoryPage({ sceneId }: { sceneId: string }) {
 function SceneDrawing({ scene }: { scene: Scene }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
   const [brushMax, setBrushMax] = useState<number | undefined>();
-  const tools = useDrawingTools(canvasRef, { maxBrushSize: brushMax });
+  // 따라 그리기는 채점하므로 선 끝 얇게를 쓰지 않는다 (손떨림 보정만).
+  const tools = useDrawingTools(canvasRef, { maxBrushSize: brushMax, fade: false });
+  // 이어서 그리기: 장면마다 그리던 그림을 따로 저장한다.
+  const draft = useDrawingDraft(`story:${scene.id}`, tools);
 
   // 밑그림 설정은 다른 장면을 그릴 때도 이어지도록 저장해 둔다 (lib/userSettings).
   const [showGuide, setShowGuide] = useSavedSetting("guideVisible");
@@ -160,6 +166,7 @@ function SceneDrawing({ scene }: { scene: Scene }) {
             <span className="mr-1 rounded-full bg-sun px-3 py-1 text-sm font-black text-ink">{scene.title}</span>
             <ToolbarDivider />
             <SizeMenu tools={tools} />
+            <LineMenu tools={tools} />
             <ToolbarMenu title="밑그림 설정" label="🖼️ 밑그림">
               {(close) => (
                 <>
@@ -255,6 +262,8 @@ function SceneDrawing({ scene }: { scene: Scene }) {
           onChange={handleCanvasChange}
         />
       </DrawingShell>
+
+      {draft.pending && <ResumeDialog draft={draft.pending} onResume={draft.resume} onStartNew={draft.startNew} />}
 
       {showExample && exampleUrl && (
         <div

@@ -2,20 +2,20 @@
 // - useDrawingTools: 굵기·지우개·획 목록·되돌리기 상태를 관리하고 단축키를 등록하는 훅
 // - DrawingShell: 위 툴바 / 왼쪽 도구 막대 + 가운데 그림판 / 아래 상태 막대로 된 화면 틀
 // - ToolbarButton, ToolbarMenu, MenuItem: 툴바 버튼과 눌렀을 때 펼쳐지는 메뉴
-// - SizeMenu, HistoryButtons, ShortcutList: 굵기 조절 바, 되돌리기/다시, 단축키 목록
+// - SizeMenu, LineMenu, HistoryButtons, ShortcutList: 굵기 조절 바, 선 다듬기(손떨림 보정·선 끝 얇게), 되돌리기/다시, 단축키 목록
+// - useDrawingDraft, ResumeDialog: 이어서 그리기 (그리던 그림을 저장해 두고 다시 열면 이어 그릴지 묻는다)
 // - downloadImage: 그린 그림을 PNG 파일로 내려받기
-// 선화 연습이 목적이라 색은 검정 하나, 손떨림 보정과 시작·끝 흐리기는 고정값으로 쓴다.
+// 선화 연습이 목적이라 색은 검정 하나만 쓴다. 굵기·손떨림 보정·선 끝 얇게는 저장해 두고 다음에도 이어 쓴다.
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { loadDraft, removeDraft, saveDraft, type Draft } from "../lib/drawingDraft";
 import { useSavedSetting } from "../lib/userSettings";
 import { navigate } from "../router";
 import { visibleStrokes, type DrawAction, type Stroke, type TracingCanvasHandle } from "./TracingCanvas";
 
 /** 펜 색 (검정 고정) */
 const INK_COLOR = "#363636";
-/** 손떨림 보정 세기 (0~1) */
-const SMOOTHING = 0.5;
-/** 시작·끝 흐리기 길이(캔버스 픽셀) */
-const FADE_PX = 9;
+/** 선 끝 얇게 조절 바 1칸 = 캔버스 3픽셀 (최대 300픽셀에 걸쳐 가늘어짐) */
+const FADE_PX_PER_STEP = 3;
 const MIN_SIZE = 2;
 /** 브러쉬 최대 굵기 */
 const BRUSH_MAX_SIZE = 6;
@@ -39,12 +39,19 @@ const shortcuts: [keys: string[], desc: string][] = [
 /**
  * 그리기 상태와 동작을 한데 묶은 훅. 키보드 단축키도 여기서 등록한다.
  * maxBrushSize: 브러쉬 최대 굵기를 BRUSH_MAX_SIZE보다 더 낮출 때 (따라 그리기에서 흰 선 두께에 맞출 때). 지우개에는 적용하지 않는다.
+ * fade: false면 선 끝 얇게를 쓰지 않는다 (따라 그리기: 선 끝이 뾰족하면 짧게 끊어 그린 털선이 서로 안 겹쳐 감점을 피해 간다).
+ *       저장된 선 끝 얇게 값은 그대로 두므로 캐릭터 그리기에서는 계속 쓴다.
  */
-export function useDrawingTools(canvasRef: RefObject<TracingCanvasHandle | null>, { maxBrushSize = BRUSH_MAX_SIZE }: { maxBrushSize?: number } = {}) {
+export function useDrawingTools(
+  canvasRef: RefObject<TracingCanvasHandle | null>,
+  { maxBrushSize = BRUSH_MAX_SIZE, fade: fadeEnabled = true }: { maxBrushSize?: number; fade?: boolean } = {},
+) {
   const [actions, setActions] = useState<DrawAction[]>([]);
   const [redoStack, setRedoStack] = useState<DrawAction[]>([]);
   // 굵기는 그림을 바꿔도 이어지도록 저장해 둔다 (lib/userSettings).
   const [rawSize, setRawSize] = useSavedSetting("brushSize");
+  const [smoothing, setSmoothing] = useSavedSetting("smoothing");
+  const [fade, setFade] = useSavedSetting("fade");
   const [erase, setErase] = useState(false);
 
   // 브러쉬와 지우개가 굵기를 같이 쓰므로, 저장된 값은 두고 쓸 때만 상한으로 자른다.
@@ -70,6 +77,12 @@ export function useDrawingTools(canvasRef: RefObject<TracingCanvasHandle | null>
     setActions((prev) => [...prev, redoStack[redoStack.length - 1]]);
     setRedoStack(redoStack.slice(0, -1));
   }, [redoStack]);
+
+  /** 저장해 둔 그림을 불러올 때: 획 목록을 통째로 바꾸고 다시 하기 목록은 비운다. */
+  const replaceActions = useCallback((next: DrawAction[]) => {
+    setActions(next);
+    setRedoStack([]);
+  }, []);
 
   const clearAll = () => {
     if (!hasDrawing) return;
@@ -120,19 +133,25 @@ export function useDrawingTools(canvasRef: RefObject<TracingCanvasHandle | null>
     size,
     sizeMax,
     erase,
+    smoothing,
+    fade,
+    fadeEnabled,
     hasDrawing,
     setSize,
     setErase,
+    setSmoothing,
+    setFade,
     undo,
     redo,
     clearAll,
+    replaceActions,
     /** TracingCanvas에 그대로 넘기는 값 */
     canvasProps: {
       color: INK_COLOR,
       size,
       erase,
-      smoothing: SMOOTHING,
-      fade: FADE_PX,
+      smoothing: smoothing / 100,
+      fade: fadeEnabled ? fade * FADE_PX_PER_STEP : 0,
       actions,
       onStrokeEnd: addStroke,
     },
@@ -295,6 +314,126 @@ export function SizeMenu({ tools }: { tools: DrawingTools }) {
         </label>
       )}
     </ToolbarMenu>
+  );
+}
+
+/** 툴바의 선 다듬기 메뉴: 손떨림 보정과 선 끝 얇게 조절 바 (선 끝 얇게를 끈 화면에서는 손떨림 보정만) */
+export function LineMenu({ tools }: { tools: DrawingTools }) {
+  const { smoothing, fade, fadeEnabled } = tools;
+  return (
+    <ToolbarMenu title={fadeEnabled ? "손떨림 보정, 선 끝 얇게" : "손떨림 보정"} label={fadeEnabled ? "〰️ 선 다듬기" : "〰️ 손떨림 보정"}>
+      {() => (
+        <>
+          <label className="block text-sm font-bold">
+            <span className="flex justify-between">
+              손떨림 보정 <span className="tabular-nums text-ink-muted">{smoothing}%</span>
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={smoothing}
+              onChange={(e) => tools.setSmoothing(Number(e.target.value))}
+              className="mt-2 w-full accent-sky-deep"
+            />
+          </label>
+          {fadeEnabled && (
+            <label className="mt-3 block text-sm font-bold">
+              <span className="flex justify-between">
+                선 끝 얇게 <span className="tabular-nums text-ink-muted">{fade === 0 ? "끔" : fade}</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={fade}
+                onChange={(e) => tools.setFade(Number(e.target.value))}
+                className="mt-2 w-full accent-sky-deep"
+              />
+            </label>
+          )}
+          <p className="mt-2 text-xs font-medium text-ink-muted">
+            {fadeEnabled ? "보정을 올리면 선이 부드러워지고, 선 끝 얇게를 올리면 선의 시작과 끝이 가늘어져요." : "보정을 올리면 손이 떨려도 선이 부드럽게 그려져요."}
+          </p>
+        </>
+      )}
+    </ToolbarMenu>
+  );
+}
+
+/**
+ * 이어서 그리기. key마다(그림마다) 그리던 획을 저장해 둔다.
+ *  - 처음 열 때 저장된 그림이 있으면 pending에 담아 두고, ResumeDialog로 이어 그릴지 묻는다.
+ *  - 고르기 전에는 저장하지 않는다 (빈 그림으로 덮어쓰지 않게).
+ *  - 그림이 바뀌면 잠깐 뒤에 저장하고, 화면을 나가거나 창을 닫을 때도 바로 저장한다. 다 지우면 저장된 그림도 지운다.
+ * name: 캐릭터 이름처럼 그림과 같이 저장할 값
+ */
+export function useDrawingDraft(key: string, tools: DrawingTools, name?: string) {
+  const [pending, setPending] = useState<Draft | null>(() => loadDraft(key));
+  const actions = tools.canvasProps.actions;
+  const latest = useRef({ actions, name, pending });
+  latest.current = { actions, name, pending };
+
+  const flush = useCallback(() => {
+    const { actions, name, pending } = latest.current;
+    if (pending) return;
+    const strokes = visibleStrokes(actions);
+    if (strokes.length) saveDraft(key, strokes, name);
+    else removeDraft(key);
+  }, [key]);
+
+  useEffect(() => {
+    if (pending) return;
+    const t = setTimeout(flush, 400);
+    return () => clearTimeout(t);
+  }, [pending, actions, name, flush]);
+
+  useEffect(() => {
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      flush();
+    };
+  }, [flush]);
+
+  const { replaceActions } = tools;
+  /** 저장된 그림을 불러온다. 같이 저장한 값(이름 등)을 돌려준다. */
+  const resume = useCallback(() => {
+    if (!pending) return undefined;
+    replaceActions(pending.strokes);
+    setPending(null);
+    return pending.name;
+  }, [pending, replaceActions]);
+
+  const startNew = useCallback(() => {
+    removeDraft(key);
+    setPending(null);
+  }, [key]);
+
+  return { pending, resume, startNew };
+}
+
+/** 저장된 그림이 있을 때 이어 그릴지 새로 그릴지 묻는 창 */
+export function ResumeDialog({ draft, onResume, onStartNew }: { draft: Draft; onResume: () => void; onStartNew: () => void }) {
+  const when = new Date(draft.savedAt).toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return (
+    <div role="dialog" aria-modal="true" aria-label="이어서 그리기" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-3xl border border-white/90 bg-white p-6 text-center shadow-card-hover">
+        <p className="text-4xl" aria-hidden="true">
+          ✏️
+        </p>
+        <h2 className="mt-2 text-xl font-black">그리던 그림이 있어요</h2>
+        <p className="mt-1 text-sm font-medium text-ink-muted">{when}에 그리던 그림이에요. 이어서 그릴까요?</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" onClick={onStartNew} className="rounded-full bg-sky-soft py-3 text-sm font-bold hover:bg-sky-haze">
+            새로 그리기
+          </button>
+          <button type="button" onClick={onResume} autoFocus className="rounded-full bg-ink py-3 text-sm font-bold text-white hover:bg-sky-deep">
+            이어서 그리기
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

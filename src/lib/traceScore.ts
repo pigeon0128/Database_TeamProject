@@ -17,7 +17,7 @@
 //  - 펜을 떼지 않고 왔다 갔다 문지르면 같은 획의 앞부분과 겹친다.
 // 흰 선을 가로지르기만 한 획은 겹치지 않는다. 회색 구역(선 밖)은 침범 감점이 맡으므로 겹침에서 뺀다.
 
-import type { Stroke } from "../components/TracingCanvas";
+import { taper, type Stroke } from "../components/TracingCanvas";
 
 /** 이 밝기 이상이면 흰 선(인물/주요 요소) */
 const WHITE_MIN = 225;
@@ -35,7 +35,7 @@ const BRUSH_WIDTH_RATIO = 1.2;
 /** 칠한 픽셀로 보이는 브러쉬 가장자리 (안티앨리어싱으로 반지름보다 조금 더 칠해진다) */
 const BRUSH_EDGE = 0.5;
 /** 겹침이 이 %까지는 감점하지 않는다 (획을 이어 그린 곳, 선이 만나는 곳 등) */
-const OVERLAP_FREE_PCT = 10;
+const OVERLAP_FREE_PCT = 12;
 /** 겹침이 허용치보다 1%p 많을 때마다 깎는 점수 */
 const OVERLAP_PENALTY_WEIGHT = 0.6;
 /**
@@ -251,9 +251,10 @@ function getOverlapBuffers(masks: GuideMasks) {
 }
 
 /**
- * 획들을 순서대로 붓 모양(지름 = 브러쉬 굵기)으로 1픽셀 간격으로 찍으면서 겹침을 센다.
- * 시작·끝 흐리기(가늘어지는 끝)는 무시하고 원래 굵기로 찍는다. 흐리기를 반영하면 짧은 털선의 끝이 뾰족해져서
- * 서로 거의 닿지 않는다 (12픽셀 털선을 이어 붙여도 겹침 2.5%, 원래 굵기로는 29.7%).
+ * 획들을 순서대로 붓 모양으로 1픽셀 간격으로 찍으면서 겹침을 센다.
+ * 붓 지름은 화면에 그려지는 것과 같다 (손떨림 보정된 점, 선 끝 얇게로 가늘어진 굵기). 보이는 대로 판정한다.
+ * 선 끝 얇게를 쓰면 획 끝이 뾰족해져 짧게 끊어 그린 털선이 거의 안 겹치므로
+ * (12픽셀 털선 이어 붙이기: 끔 29.7%, 2단계 2.0%) 채점하는 따라 그리기에서는 선 끝 얇게를 끈다 (StoryPage).
  * 한 픽셀에 대해
  *  - 다른 획이 이미 칠해 둔 곳을 새 획이 칠하면 겹침 1번
  *  - 같은 획이 그 픽셀을 떠났다가 SELF_RETURN_BRUSH × 굵기 이상 더 가서 다시 칠하면 겹침 1번 (왔다 갔다 문지르기)
@@ -268,10 +269,12 @@ function countOverlap(masks: GuideMasks, strokes: Stroke[]) {
   strokes.forEach((s, k) => {
     const pts = s.points;
     const returnGap = s.size * SELF_RETURN_BRUSH;
+    let total = 0;
+    for (let j = 1; j < pts.length; j++) total += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]);
 
-    const r = s.size / 2 + BRUSH_EDGE;
-    const r2 = r * r;
     const stamp = (cx: number, cy: number, arc: number) => {
+      const r = (s.size * taper(arc, total, s.fade)) / 2 + BRUSH_EDGE;
+      const r2 = r * r;
       for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(height - 1, Math.ceil(cy + r)); y++) {
         for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(width - 1, Math.ceil(cx + r)); x++) {
           const dx = x + 0.5 - cx;

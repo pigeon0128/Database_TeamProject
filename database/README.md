@@ -59,6 +59,9 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 그림을 새로 고를 때마다 설정이 기본값으로 초기화되지 않도록 사용자당 한 행으로 마지막 설정을 저장합니다.
 행이 없으면 앱의 기본값(굵기 6, 밑그림 보이기, 진하기 80%, 손떨림 보정 50%, 선 끝 얇게 끔)을 씁니다. 저장은 `ON CONFLICT ... DO UPDATE`(UPSERT)로 처리하고,
 값의 범위는 앱의 조절 범위와 같은 CHECK 제약조건으로 제한합니다. 조회·저장 SQL: `queries/user_settings.sql`
+앱은 로그인한 사용자의 설정을 API(`GET`/`PUT /api/settings`, `server/index.js`)로 불러오고 저장합니다.
+화면을 바로 띄우고 서버에 잠깐 연결되지 않을 때도 쓸 수 있도록 브라우저(localStorage)에도 사용자별 사본을 둡니다.
+불러오기에 실패한 동안에는 DB에 저장하지 않아서, 기본값이 DB의 설정을 덮어쓰지 않습니다.
 
 ## 6. Leaderboard
 
@@ -97,7 +100,6 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 
 - 닉네임만으로는 사용자 소유권이나 인증을 보장하지 않습니다.
 - 사용자 이미지 파일 업로드는 아직 연동하지 않았습니다.
-- REST API 및 공용 PostgreSQL 배포는 별도 작업이 필요합니다.
-  그래서 앱은 지금 그리기 설정을 브라우저(localStorage)에 저장하고, API가 생기면 `src/lib/userSettings.ts`의 저장·불러오기를 `user_settings` 테이블로 바꿉니다.
+- 공용 PostgreSQL 배포는 별도 작업이 필요합니다.
 - `docs/erd.png`에는 아직 `user_settings` 테이블이 없습니다.
 - 외부 이미지 파일 삭제는 DB의 ON DELETE CASCADE만으로 처리되지 않습니다.

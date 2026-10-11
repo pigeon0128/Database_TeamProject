@@ -1,4 +1,5 @@
 // API 서버(server/index.js) 호출. 개발 중에는 Vite가 /api 요청을 API 서버로 넘긴다.
+import type { DrawingSettings } from "./userSettings";
 
 export type User = { id: number; loginId: string };
 
@@ -29,7 +30,8 @@ export class ApiError extends Error {
 
 const SERVER_DOWN = "API 서버에 연결할 수 없어요. 터미널에서 pnpm dev:server 가 실행 중인지 확인해 주세요.";
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** keepalive: 페이지를 닫는 중에도 요청을 끝까지 보낸다 (설정 저장) */
+async function request<T>(method: string, path: string, body?: unknown, { keepalive = false } = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
@@ -37,6 +39,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: "same-origin",
+      keepalive,
     });
   } catch {
     throw new ApiError(SERVER_DOWN, 0);
@@ -59,4 +62,8 @@ export const api = {
     request<{ recordId: number; playedAt: string }>("POST", "/play-records", { drawingId, similarityScore, durationMs }),
   leaderboard: (drawingId: number, limit = 10) =>
     request<{ top: LeaderboardEntry[]; me: LeaderboardEntry | null }>("GET", `/leaderboard?drawingId=${drawingId}&limit=${limit}`),
+  /** 저장된 설정이 없으면 settings: null */
+  getSettings: () => request<{ settings: DrawingSettings | null }>("GET", "/settings"),
+  saveSettings: (settings: DrawingSettings, opts?: { keepalive?: boolean }) =>
+    request<{ settings: DrawingSettings }>("PUT", "/settings", settings, opts),
 };

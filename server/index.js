@@ -114,6 +114,61 @@ app.post("/api/play-records", requireUser, async (req, res) => {
   res.status(201).json({ recordId: Number(rows[0].record_id), playedAt: rows[0].played_at });
 });
 
+// ── 그리기 설정 ───────────────────────────────────────────
+// 사용자당 한 행(user_settings). 범위는 database/migrations/003_user_settings.sql 의 CHECK 제약과 같다.
+function readSettings(body) {
+  const int = (value, min, max, name) => {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < min || n > max) throw new BadRequest(`${name} 값은 ${min}~${max} 사이여야 해요.`);
+    return n;
+  };
+  if (typeof body?.guideVisible !== "boolean") throw new BadRequest("밑그림 보이기 값이 올바르지 않아요.");
+  return {
+    brushSize: int(body.brushSize, 2, 48, "굵기"),
+    guideVisible: body.guideVisible,
+    guideOpacity: int(body.guideOpacity, 10, 100, "밑그림 진하기"),
+    smoothing: int(body.smoothing, 0, 100, "손떨림 보정"),
+    fade: int(body.fade, 0, 100, "선 끝 얇게"),
+  };
+}
+
+const toSettings = (r) => ({
+  brushSize: r.brush_size,
+  guideVisible: r.guide_visible,
+  guideOpacity: r.guide_opacity,
+  smoothing: r.smoothing,
+  fade: r.fade,
+  updatedAt: r.updated_at,
+});
+
+// 저장된 설정이 없으면 settings: null (앱이 기본값이나 브라우저에 있던 값을 쓴다)
+app.get("/api/settings", requireUser, async (req, res) => {
+  const { rows } = await pool.query(
+    "SELECT brush_size, guide_visible, guide_opacity, smoothing, fade, updated_at FROM user_settings WHERE user_id = $1",
+    [req.userId],
+  );
+  res.json({ settings: rows.length ? toSettings(rows[0]) : null });
+});
+
+// 처음이면 INSERT, 이미 있으면 UPDATE (database/queries/user_settings.sql 의 UPSERT와 같다)
+app.put("/api/settings", requireUser, async (req, res) => {
+  const s = readSettings(req.body);
+  const { rows } = await pool.query(
+    `INSERT INTO user_settings (user_id, brush_size, guide_visible, guide_opacity, smoothing, fade)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (user_id) DO UPDATE
+     SET brush_size = EXCLUDED.brush_size,
+         guide_visible = EXCLUDED.guide_visible,
+         guide_opacity = EXCLUDED.guide_opacity,
+         smoothing = EXCLUDED.smoothing,
+         fade = EXCLUDED.fade,
+         updated_at = NOW()
+     RETURNING brush_size, guide_visible, guide_opacity, smoothing, fade, updated_at`,
+    [req.userId, s.brushSize, s.guideVisible, s.guideOpacity, s.smoothing, s.fade],
+  );
+  res.json({ settings: toSettings(rows[0]) });
+});
+
 // ── 리더보드 ──────────────────────────────────────────────
 // database/queries/leaderboard.sql 과 같은 규칙(사용자별 최고 기록 1건, 일치율↓ 시간↑ 완료시각↑ 기록ID↑)에
 // 그림 ID·개수를 매개변수로 받고, 상위 N명 밖에 있는 내 순위도 함께 돌려준다.
@@ -168,6 +223,11 @@ app.use((err, _req, res, _next) => {
   if (err.status && err.status < 500) return res.status(err.status).json({ error: err.message });
   // 외래키 위반: 없는 그림/사용자를 가리킬 때
   if (err.code === "23503") return res.status(400).json({ error: "존재하지 않는 그림이거나 사용자예요." });
+  // 테이블이 없을 때: 마이그레이션을 다 실행하지 않은 DB
+  if (err.code === "42P01") {
+    console.error("[db] 테이블 없음:", err.message);
+    return res.status(503).json({ error: "데이터베이스 테이블이 없어요. database/migrations 의 SQL을 순서대로 실행했는지 확인해 주세요." });
+  }
   // 데이터베이스에 연결할 수 없을 때
   if (["ECONNREFUSED", "ECONNRESET", "ENOTFOUND", "ETIMEDOUT", "28P01", "3D000"].includes(err.code)) {
     console.error("[db] 연결 실패:", err.message);

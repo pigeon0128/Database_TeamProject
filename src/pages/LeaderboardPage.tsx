@@ -1,11 +1,13 @@
 // 리더보드 화면 (#/leaderboard?drawing=<id>). 그림(장면)별로 사람마다 최고 기록 1개를 순위로 보여 준다.
 // 일치율이 높은 순, 같으면 빨리 그린 순. 내 기록이 10위 밖이면 표 아래에 따로 보여 준다. 데이터는 API 서버(server/)에서 받는다.
+// 기록마다 그린 그림(user_artworks)이 있으면 썸네일로 보여 주고, 누르면 밑그림과 겹쳐 크게 본다.
 import { useCallback, useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../auth";
-import { findSceneByDrawing } from "../data/scenes";
-import { api, ApiError, type Drawing, type LeaderboardEntry } from "../lib/api";
+import { findSceneByDrawing, type Scene } from "../data/scenes";
+import { api, ApiError, artworkUrl, type Drawing, type LeaderboardEntry } from "../lib/api";
 import { formatDate, formatDuration, formatScore } from "../lib/format";
+import { loadScenePreview } from "../lib/sceneAssets";
 import { navigate, usePath } from "../router";
 
 const LIMIT = 10;
@@ -16,7 +18,69 @@ const drawingTitle = (d: Drawing) => findSceneByDrawing(d.id)?.title ?? d.title;
 
 type Board = { top: LeaderboardEntry[]; me: LeaderboardEntry | null };
 
-function Row({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+/** 기록의 그림: 흐린 밑그림 위에 그린 선을 겹친 작은 그림. 누르면 크게 본다 */
+function Thumbnail({ entry, guideUrl, aspect, onOpen }: { entry: LeaderboardEntry; guideUrl: string | null; aspect: number; onOpen: () => void }) {
+  if (!entry.hasArtwork) return <span className="text-xs font-semibold text-ink-muted">없음</span>;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`${entry.nickname}의 그림 크게 보기`}
+      className="relative block w-14 overflow-hidden rounded-xl border border-sky-haze bg-white transition hover:ring-2 hover:ring-sky-deep sm:w-24"
+      style={{ aspectRatio: aspect }}
+    >
+      {guideUrl && <img src={guideUrl} alt="" className="absolute inset-0 h-full w-full opacity-30" />}
+      <img src={artworkUrl(entry.recordId)} alt={`${entry.nickname}의 그림`} loading="lazy" className="absolute inset-0 h-full w-full" />
+    </button>
+  );
+}
+
+/** 그림 크게 보기: 밑그림을 켜고 끌 수 있다 */
+function ArtworkViewer({ entry, scene, guideUrl, onClose }: { entry: LeaderboardEntry; scene: Scene | undefined; guideUrl: string | null; onClose: () => void }) {
+  const [showGuide, setShowGuide] = useState(true);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${entry.nickname}의 그림`}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm"
+    >
+      <figure className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-card-hover" onClick={(e) => e.stopPropagation()}>
+        <div className="relative w-full bg-white" style={{ aspectRatio: scene ? scene.width / scene.height : undefined }}>
+          {showGuide && guideUrl && <img src={guideUrl} alt="" className="absolute inset-0 h-full w-full opacity-50" />}
+          <img src={artworkUrl(entry.recordId)} alt={`${entry.nickname}의 그림`} className={scene ? "absolute inset-0 h-full w-full" : "w-full"} />
+        </div>
+        <figcaption className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <span className="text-sm font-bold">
+            {MEDALS[entry.ranking - 1] ?? `${entry.ranking}위`} {entry.nickname} · {formatScore(entry.score)}점 · {formatDuration(entry.durationMs)}
+          </span>
+          <span className="flex items-center gap-3">
+            {guideUrl && (
+              <label className="flex items-center gap-2 text-sm font-bold">
+                밑그림 같이 보기
+                <input type="checkbox" checked={showGuide} onChange={(e) => setShowGuide(e.target.checked)} className="h-5 w-5 accent-sky-deep" />
+              </label>
+            )}
+            <button type="button" onClick={onClose} className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white">
+              닫기
+            </button>
+          </span>
+        </figcaption>
+      </figure>
+    </div>
+  );
+}
+
+type RowProps = { entry: LeaderboardEntry; isMe: boolean; guideUrl: string | null; aspect: number; onOpen: () => void };
+
+function Row({ entry, isMe, guideUrl, aspect, onOpen }: RowProps) {
   return (
     <tr className={isMe ? "bg-sun/30" : "odd:bg-white/50"}>
       <td className="py-3 pl-4 pr-2 text-center text-lg font-black tabular-nums">{MEDALS[entry.ranking - 1] ?? entry.ranking}</td>
@@ -26,7 +90,10 @@ function Row({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
       </td>
       <td className="px-2 py-3 text-right font-black tabular-nums text-sky-deep">{formatScore(entry.score)}</td>
       <td className="px-2 py-3 text-right font-semibold tabular-nums">{formatDuration(entry.durationMs)}</td>
-      <td className="hidden py-3 pl-2 pr-4 text-right text-sm font-medium text-ink-muted sm:table-cell">{formatDate(entry.playedAt)}</td>
+      <td className="hidden py-3 pl-2 pr-2 text-right text-sm font-medium text-ink-muted sm:table-cell">{formatDate(entry.playedAt)}</td>
+      <td className="py-2 pl-1 pr-3 sm:pl-2 sm:pr-4">
+        <Thumbnail entry={entry} guideUrl={guideUrl} aspect={aspect} onOpen={onOpen} />
+      </td>
     </tr>
   );
 }
@@ -64,6 +131,22 @@ export default function LeaderboardPage() {
   }, [selected?.id, load]);
 
   const scene = selected ? findSceneByDrawing(selected.id) : undefined;
+  const aspect = scene ? scene.width / scene.height : 4 / 3;
+
+  // 그림 썸네일과 크게 보기에 깔 밑그림 (장면 고르기 화면과 같은 이미지)
+  const [guideUrl, setGuideUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setGuideUrl(null);
+    if (!scene) return;
+    let alive = true;
+    loadScenePreview(scene).then((p) => alive && setGuideUrl(p.guideUrl), () => {});
+    return () => {
+      alive = false;
+    };
+  }, [scene]);
+
+  const [viewing, setViewing] = useState<LeaderboardEntry | null>(null);
+  const closeViewer = useCallback(() => setViewing(null), []);
   const meOutsideTop = board?.me && board.me.ranking > LIMIT ? board.me : null;
 
   return (
@@ -131,27 +214,30 @@ export default function LeaderboardPage() {
                 <th className="px-2 py-2 text-left">아이디</th>
                 <th className="px-2 py-2 text-right">일치율</th>
                 <th className="px-2 py-2 text-right">걸린 시간</th>
-                <th className="hidden py-2 pl-2 pr-4 text-right sm:table-cell">날짜</th>
+                <th className="hidden py-2 pl-2 pr-2 text-right sm:table-cell">날짜</th>
+                <th className="py-2 pl-2 pr-4 text-left">그림</th>
               </tr>
             </thead>
             <tbody>
               {board.top.map((e) => (
-                <Row key={e.userId} entry={e} isMe={e.userId === user?.id} />
+                <Row key={e.userId} entry={e} isMe={e.userId === user?.id} guideUrl={guideUrl} aspect={aspect} onOpen={() => setViewing(e)} />
               ))}
               {meOutsideTop && (
                 <>
                   <tr>
-                    <td colSpan={5} className="py-1 text-center text-ink-muted">
+                    <td colSpan={6} className="py-1 text-center text-ink-muted">
                       ⋮
                     </td>
                   </tr>
-                  <Row entry={meOutsideTop} isMe />
+                  <Row entry={meOutsideTop} isMe guideUrl={guideUrl} aspect={aspect} onOpen={() => setViewing(meOutsideTop)} />
                 </>
               )}
             </tbody>
           </table>
         )}
       </section>
+
+      {viewing && <ArtworkViewer entry={viewing} scene={scene} guideUrl={guideUrl} onClose={closeViewer} />}
 
       {board && !board.me && !error && (
         <p className="mt-3 text-center text-sm font-semibold text-ink-muted">아직 이 장면의 내 기록이 없어요.</p>

@@ -21,6 +21,8 @@ export type DrawAction = Stroke | { type: "clear" };
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */
   exportImage: (withGuide: boolean) => string | null;
+  /** 사용자가 그린 선만, 투명 배경 PNG data URL (리더보드에 올리는 완성 그림) */
+  exportDrawing: () => string | null;
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
@@ -218,6 +220,9 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       }
       ctx.drawImage(canvas, 0, 0);
       return out.toDataURL("image/png");
+    },
+    exportDrawing() {
+      return canvasRef.current?.toDataURL("image/png") ?? null;
     },
     zoomIn: () => zoomAt(ZOOM_STEP),
     zoomOut: () => zoomAt(1 / ZOOM_STEP),

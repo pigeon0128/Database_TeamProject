@@ -34,7 +34,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 | chapters | 스토리 챕터 |
 | drawings | 챕터별 원본 그림 |
 | play_records | 사용자별 그림 플레이 기록 |
-| user_artworks | 사용자가 완성한 작품의 저장 경로 |
+| user_artworks | 사용자가 완성한 작품 — 그림 자체(PNG, `image_data`) 또는 다른 저장소의 경로(`image_key`) (`migrations/005_artwork_images.sql`) |
 | user_settings | 사용자가 마지막으로 바꾼 그리기 설정 (`migrations/003_user_settings.sql`) |
 | drawing_drafts | 다 그리기 전의 그림(획 목록, JSONB) — 이어서 그리기용 (`migrations/004_drawing_drafts.sql`) |
 | schema_migrations | 실행한 마이그레이션 파일 목록 (`pnpm db:migrate` 가 만들고 관리) |
@@ -54,7 +54,14 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 사용자, 콘텐츠, 플레이 기록을 별도 테이블로 분리하여 중복 데이터를 최소화하고 외래키를 통해 참조 무결성을 유지합니다.
 
 ### Image Storage
-이미지 파일 자체가 아니라 저장소의 파일 경로 또는 객체 키를 데이터베이스에 보관합니다. 실제 이미지 저장소 연동은 별도 구현이 필요합니다.
+처음에는 이미지 파일을 다른 저장소에 두고 경로(`image_key`)만 보관하는 설계였지만, 따로 파일 저장소를 두지 않도록
+`005_artwork_images.sql` 에서 그림 자체를 `image_data`(BYTEA)에 저장하도록 바꿨습니다. 경로만 있는 기존 행도 그대로 쓸 수 있도록
+"경로 또는 이미지 중 하나는 있어야 한다"는 CHECK 제약조건을 둡니다.
+
+- 저장하는 그림은 밑그림 없이 사용자가 그린 선만 담은 투명 배경 PNG입니다 (원본 크기, 한 장에 약 60KB). 리더보드에서 밑그림 위에 겹쳐 보여 줍니다.
+- 기록(`play_records`)과 그림(`user_artworks`)은 API 서버가 한 트랜잭션으로 함께 넣습니다. 하나가 실패하면 둘 다 저장되지 않습니다.
+- 그림은 리더보드에서 그 사람의 최고 기록에 붙은 것을 보여 줍니다 (`GET /api/artworks/:recordId`).
+- 그림이 많아지면 DB 크기가 커지므로, 서비스로 키울 때는 파일 저장소(S3 등)로 옮기고 `image_key` 만 남기는 방식을 다시 검토합니다.
 
 ### Data Integrity
 일치율은 0~100 범위로 제한하고, 소요 시간에는 음수가 들어가지 않도록 CHECK 제약조건을 적용합니다.
@@ -111,7 +118,6 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 ## 9. Current Limitations
 
 - 닉네임만으로는 사용자 소유권이나 인증을 보장하지 않습니다.
-- 사용자 이미지 파일 업로드는 아직 연동하지 않았습니다.
 - 공용 PostgreSQL 배포는 별도 작업이 필요합니다.
 - `docs/erd.png`에는 아직 `user_settings`, `drawing_drafts` 테이블이 없습니다.
 - 외부 이미지 파일 삭제는 DB의 ON DELETE CASCADE만으로 처리되지 않습니다.

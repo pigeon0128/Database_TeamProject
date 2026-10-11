@@ -201,10 +201,13 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
     if (url) downloadImage(url, `${scene.title}${withGuide ? "-밑그림포함" : ""}.png`);
   };
 
+  /** 완료할 때 꺼낸 완성 그림. "다시 저장하기" 때 같은 그림을 다시 보낸다 */
+  const artworkRef = useRef<string | null>(null);
+
   const send = (score: number, durationMs: number) => {
     if (scene.drawingId === undefined) return;
     setSubmission({ status: "saving", score, durationMs });
-    api.savePlayRecord(scene.drawingId, score, durationMs).then(
+    api.savePlayRecord(scene.drawingId, score, durationMs, artworkRef.current).then(
       () => setSubmission({ status: "saved", score, durationMs }),
       (e: unknown) =>
         setSubmission({
@@ -226,6 +229,8 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
     const durationMs = Date.now() - startedAt;
     setElapsedMs(durationMs);
     draft.finish();
+    // 밑그림 없이 그린 선만 저장한다 (리더보드에서 밑그림 위에 겹쳐 볼 수 있게)
+    artworkRef.current = canvasRef.current?.exportDrawing() ?? null;
     send(latest.exactScore, durationMs);
   };
 

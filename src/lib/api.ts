@@ -14,12 +14,19 @@ export type Drawing = {
 
 export type LeaderboardEntry = {
   ranking: number;
+  /** 이 순위에 쓰인 기록 (그 사람의 최고 기록) */
+  recordId: number;
+  /** 그 기록에 완성 그림이 저장되어 있는지 */
+  hasArtwork: boolean;
   userId: number;
   nickname: string;
   score: number;
   durationMs: number;
   playedAt: string;
 };
+
+/** 기록에 저장된 완성 그림 주소 (<img src> 에 그대로 쓴다) */
+export const artworkUrl = (recordId: number) => `/api/artworks/${recordId}`;
 
 export class ApiError extends Error {
   status: number;
@@ -59,8 +66,9 @@ export const api = {
   register: (loginId: string, password: string) => request<{ user: User }>("POST", "/auth/register", { loginId, password }),
   logout: () => request<{ ok: true }>("POST", "/auth/logout"),
   drawings: () => request<{ drawings: Drawing[] }>("GET", "/drawings"),
-  savePlayRecord: (drawingId: number, similarityScore: number, durationMs: number) =>
-    request<{ recordId: number; playedAt: string }>("POST", "/play-records", { drawingId, similarityScore, durationMs }),
+  /** image: 완성 그림 (PNG data URL). 기록과 함께 한 번에 저장된다 */
+  savePlayRecord: (drawingId: number, similarityScore: number, durationMs: number, image: string | null) =>
+    request<{ recordId: number; playedAt: string; hasArtwork: boolean }>("POST", "/play-records", { drawingId, similarityScore, durationMs, image }),
   leaderboard: (drawingId: number, limit = 10) =>
     request<{ top: LeaderboardEntry[]; me: LeaderboardEntry | null }>("GET", `/leaderboard?drawingId=${drawingId}&limit=${limit}`),
   /** 저장된 설정이 없으면 settings: null */

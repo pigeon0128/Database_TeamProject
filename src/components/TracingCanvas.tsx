@@ -1,3 +1,7 @@
+// 그림을 그리는 캔버스 컴포넌트 (스토리 장면, 캐릭터 그리기 공용).
+// - 밑그림 이미지를 아래에 깔고, 그 위 투명 캔버스에 사용자의 획을 그린다.
+// - 획은 점 배열(Stroke)로 저장해 두고, 되돌리기 등으로 목록이 바뀌면 처음부터 다시 그린다.
+// - 손떨림 보정, 시작·끝 흐리기(Fade), 확대/이동(Ctrl+휠, 두 손가락), 이미지 내보내기를 담당한다.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 export type Point = [x: number, y: number];
@@ -69,7 +73,7 @@ const FADE_MIN = 0.12;
  * 획의 시작에서 d만큼 떨어진 곳의 굵기 비율.
  * 시작과 끝에서 fade 길이 안쪽은 점점 가늘어진다. 그리는 중에는 끝을 모르므로 total = Infinity.
  */
-function taper(d: number, total: number, fade: number) {
+export function taper(d: number, total: number, fade: number) {
   if (fade <= 0) return 1;
   const t = Math.min(1, Math.max(0, Math.min(d, total - d) / fade));
   return FADE_MIN + (1 - FADE_MIN) * t;

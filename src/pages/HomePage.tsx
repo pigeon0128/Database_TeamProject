@@ -1,4 +1,5 @@
 // 메인 화면 (#/). 캐릭터 그리기, 스토리 장면 그리기, 리더보드, 설정으로 가는 메뉴 카드를 보여 준다.
+// 창 높이에 맞춰 한 화면에 모두 들어간다: 메뉴 카드 2×2가 남는 높이를 나눠 쓰고, 글자·아이콘 크기도 창 높이(vh)에 따라 줄어든다.
 import type { ReactNode } from "react";
 import { useAuth } from "../auth";
 import { navigate } from "../router";
@@ -62,7 +63,7 @@ const menuItems: MenuItem[] = [
   {
     title: "설정 및 방법",
     path: "/settings",
-    description: "도움말과 설정을 확인해요",
+    description: "단축키를 내 손에 맞게 바꿔요",
     accent: "bg-lavender",
     icon: (
       <svg viewBox="0 0 120 120" aria-hidden="true" className="h-full w-full">
@@ -98,7 +99,7 @@ function UserBar() {
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-sky-soft px-5 py-8 text-ink sm:px-8 sm:py-10">
+    <main className="relative flex h-dvh flex-col overflow-hidden bg-sky-soft px-5 py-[clamp(0.75rem,3vh,2.5rem)] text-ink sm:px-8">
       <div className="absolute inset-x-0 bottom-0 h-1/3 bg-[linear-gradient(to_top,var(--color-sky-haze),transparent)]" />
       <Cloud className="cloud-float absolute -left-12 top-12 w-44 text-white sm:left-8 sm:w-52" />
       <Cloud className="cloud-float-delayed absolute -right-16 top-40 w-56 text-white/80 sm:right-5 sm:top-24 sm:w-64" />
@@ -106,35 +107,35 @@ export default function HomePage() {
       <div className="absolute left-[8%] top-[42%] h-3 w-3 rounded-full bg-white/70" />
       <div className="absolute right-[9%] top-[55%] h-2 w-2 rounded-full bg-white/70" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-4xl flex-col justify-center">
-        <header className="mb-7 text-center sm:mb-10">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/55 px-4 py-2 text-sm font-bold text-sky-deep shadow-sm backdrop-blur">
+      <div className="relative mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
+        <header className="shrink-0 pt-[clamp(2.5rem,5vh,3rem)] pb-[clamp(0.75rem,3.5vh,2.5rem)] text-center">
+          <div className="mb-[clamp(0.5rem,2vh,1rem)] inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/55 px-4 py-2 text-sm font-bold text-sky-deep shadow-sm backdrop-blur [@media(max-height:620px)]:hidden">
             <span className="inline-block h-2 w-2 rounded-full bg-sun" />
             오늘은 무엇을 그려볼까요?
           </div>
-          <h1 className="text-4xl font-black tracking-[-0.04em] text-ink sm:text-5xl">
+          <h1 className="text-[clamp(1.6rem,min(5.5vh,6vw),3rem)] font-black leading-tight tracking-[-0.04em] text-ink">
             도로 AI <span className="text-sky-deep">그림</span> 그리기 프로그램
           </h1>
-          <p className="mt-3 text-base font-medium text-ink-muted sm:text-lg">원하는 메뉴를 골라 즐겁게 시작해 보세요.</p>
+          <p className="mt-[clamp(0.25rem,1.2vh,0.75rem)] text-[clamp(0.85rem,2.2vh,1.125rem)] font-medium text-ink-muted">원하는 메뉴를 골라 즐겁게 시작해 보세요.</p>
         </header>
 
-        <section aria-label="메인 메뉴" className="grid grid-cols-2 gap-3 sm:gap-5">
+        <section aria-label="메인 메뉴" className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-[clamp(0.75rem,2.2vh,1.25rem)]">
           {menuItems.map((item, index) => (
             <button
               key={item.title}
               type="button"
               onClick={() => navigate(item.path)}
-              className="menu-card group relative min-h-52 overflow-hidden rounded-4xl border border-white/90 bg-white/76 p-5 text-left shadow-card backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-card-hover focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep sm:min-h-64 sm:p-7"
+              className="menu-card group relative min-h-0 overflow-hidden rounded-4xl border border-white/90 bg-white/76 p-[clamp(0.9rem,2.6vh,1.75rem)] text-left shadow-card backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-card-hover focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep"
             >
               <span className={`absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-30 sm:h-36 sm:w-36 ${item.accent}`} />
               <span className="relative flex h-full flex-col">
-                <span className={`mb-4 flex h-20 w-20 items-center justify-center rounded-3xl p-2.5 shadow-sm transition duration-300 group-hover:rotate-3 group-hover:scale-105 sm:h-28 sm:w-28 sm:p-4 ${item.accent}`}>
+                <span className={`mb-2 flex size-[clamp(3rem,min(13vh,20vw),7rem)] shrink-0 items-center justify-center rounded-3xl p-[clamp(0.4rem,1.5vh,1rem)] shadow-sm transition duration-300 group-hover:rotate-3 group-hover:scale-105 ${item.accent}`}>
                   {item.icon}
                 </span>
                 <span className="mt-auto flex items-end justify-between gap-2">
                   <span>
-                    <strong className="block text-lg font-extrabold tracking-[-0.025em] sm:text-2xl">{item.title}</strong>
-                    <span className="mt-1 hidden text-sm font-medium text-ink-muted sm:block">{item.description}</span>
+                    <strong className="block text-[clamp(1rem,min(3vh,4.5vw),1.5rem)] font-extrabold leading-snug tracking-[-0.025em]">{item.title}</strong>
+                    <span className="mt-1 hidden text-sm font-medium text-ink-muted sm:block [@media(max-height:600px)]:hidden">{item.description}</span>
                   </span>
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-xl text-white transition group-hover:translate-x-1" aria-hidden="true">
                     →
@@ -146,7 +147,7 @@ export default function HomePage() {
           ))}
         </section>
 
-        <footer className="mt-6 flex min-h-8 items-center justify-center text-center">
+        <footer className="flex shrink-0 items-center justify-center pt-[clamp(0.5rem,2vh,1.5rem)] text-center">
           <p className="text-xs font-semibold tracking-wide text-ink-muted/70">
             윤태원, 구준영, 김상봉, 이찬영, 이준수
           </p>

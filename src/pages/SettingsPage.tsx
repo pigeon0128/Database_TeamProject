@@ -1,11 +1,8 @@
-// 설정 및 방법 화면 (#/settings): 비밀번호 바꾸기, 그리기 단축키 바꾸기.
-// 비밀번호는 POST /api/auth/password, 단축키는 그리기 설정과 함께 DB에 저장된다 (lib/userSettings → user_settings.shortcuts).
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { useAuth } from "../auth";
+// 설정 및 방법 화면 (#/settings): 그리기 단축키 바꾸기. (비밀번호 변경은 로그인 화면에 있다)
+// 단축키는 그리기 설정과 함께 DB에 저장된다 (lib/userSettings → user_settings.shortcuts).
+import { useEffect, useState, type ReactNode } from "react";
 import PageLayout from "../components/PageLayout";
-import TextField from "../components/TextField";
 import { Kbd } from "../components/toolbar";
-import { api, ApiError } from "../lib/api";
 import {
   changedShortcuts,
   comboFromEvent,
@@ -34,59 +31,6 @@ function Notice({ tone, children }: { tone: "error" | "ok"; children: ReactNode 
     <p role={tone === "error" ? "alert" : "status"} className={`rounded-2xl px-4 py-3 text-sm font-bold ${tone === "error" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
       {children}
     </p>
-  );
-}
-
-/** 비밀번호 바꾸기: 지금 비밀번호를 확인한 뒤 바꾼다 */
-function PasswordForm() {
-  const { user, expire } = useAuth();
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (next !== confirm) {
-      setResult({ tone: "error", text: "새 비밀번호 확인이 일치하지 않아요." });
-      return;
-    }
-    setBusy(true);
-    setResult(null);
-    try {
-      await api.changePassword(current, next);
-      setCurrent("");
-      setNext("");
-      setConfirm("");
-      setResult({ tone: "ok", text: "비밀번호를 바꿨어요. 다음 로그인부터 새 비밀번호를 쓰세요." });
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) return expire();
-      setResult({ tone: "error", text: err instanceof ApiError ? err.message : "잠시 후 다시 시도해 주세요." });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      {/* 비밀번호 관리자가 어느 아이디의 비밀번호인지 알 수 있게 */}
-      <input type="text" name="username" autoComplete="username" value={user?.loginId ?? ""} readOnly hidden />
-      <p className="text-sm font-bold">
-        아이디 <span className="text-sky-deep">{user?.loginId}</span>
-      </p>
-      <TextField label="지금 비밀번호" type="password" value={current} onChange={setCurrent} autoComplete="current-password" />
-      <TextField label="새 비밀번호" type="password" value={next} onChange={setNext} autoComplete="new-password" hint="4자 이상" />
-      <TextField label="새 비밀번호 확인" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" />
-      {result && <Notice tone={result.tone}>{result.text}</Notice>}
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full rounded-2xl bg-sky-deep py-3.5 text-base font-extrabold text-white shadow-card transition hover:brightness-110 disabled:opacity-50"
-      >
-        {busy ? "잠시만요…" : "비밀번호 바꾸기"}
-      </button>
-    </form>
   );
 }
 
@@ -130,12 +74,12 @@ function ShortcutEditor() {
 
   return (
     <>
-      <ul className="divide-y divide-sky-haze">
+      <ul className="grid gap-x-8 md:grid-cols-2">
         {SHORTCUT_ACTIONS.map((action) => {
           const isEditing = editing === action;
           const isDefault = keys[action] === DEFAULT_SHORTCUTS[action];
           return (
-            <li key={action} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
+            <li key={action} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-sky-haze py-2">
               <span className="w-24 shrink-0 text-sm font-bold">{SHORTCUT_LABELS[action]}</span>
               <span className="flex min-w-0 flex-1 items-center gap-1">
                 {isEditing ? (
@@ -170,7 +114,7 @@ function ShortcutEditor() {
             </li>
           );
         })}
-        <li className="flex items-center gap-3 py-2.5 text-ink-muted">
+        <li className="flex items-center gap-3 border-b border-sky-haze py-2 text-ink-muted">
           <span className="w-24 shrink-0 text-sm font-bold">화면 이동</span>
           <span className="flex flex-1 items-center gap-1 text-xs font-semibold">
             <Kbd>Ctrl</Kbd> + 드래그 (바꿀 수 없어요)
@@ -204,14 +148,9 @@ function ShortcutEditor() {
 export default function SettingsPage() {
   return (
     <PageLayout title="설정 및 방법">
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        <Section title="🔑 비밀번호 바꾸기" description="지금 비밀번호를 입력해야 바꿀 수 있어요.">
-          <PasswordForm />
-        </Section>
-        <Section title="⌨️ 단축키" description="그리기 화면(스토리, 캐릭터)에서 쓰는 키를 바꿀 수 있어요.">
-          <ShortcutEditor />
-        </Section>
-      </div>
+      <Section title="⌨️ 단축키" description="그리기 화면(스토리, 캐릭터)에서 쓰는 키를 바꿀 수 있어요. 바꾸기를 누르고 새 키를 누르세요.">
+        <ShortcutEditor />
+      </Section>
     </PageLayout>
   );
 }

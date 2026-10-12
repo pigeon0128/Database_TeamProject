@@ -81,9 +81,9 @@ export const api = {
   login: (loginId: string, password: string) => request<{ user: User }>("POST", "/auth/login", { loginId, password }),
   register: (loginId: string, password: string) => request<{ user: User }>("POST", "/auth/register", { loginId, password }),
   logout: () => request<{ ok: true }>("POST", "/auth/logout"),
-  /** 지금 비밀번호가 맞아야 바뀐다 (틀리면 400) */
-  changePassword: (currentPassword: string, newPassword: string) =>
-    request<{ ok: true }>("POST", "/auth/password", { currentPassword, newPassword }),
+  /** 로그인 화면에서 비밀번호 바꾸기. 아이디와 지금 비밀번호가 맞아야 바뀐다 (틀리면 401). 로그인은 하지 않는다 */
+  changePassword: (loginId: string, currentPassword: string, newPassword: string) =>
+    request<{ ok: true }>("POST", "/auth/password", { loginId, currentPassword, newPassword }),
   drawings: () => request<{ drawings: Drawing[] }>("GET", "/drawings"),
   /** image: 완성 그림 (PNG data URL). 기록과 함께 한 번에 저장된다 */
   savePlayRecord: (drawingId: number, similarityScore: number, durationMs: number, image: string | null) =>

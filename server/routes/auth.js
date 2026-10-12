@@ -1,7 +1,7 @@
 // 로그인 API (/api/auth): 가입, 로그인, 로그아웃, 지금 로그인한 사용자, 비밀번호 바꾸기. 아이디는 users.nickname 을 그대로 쓴다.
 // 비밀번호 해시와 세션 쿠키는 ../auth.js 가 맡는다.
 import { Router } from "express";
-import { clearSessionCookie, hashPassword, requireUser, sessionUserId, setSessionCookie, verifyPassword } from "../auth.js";
+import { clearSessionCookie, hashPassword, sessionUserId, setSessionCookie, verifyPassword } from "../auth.js";
 import { pool } from "../db.js";
 import { BadRequest } from "../errors.js";
 
@@ -67,19 +67,20 @@ authRoutes.get("/me", async (req, res) => {
   res.json({ user: toUser(rows[0]) });
 });
 
-// 비밀번호 바꾸기: 지금 비밀번호가 맞아야 바꾼다. 틀리면 400 (401은 앱이 "로그인이 끝났다"로 받아들이므로 쓰지 않는다)
-authRoutes.post("/password", requireUser, async (req, res) => {
+// 비밀번호 바꾸기 (로그인 화면): 아이디와 지금 비밀번호가 맞아야 바꾼다. 로그인은 하지 않는다.
+// 아이디가 없을 때와 비밀번호가 틀렸을 때 같은 안내를 보내서, 어떤 아이디가 있는지 알 수 없게 한다.
+authRoutes.post("/password", async (req, res) => {
+  const loginId = String(req.body?.loginId ?? "").trim();
   const currentPassword = String(req.body?.currentPassword ?? "");
   const newPassword = String(req.body?.newPassword ?? "");
-  if (!currentPassword) throw new BadRequest("지금 비밀번호를 입력해 주세요.");
+  if (!loginId || !currentPassword) throw new BadRequest("아이디와 지금 비밀번호를 입력해 주세요.");
   checkPasswordLength(newPassword, "새 비밀번호");
   if (newPassword === currentPassword) throw new BadRequest("새 비밀번호가 지금 비밀번호와 같아요.");
 
-  const { rows } = await pool.query("SELECT password_hash FROM users WHERE user_id = $1", [req.userId]);
-  if (!rows.length) return res.status(401).json({ error: "로그인이 필요합니다." });
-  if (!(await verifyPassword(currentPassword, rows[0].password_hash))) {
-    throw new BadRequest("지금 비밀번호가 맞지 않아요.");
+  const { rows } = await pool.query("SELECT user_id, password_hash FROM users WHERE nickname = $1", [loginId]);
+  if (!rows.length || !(await verifyPassword(currentPassword, rows[0].password_hash))) {
+    return res.status(401).json({ error: "아이디 또는 지금 비밀번호가 맞지 않아요." });
   }
-  await pool.query("UPDATE users SET password_hash = $1 WHERE user_id = $2", [await hashPassword(newPassword), req.userId]);
+  await pool.query("UPDATE users SET password_hash = $1 WHERE user_id = $2", [await hashPassword(newPassword), rows[0].user_id]);
   res.json({ ok: true });
 });

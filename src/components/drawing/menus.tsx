@@ -104,7 +104,7 @@ export function HistoryButtons({ tools }: { tools: DrawingTools }) {
 
 /** 도움말 메뉴의 단축키 목록. 키는 설정 및 방법 화면에서 바꾼다 */
 export function ShortcutList({ keys }: { keys: ShortcutMap }) {
-  const rows: [string[], string][] = [...SHORTCUT_ACTIONS.map((a) => [comboKeys(keys[a]), SHORTCUT_LABELS[a]] as [string[], string]), [["Ctrl"], "+드래그: 이동"]];
+  const rows: [string[], string][] = [...SHORTCUT_ACTIONS.map((a) => [comboKeys(keys[a]), SHORTCUT_LABELS[a]] as [string[], string]), [["휠"], "확대·축소"], [["우클릭"], "+드래그: 이동"]];
   return (
     <>
       <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">

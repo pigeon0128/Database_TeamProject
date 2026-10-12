@@ -114,12 +114,18 @@ function ShortcutEditor() {
             </li>
           );
         })}
-        <li className="flex items-center gap-3 border-b border-sky-haze py-2 text-ink-muted">
-          <span className="w-24 shrink-0 text-sm font-bold">화면 이동</span>
-          <span className="flex flex-1 items-center gap-1 text-xs font-semibold">
-            <Kbd>Ctrl</Kbd> + 드래그 (바꿀 수 없어요)
-          </span>
-        </li>
+        {/* 마우스 동작은 바꿀 수 없다 (components/TracingCanvas.tsx) */}
+        {[
+          ["확대·축소", "휠", ""],
+          ["화면 이동", "우클릭", "+ 드래그"],
+        ].map(([label, key, rest]) => (
+          <li key={label} className="flex items-center gap-3 border-b border-sky-haze py-2 text-ink-muted">
+            <span className="w-24 shrink-0 text-sm font-bold">{label}</span>
+            <span className="flex flex-1 items-center gap-1 text-xs font-semibold">
+              <Kbd>{key}</Kbd> {rest} (바꿀 수 없어요)
+            </span>
+          </li>
+        ))}
       </ul>
       {error && (
         <div className="mt-3">

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+<rect width="1200" height="900" fill="#b6b6b6"/>
+<g fill="none" stroke="#8e8e8e" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="440" cy="420" r="18"/><circle cx="500" cy="560" r="12"/><path d="M120 760 C150 720 220 720 240 750 C270 730 320 740 320 780 L120 780 Z"/><circle cx="200" cy="400" r="4"/><circle cx="1050" cy="120" r="4"/><circle cx="1080" cy="700" r="4"/><circle cx="640" cy="820" r="4"/><circle cx="150" cy="560" r="4"/></g>
+<g fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M720 160 A300 300 0 1 0 720 740 A235 235 0 1 1 720 160 Z"/><polygon points="860.0,205.0 873.5,241.4 912.3,243.0 881.9,267.1 892.3,304.5 860.0,283.0 827.7,304.5 838.1,267.1 807.7,243.0 846.5,241.4"/><polygon points="930.0,482.0 939.4,507.1 966.1,508.3 945.2,524.9 952.3,550.7 930.0,536.0 907.7,550.7 914.8,524.9 893.9,508.3 920.6,507.1"/><polygon points="330.0,178.0 337.6,199.5 360.4,200.1 342.4,214.0 348.8,235.9 330.0,223.0 311.2,235.9 317.6,214.0 299.6,200.1 322.4,199.5"/></g>
+</svg>

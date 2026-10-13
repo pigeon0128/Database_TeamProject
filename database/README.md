@@ -12,6 +12,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 - 사용자 작품 메타데이터 저장
 - 사용자별 그리기 설정 보존 (브러쉬 굵기, 밑그림 보이기·진하기, 손떨림 보정, 선 끝 얇게)
 - 그리던 그림 보관 (이어서 그리기)
+- 사용자가 완성한 그림을 모아 보는 도감
 
 ## 2. Environment
 
@@ -99,18 +100,41 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 
 조회 SQL: `queries/leaderboard.sql`
 
-## 7. Local Setup
+## 7. Collection
+
+사용자가 완성한 그림을 수집하고 조회하는 도감 기능입니다.
+
+### Collection Rules
+- `user_artworks`에 작품이 저장되면 수집 완료로 판단합니다.
+- 동일 그림의 여러 완성 작품을 보관할 수 있습니다.
+- 대표 작품은 일치율 내림차순, 소요시간 오름차순, 기록 ID 내림차순으로 선정합니다.
+- 미수집 그림도 도감 목록에 포함됩니다.
+
+### Queries
+`queries/collection.sql`
+
+- 사용자별 도감 전체 조회
+- 대표 작품 및 최고 기록 조회
+- 챕터별 전체 그림 수와 수집된 그림 수 집계
+
+별도의 도감 테이블을 생성하지 않고 기존 테이블 간 JOIN으로 구현합니다.
+
+`005_artwork_images.sql` 이후 앱이 저장하는 그림은 `image_data` 에 들어가고 `image_key` 는 비어 있을 수 있습니다.
+이때 대표 작품 그림은 그 기록의 ID로 `GET /api/artworks/:recordId` 에서 불러옵니다.
+
+## 8. Local Setup
 
 1. PostgreSQL 서버를 준비하고, 프로젝트 폴더의 `.env` 에 `DATABASE_URL` 을 적습니다 (루트 README 4단계).
 2. `pnpm db:migrate` 를 실행합니다. DB가 없으면 만들고, `migrations/` 의 SQL 중 아직 실행하지 않은 것만 번호 순서대로 실행해
    `schema_migrations` 표에 기록한 뒤, 장면 목록(`seeds/content.sql`)을 넣습니다.
 3. 개발용 예시 데이터가 필요하면 빈 DB에서 `pnpm db:migrate --seed` 로 실행합니다 (`seeds/dev_seed.sql`).
 4. `queries/leaderboard.sql`로 리더보드 결과를 확인합니다.
+5. `queries/collection.sql`로 도감 조회 결과를 확인합니다.
 
-새 마이그레이션은 다음 번호(`005_...sql`)로 `migrations/` 에 추가하고, 파일 안에서 `BEGIN; ... COMMIT;` 으로 감쌉니다.
+새 마이그레이션은 다음 번호(`007_...sql`)로 `migrations/` 에 추가하고, 파일 안에서 `BEGIN; ... COMMIT;` 으로 감쌉니다.
 이미 실행한 마이그레이션 파일은 고치지 않습니다 (다른 사람 DB에는 다시 실행되지 않으므로 새 파일로 고칩니다).
 
-## 8. Verification
+## 9. Verification
 
 현재 확인한 항목:
 - 5개 테이블 생성
@@ -118,8 +142,9 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 - 사용자별 최고 기록 선택
 - 동점 시 소요 시간 기준 정렬
 - 일치율 CHECK 제약조건 위반 차단
+- 도감 전체 조회 및 챕터별 수집 현황 쿼리 실행
 
-## 9. Current Limitations
+## 10. Current Limitations
 
 - 닉네임만으로는 사용자 소유권이나 인증을 보장하지 않습니다.
 - 공용 PostgreSQL 배포는 별도 작업이 필요합니다.

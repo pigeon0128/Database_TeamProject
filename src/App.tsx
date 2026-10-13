@@ -5,6 +5,7 @@ import { usePath } from "./router";
 import { AuthProvider, useAuth } from "./auth";
 import HomePage from "./pages/HomePage";
 import CharacterPage from "./pages/CharacterPage";
+import CreaturePage from "./pages/CreaturePage";
 import LoginPage from "./pages/LoginPage";
 import StoryPage from "./pages/story/StoryPage";
 import StorySelectPage from "./pages/StorySelectPage";
@@ -16,6 +17,7 @@ const routes: Record<string, ComponentType> = {
   "/character": CharacterPage,
   "/story": StorySelectPage,
   "/leaderboard": LeaderboardPage,
+  "/creatures": CreaturePage,
   "/settings": SettingsPage,
 };
 

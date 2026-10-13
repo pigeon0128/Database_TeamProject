@@ -1,4 +1,5 @@
-// 메인 화면 (#/). 캐릭터 그리기, 스토리 장면 그리기, 리더보드, 설정으로 가는 메뉴 카드를 보여 준다.
+// 메인 화면 (#/). 캐릭터 그리기, 스토리 장면 그리기, 리더보드, 도감 생물 그리기로 가는 메뉴 카드를 보여 주고,
+// 오른쪽 아래 모서리의 톱니바퀴 버튼으로 설정 및 방법 화면에 간다.
 // 창 높이에 맞춰 한 화면에 모두 들어간다: 메뉴 카드 2×2가 남는 높이를 나눠 쓰고, 글자·아이콘 크기도 창 높이(vh)에 따라 줄어든다.
 import type { ReactNode } from "react";
 import { useAuth } from "../auth";
@@ -61,14 +62,18 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    title: "설정 및 방법",
-    path: "/settings",
-    description: "단축키를 내 손에 맞게 바꿔요",
+    title: "도감 생물 그리기",
+    path: "/creatures",
+    description: "도감 속 생물들을 그려봐요",
     accent: "bg-lavender",
     icon: (
       <svg viewBox="0 0 120 120" aria-hidden="true" className="h-full w-full">
-        <path d="M52 24h16l3 11c3 1 6 3 8 5l11-3 8 14-8 8v10l8 8-8 14-11-3c-2 2-5 4-8 5l-3 11H52l-3-11c-3-1-6-3-8-5l-11 3-8-14 8-8V59l-8-8 8-14 11 3c2-2 5-4 8-5l3-11Z" fill="#FFF9F0" stroke="#363636" strokeWidth="5" strokeLinejoin="round" />
-        <circle cx="60" cy="64" r="14" fill="#1E82DC" stroke="#363636" strokeWidth="5" />
+        <rect x="26" y="18" width="68" height="86" rx="8" fill="#FFF9F0" stroke="#363636" strokeWidth="5" />
+        <path d="M26 26a8 8 0 0 1 8-8h8v86h-8a8 8 0 0 1-8-8Z" fill="#1E82DC" stroke="#363636" strokeWidth="5" strokeLinejoin="round" />
+        <circle cx="64" cy="40" r="8" fill="#FEE500" stroke="#363636" strokeWidth="4" />
+        <path d="M54 88c0-20 13-33 31-33 0 20-13 33-31 33Z" fill="#00E8AA" stroke="#363636" strokeWidth="4" strokeLinejoin="round" />
+        <path d="M57 85 76 64" stroke="#363636" strokeWidth="3" strokeLinecap="round" />
+        <path d="M52 56h10" stroke="#A9B3C5" strokeWidth="4" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -79,6 +84,24 @@ function Cloud({ className }: { className: string }) {
     <svg viewBox="0 0 180 90" aria-hidden="true" className={className}>
       <path d="M18 78c-10 0-16-7-16-15s7-15 16-15c3-15 16-25 32-25 5 0 10 1 14 4C72 11 86 2 103 2c24 0 43 18 45 41 17 0 30 10 30 23 0 7-5 12-13 12H18Z" fill="currentColor" />
     </svg>
+  );
+}
+
+/** 오른쪽 아래 모서리의 설정 및 방법 버튼 (톱니바퀴) */
+function SettingsButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => navigate("/settings")}
+      title="설정 및 방법"
+      aria-label="설정 및 방법"
+      className="group absolute bottom-[clamp(0.75rem,3vh,2.5rem)] right-5 z-10 flex size-12 items-center justify-center rounded-2xl border border-white/80 bg-white/70 p-2 shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep sm:right-8"
+    >
+      <svg viewBox="0 0 120 120" aria-hidden="true" className="h-full w-full transition duration-500 group-hover:rotate-90">
+        <path d="M52 24h16l3 11c3 1 6 3 8 5l11-3 8 14-8 8v10l8 8-8 14-11-3c-2 2-5 4-8 5l-3 11H52l-3-11c-3-1-6-3-8-5l-11 3-8-14 8-8V59l-8-8 8-14 11 3c2-2 5-4 8-5l3-11Z" fill="#FFF9F0" stroke="#363636" strokeWidth="6" strokeLinejoin="round" />
+        <circle cx="60" cy="64" r="14" fill="#1E82DC" stroke="#363636" strokeWidth="6" />
+      </svg>
+    </button>
   );
 }
 
@@ -104,6 +127,7 @@ export default function HomePage() {
       <Cloud className="cloud-float absolute -left-12 top-12 w-44 text-white sm:left-8 sm:w-52" />
       <Cloud className="cloud-float-delayed absolute -right-16 top-40 w-56 text-white/80 sm:right-5 sm:top-24 sm:w-64" />
       <UserBar />
+      <SettingsButton />
       <div className="absolute left-[8%] top-[42%] h-3 w-3 rounded-full bg-white/70" />
       <div className="absolute right-[9%] top-[55%] h-2 w-2 rounded-full bg-white/70" />
 
@@ -147,7 +171,7 @@ export default function HomePage() {
           ))}
         </section>
 
-        <footer className="flex shrink-0 items-center justify-center pt-[clamp(0.5rem,2vh,1.5rem)] text-center">
+        <footer className="flex min-h-14 shrink-0 items-center justify-center pt-[clamp(0.5rem,2vh,1.5rem)] text-center">
           <p className="text-xs font-semibold tracking-wide text-ink-muted/70">
             윤태원, 구준영, 김상봉, 이찬영, 이준수
           </p>

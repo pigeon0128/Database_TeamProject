@@ -1,7 +1,7 @@
 // 그림을 그리는 캔버스 컴포넌트 (스토리 장면, 캐릭터 그리기 공용).
 // - 밑그림 이미지를 아래에 깔고, 그 위 투명 캔버스에 사용자의 획을 그린다.
 // - 획은 점 배열(Stroke)로 저장해 두고, 되돌리기 등으로 목록이 바뀌면 처음부터 다시 그린다.
-// - 손떨림 보정, 시작·끝 흐리기(Fade), 확대/이동(Ctrl+휠, 두 손가락), 이미지 내보내기를 담당한다.
+// - 손떨림 보정, 시작·끝 흐리기(Fade), 확대/이동(마우스 휠로 확대, 오른쪽 버튼 드래그로 이동, 터치는 두 손가락), 이미지 내보내기를 담당한다.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { taper, visibleStrokes, type DrawAction, type Point, type Stroke } from "../lib/strokes";
 
@@ -126,7 +126,6 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   const [view, setView] = useState<View>({ z: 1, tx: 0, ty: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
-  const [panKeyHeld, setPanKeyHeld] = useState(false);
   const [panning, setPanning] = useState(false);
 
   const mode = useRef<Mode>("none");
@@ -197,19 +196,16 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     resetZoom,
   }));
 
-  // Ctrl+휠(트랙패드 핀치 포함): 브라우저 확대 대신 캔버스를 커서 위치 기준으로 확대.
-  // 확대된 상태의 일반 휠: 캔버스 안에서 이동. 캔버스 밖의 Ctrl+휠은 브라우저 확대만 막는다.
+  // 휠: 캔버스 위에서는 페이지를 스크롤하지 않고 커서 위치 기준으로 확대/축소 (트랙패드 핀치도 같다).
+  // 캔버스 밖의 Ctrl+휠은 브라우저 확대만 막는다.
   useEffect(() => {
     const el = viewportRef.current!;
     const onViewportWheel = (e: WheelEvent) => {
+      e.preventDefault();
       const rect = el.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        zoomAt(Math.exp(-e.deltaY * 0.0025), e.clientX - rect.left, e.clientY - rect.top);
-      } else if (viewRef.current.z > 1) {
-        e.preventDefault();
-        setView((v) => clampView({ ...v, tx: v.tx - e.deltaX, ty: v.ty - e.deltaY }));
-      }
+      // 마우스 휠은 한 칸이 deltaY 100 안팎, 트랙패드는 작은 값이 여러 번 온다
+      const delta = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      zoomAt(Math.exp(-delta * 0.0025), e.clientX - rect.left, e.clientY - rect.top);
     };
     const onWindowWheel = (e: WheelEvent) => {
       if ((e.ctrlKey || e.metaKey) && !el.contains(e.target as Node)) e.preventDefault();
@@ -220,27 +216,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       el.removeEventListener("wheel", onViewportWheel);
       window.removeEventListener("wheel", onWindowWheel);
     };
-  }, [zoomAt, clampView]);
-
-  // Ctrl(맥은 Cmd)을 누른 채 드래그하면 화면 이동. 누르고 있는 동안 커서를 손 모양으로 바꾼다.
-  useEffect(() => {
-    const isPanKey = (e: KeyboardEvent) => e.key === "Control" || e.key === "Meta";
-    const down = (e: KeyboardEvent) => {
-      if (isPanKey(e)) setPanKeyHeld(true);
-    };
-    const up = (e: KeyboardEvent) => {
-      if (isPanKey(e)) setPanKeyHeld(false);
-    };
-    const blur = () => setPanKeyHeld(false);
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", blur);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", blur);
-    };
-  }, []);
+  }, [zoomAt]);
 
   // 창 크기가 바뀌면 이동 범위를 다시 맞춘다.
   useEffect(() => {
@@ -280,7 +256,8 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     }
     if (pointers.current.size > 2 || mode.current !== "none") return;
 
-    if (e.ctrlKey || e.metaKey || e.button === 1) {
+    // 오른쪽 버튼으로 끌면 화면 이동 (오른쪽 버튼 메뉴는 아래 onContextMenu 에서 막는다)
+    if (e.button === 2) {
       e.preventDefault();
       mode.current = "pan";
       setPanning(true);
@@ -395,7 +372,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
           onPointerCancel={handleUp}
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 h-full w-full touch-none"
-          style={{ cursor: panning ? "grabbing" : panKeyHeld ? "grab" : "crosshair" }}
+          style={{ cursor: panning ? "grabbing" : "crosshair" }}
         />
       </div>
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { scenes, type Scene } from "../data/scenes";
 import { draftKeys } from "../lib/drawingDraft";
-import { loadScenePreview } from "../lib/sceneAssets";
+import { loadScenePreview } from "../lib/drawing/sceneAssets";
 import { navigate } from "../router";
 
 function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; inProgress: boolean }) {

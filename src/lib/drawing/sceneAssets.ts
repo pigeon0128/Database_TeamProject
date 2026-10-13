@@ -1,7 +1,7 @@
 // 장면 하나에 필요한 준비물을 만들고 캐시한다. 픽셀 계산이 무거우므로 장면마다 한 번만 하고 화면끼리 같이 쓴다.
 // - loadScenePreview: 손질한 밑그림과 완성 예시 이미지 (장면 고르기 화면은 이것만 쓴다)
 // - loadSceneAssets: 위 이미지 + 채점용 마스크 (그리기 화면)
-import type { Scene } from "../data/scenes";
+import type { Scene } from "../../data/scenes";
 import { makeTracedExample, prepareGuide } from "./guideImage";
 import { buildGuideMasks, type GuideMasks } from "./traceScore";
 

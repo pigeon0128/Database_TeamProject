@@ -1,7 +1,7 @@
 // 그리기 설정 API (/api/settings): 사용자당 한 행(user_settings)을 불러오고 저장한다.
 // 값 범위는 세 곳이 같아야 한다: 여기 readSettings, 앱 src/lib/userSettings.ts 의 sanitize,
 // DB database/migrations/003_user_settings.sql 의 CHECK 제약. 하나를 바꾸면 나머지도 바꾼다.
-// 단축키(shortcuts)는 바꾼 동작만 {"동작": "키 조합"} 으로 받는다. 동작 이름·형식은 앱 src/lib/shortcuts.ts 와 같다.
+// 단축키(shortcuts)는 바꾼 동작만 {"동작": "키 조합"} 으로 받는다. 동작 이름·형식은 앱 src/lib/drawing/shortcuts.ts 와 같다.
 import { Router } from "express";
 import { requireUser } from "../auth.js";
 import { pool } from "../db.js";

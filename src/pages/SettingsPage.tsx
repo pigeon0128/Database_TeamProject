@@ -13,7 +13,7 @@ import {
   SHORTCUT_ACTIONS,
   SHORTCUT_LABELS,
   type ShortcutAction,
-} from "../lib/shortcuts";
+} from "../lib/drawing/shortcuts";
 import { useSavedSetting } from "../lib/userSettings";
 
 function Section({ title, description, children }: { title: string; description: string; children: ReactNode }) {

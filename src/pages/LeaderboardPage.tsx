@@ -7,7 +7,7 @@ import { useAuth } from "../auth";
 import { findSceneByDrawing, type Scene } from "../data/scenes";
 import { api, ApiError, artworkUrl, type Drawing, type LeaderboardEntry } from "../lib/api";
 import { formatDate, formatDuration, formatScore } from "../lib/format";
-import { loadScenePreview } from "../lib/sceneAssets";
+import { loadScenePreview } from "../lib/drawing/sceneAssets";
 import { navigate, usePath } from "../router";
 
 const LIMIT = 10;

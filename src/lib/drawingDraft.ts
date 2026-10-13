@@ -4,7 +4,7 @@
 // - loadDraft, draftKeys: 불러오기 / 그리던 그림 목록
 // - useDrawingDraft: 그리기 화면에서 자동 저장·이어 그리기를 맡는 훅
 import { useCallback, useEffect, useRef, useState } from "react";
-import { visibleStrokes, type DrawAction, type Stroke } from "./strokes";
+import { visibleStrokes, type DrawAction, type Stroke } from "./drawing/strokes";
 import { api } from "./api";
 
 export type Draft = {
@@ -18,14 +18,14 @@ export type Draft = {
 /** 저장 용량을 줄이려고 좌표를 소수 첫째 자리까지만 남긴다 (화면에서는 차이가 없다). */
 const round = (v: number) => Math.round(v * 10) / 10;
 
-export const compactStrokes = (strokes: Stroke[]): Stroke[] =>
+const compactStrokes = (strokes: Stroke[]): Stroke[] =>
   strokes.map((s) => ({ ...s, points: s.points.map(([x, y]) => [round(x), round(y)]) }));
 
 const isStroke = (s: unknown): s is Stroke =>
   !!s && typeof s === "object" && (s as Stroke).type === "stroke" && Array.isArray((s as Stroke).points) && (s as Stroke).points.length > 0;
 
 /** 저장된 그림. 없거나 깨졌으면 null. 서버에 연결하지 못하면 예외를 던진다. */
-export async function loadDraft(key: string): Promise<Draft | null> {
+async function loadDraft(key: string): Promise<Draft | null> {
   const { draft } = await api.getDraft(key);
   if (!draft || !draft.strokes.length || !draft.strokes.every(isStroke)) return null;
   return { strokes: draft.strokes, savedAt: new Date(draft.savedAt).getTime(), name: draft.name ?? undefined };

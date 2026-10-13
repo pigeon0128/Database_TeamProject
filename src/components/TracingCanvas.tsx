@@ -3,7 +3,7 @@
 // - 획은 점 배열(Stroke)로 저장해 두고, 되돌리기 등으로 목록이 바뀌면 처음부터 다시 그린다.
 // - 손떨림 보정, 시작·끝 흐리기(Fade), 확대/이동(마우스 휠로 확대, 오른쪽 버튼 드래그로 이동, 터치는 두 손가락), 이미지 내보내기를 담당한다.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { taper, visibleStrokes, type DrawAction, type Point, type Stroke } from "../lib/strokes";
+import { taper, visibleStrokes, type DrawAction, type Point, type Stroke } from "../lib/drawing/strokes";
 
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */

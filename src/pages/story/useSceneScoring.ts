@@ -3,9 +3,9 @@
 // 그리는 중에는 채점하지 않아서 펜 움직임이 느려지지 않는다.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scene } from "../../data/scenes";
-import { loadSceneAssets } from "../../lib/sceneAssets";
-import { visibleStrokes, type DrawAction } from "../../lib/strokes";
-import { emptyScore, scoreCanvas, type GuideMasks, type TraceScore } from "../../lib/traceScore";
+import { loadSceneAssets } from "../../lib/drawing/sceneAssets";
+import { visibleStrokes, type DrawAction } from "../../lib/drawing/strokes";
+import { emptyScore, scoreCanvas, type GuideMasks, type TraceScore } from "../../lib/drawing/traceScore";
 
 export function useSceneScoring(scene: Scene, actions: DrawAction[]) {
   const [result, setResult] = useState<TraceScore>(emptyScore);

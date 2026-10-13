@@ -34,7 +34,7 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
 };
 
 /** 키 조합 글자 형식 (서버 readShortcuts 와 같다) */
-export const COMBO_RULE = /^(Ctrl\+)?(Shift\+)?(Alt\+)?[A-Za-z0-9]{1,20}$/;
+const COMBO_RULE = /^(Ctrl\+)?(Shift\+)?(Alt\+)?[A-Za-z0-9]{1,20}$/;
 
 /** 브라우저가 먼저 가져가서 막을 수 없거나, 설정 화면에서 쓰는 키 */
 const RESERVED = new Set(["Escape", "Tab", "Shift+Tab", "Ctrl+KeyW", "Ctrl+KeyT", "Ctrl+KeyN", "Ctrl+Tab", "Ctrl+Shift+Tab", "F5", "Ctrl+KeyR"]);

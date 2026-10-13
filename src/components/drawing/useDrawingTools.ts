@@ -1,9 +1,9 @@
 // 그리기 상태 훅 (스토리 장면, 캐릭터 그리기 공용): 굵기·지우개·획 목록·되돌리기 상태를 관리하고 키보드 단축키를 등록한다.
-// 단축키는 사용자가 설정 화면에서 바꾼 키를 쓴다 (lib/shortcuts.ts, 저장은 lib/userSettings).
+// 단축키는 사용자가 설정 화면에서 바꾼 키를 쓴다 (lib/drawing/shortcuts.ts, 저장은 lib/userSettings).
 // 선화 연습이 목적이라 색은 검정 하나만 쓴다. 굵기·손떨림 보정·선 끝 얇게는 저장해 두고 다음에도 이어 쓴다 (lib/userSettings).
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
-import { actionForEvent, resolveShortcuts } from "../../lib/shortcuts";
-import { visibleStrokes, type DrawAction, type Stroke } from "../../lib/strokes";
+import { actionForEvent, resolveShortcuts } from "../../lib/drawing/shortcuts";
+import { visibleStrokes, type DrawAction, type Stroke } from "../../lib/drawing/strokes";
 import { useSavedSetting } from "../../lib/userSettings";
 import type { TracingCanvasHandle } from "../TracingCanvas";
 
@@ -74,7 +74,7 @@ export function useDrawingTools(
     setRedoStack([]);
   };
 
-  // 단축키. 한글 입력 상태에서도 동작하도록 e.key 대신 물리 키(e.code)로 판단한다 (lib/shortcuts.ts).
+  // 단축키. 한글 입력 상태에서도 동작하도록 e.key 대신 물리 키(e.code)로 판단한다 (lib/drawing/shortcuts.ts).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;

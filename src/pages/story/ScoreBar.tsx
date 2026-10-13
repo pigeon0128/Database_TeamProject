@@ -1,6 +1,6 @@
 // 스토리 그리기 화면 아래의 점수 막대: 큰 점수, 타이머, 진행 막대, 세부 감점 항목, 완료 버튼.
 import { formatClock } from "../../lib/format";
-import type { TraceScore } from "../../lib/traceScore";
+import type { TraceScore } from "../../lib/drawing/traceScore";
 
 /** 점수 구간별 색과 응원 문구 (점수 막대, 저장 결과 창이 같이 쓴다) */
 export function scoreTone(score: number) {

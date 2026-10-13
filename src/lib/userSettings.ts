@@ -13,7 +13,7 @@ import { api, type DrawingSettings } from "./api";
 export type { DrawingSettings };
 
 /** user_settings 테이블의 DEFAULT와 같은 값 */
-export const DEFAULT_SETTINGS: DrawingSettings = { brushSize: 6, guideVisible: true, guideOpacity: 80, smoothing: 50, fade: 0, shortcuts: {} };
+const DEFAULT_SETTINGS: DrawingSettings = { brushSize: 6, guideVisible: true, guideOpacity: 80, smoothing: 50, fade: 0, shortcuts: {} };
 
 /** 마지막으로 바꾼 뒤 이만큼 기다렸다가 DB에 저장한다 (조절 바를 끄는 동안 요청이 몰리지 않게) */
 const SAVE_DELAY_MS = 600;
@@ -29,7 +29,7 @@ function sanitize(raw: unknown): DrawingSettings {
     guideOpacity: inRange(s.guideOpacity, 10, 100) ? s.guideOpacity : DEFAULT_SETTINGS.guideOpacity,
     smoothing: inRange(s.smoothing, 0, 100) ? s.smoothing : DEFAULT_SETTINGS.smoothing,
     fade: inRange(s.fade, 0, 100) ? s.fade : DEFAULT_SETTINGS.fade,
-    // 키 조합 검사와 기본값 채우기는 쓰는 쪽(lib/shortcuts.ts 의 resolveShortcuts)에서 한다
+    // 키 조합 검사와 기본값 채우기는 쓰는 쪽(lib/drawing/shortcuts.ts 의 resolveShortcuts)에서 한다
     shortcuts: s.shortcuts && typeof s.shortcuts === "object" && !Array.isArray(s.shortcuts) ? (s.shortcuts as Record<string, string>) : {},
   };
 }
@@ -70,7 +70,7 @@ if (typeof window !== "undefined") {
   });
 }
 
-export function updateSettings(patch: Partial<DrawingSettings>) {
+function updateSettings(patch: Partial<DrawingSettings>) {
   current = { ...current, ...patch };
   emit();
   if (userId === null) return;

@@ -1,5 +1,5 @@
 // API 서버(server/, 경로별 코드는 server/routes/) 호출. 개발 중에는 Vite가 /api 요청을 API 서버로 넘긴다.
-import type { Stroke } from "./strokes";
+import type { Stroke } from "./drawing/strokes";
 
 export type User = { id: number; loginId: string };
 
@@ -23,7 +23,7 @@ export type DrawingSettings = {
   smoothing: number;
   /** 선 끝 얇게(시작·끝 흐리기) 단계. 0~100, 0이면 끔 */
   fade: number;
-  /** 사용자가 바꾼 단축키만 {동작: 키 조합}. 나머지는 기본 키 (lib/shortcuts.ts) */
+  /** 사용자가 바꾼 단축키만 {동작: 키 조합}. 나머지는 기본 키 (lib/drawing/shortcuts.ts) */
   shortcuts: Partial<Record<string, string>>;
 };
 

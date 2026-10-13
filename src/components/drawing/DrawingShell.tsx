@@ -1,6 +1,6 @@
 // 그리기 화면 틀: 위 툴바 / 왼쪽 도구 막대(브러쉬·지우개) + 가운데 그림판 / 아래 상태 막대.
 import type { ReactNode } from "react";
-import { comboText } from "../../lib/shortcuts";
+import { comboText } from "../../lib/drawing/shortcuts";
 import { navigate } from "../../router";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
 import type { DrawingTools } from "./useDrawingTools";

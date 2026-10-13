@@ -1,7 +1,7 @@
 // 그리기 툴바의 메뉴들: 굵기, 선 다듬기(손떨림 보정·선 끝 얇게), 되돌리기/다시 하기, 단축키 목록.
 // 단축키 표시는 사용자가 바꾼 키(tools.keys)를 따른다.
 import { Kbd, ToolbarButton, ToolbarMenu } from "../toolbar";
-import { comboKeys, comboText, SHORTCUT_ACTIONS, SHORTCUT_LABELS, type ShortcutMap } from "../../lib/shortcuts";
+import { comboKeys, comboText, SHORTCUT_ACTIONS, SHORTCUT_LABELS, type ShortcutMap } from "../../lib/drawing/shortcuts";
 import { BRUSH_MAX_SIZE, MIN_SIZE, type DrawingTools } from "./useDrawingTools";
 
 /** 툴바의 굵기 메뉴: 누르면 굵기 조절 바가 나온다 */

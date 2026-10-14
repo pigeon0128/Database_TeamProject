@@ -1,7 +1,7 @@
 -- 앱에 들어 있는 장면(챕터·그림) 목록과 도감 생물 정보. 기록 저장과 리더보드가 drawing_id 로 그림을 찾으므로 꼭 있어야 한다.
 -- (src/data/scenes.ts, src/data/creatures.ts 의 drawingId 와 맞춘다. 그림을 추가하면 여기에도 추가한다)
 -- 여러 번 실행해도 된다: 이미 있으면 건너뛴다. pnpm db:migrate 가 마이그레이션 뒤에 매번 실행한다.
--- 밑그림 이미지는 reference_image_key 와 같은 경로의 database/seeds/guides 파일을 pnpm db:migrate 가 넣는다.
+-- reference_image_key 는 밑그림 이미지의 경로다 (앱의 src/assets/<경로> 파일).
 -- 도감 설명은 아이 눈높이로 새로 쓴 글이다.
 
 BEGIN;

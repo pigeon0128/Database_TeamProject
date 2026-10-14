@@ -35,12 +35,13 @@ src/                      화면 (React)
     drawing/                  그리기 화면 공용 (도구 상태, 메뉴, 화면 틀)
   lib/                      서버에 저장되는 상태와 도우미 (api, 설정, 이어 그리기, 날짜·시간 형식)
     drawing/                  그림·채점 엔진 (획, 채점, 밑그림 가공, 단축키) — 서버 없이 브라우저에서만 동작
-  data/                     장면 목록(scenes), 도감 생물 목록(creatures) — 밑그림 이미지는 DB에서 API로 받는다
+  data/                     장면 목록(scenes), 도감 생물 목록(creatures)
+  assets/                   밑그림 이미지 (story/, creatures/) — DB에는 경로만 저장
 server/                   API 서버 (Express)
   routes/                   주소별 처리 (auth, drawings, records, settings, drafts, collection)
 database/                 DB (PostgreSQL)
   migrations/               표를 만드는 SQL (번호 순서대로 실행)
-  queries/, seeds/          예시 쿼리, 기본 데이터 (seeds/guides: DB에 넣을 밑그림 원본)
+  queries/, seeds/          예시 쿼리, 기본 데이터
 scripts/                  pnpm db:migrate, pnpm dev:all
 ```
 

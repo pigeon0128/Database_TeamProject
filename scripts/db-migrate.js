@@ -3,7 +3,6 @@
 //  2. DB(doroland_drawing 등)가 없으면 만든다
 //  3. database/migrations 의 SQL 중 아직 실행하지 않은 것만 번호 순서대로 실행하고 schema_migrations 표에 기록한다
 //  4. 앱의 장면 목록(database/seeds/content.sql)을 넣는다 (이미 있으면 건너뜀)
-//  5. 밑그림 이미지(database/seeds/guides)를 drawings.reference_image 에 넣는다 (바뀐 것만)
 // psql 을 설치하거나 경로를 잡을 필요가 없다 (API 서버와 같은 pg 라이브러리로 접속한다).
 import { randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -131,25 +130,6 @@ if (withSeed) {
 }
 await client.query(readFileSync(join(dbDir, "seeds", "content.sql"), "utf8"));
 console.log("  장면 목록(content.sql) 확인 완료");
-
-// ── 5. 밑그림 이미지 ─────────────────────────────────────
-// drawings.reference_image_key 와 같은 경로의 파일(database/seeds/guides/<key>)을 DB에 넣는다. 내용이 같으면 건너뛴다.
-const CONTENT_TYPES = { ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg", ".svg": "image/svg+xml" };
-const guideRows = (await client.query("SELECT drawing_id, reference_image_key FROM drawings")).rows;
-let uploaded = 0;
-for (const { drawing_id, reference_image_key: key } of guideRows) {
-  const file = join(dbDir, "seeds", "guides", key);
-  if (!existsSync(file)) continue;
-  const type = CONTENT_TYPES[key.slice(key.lastIndexOf(".")).toLowerCase()];
-  if (!type) continue;
-  const { rowCount } = await client.query(
-    `UPDATE drawings SET reference_image = $1, reference_content_type = $2
-      WHERE drawing_id = $3 AND reference_image IS DISTINCT FROM $1`,
-    [readFileSync(file), type, drawing_id],
-  );
-  uploaded += rowCount;
-}
-console.log(`  밑그림 이미지 ${uploaded ? `${uploaded}개를 넣었어요` : "확인 완료"}`);
 
 const tables = (await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY 1")).rows;
 console.log(`완료: 표 ${tables.length}개 (${tables.map((t) => t.table_name).join(", ")})`);

@@ -1,7 +1,7 @@
-// 스토리 장면 목록. 장면을 새로 추가하려면 밑그림 이미지를 database/seeds/guides/story 에 넣고(DB에 올라간다)
-// database/seeds/content.sql 과 여기에 항목을 하나씩 더 적는다. 밑그림은 DB에서 API로 받는다.
+// 스토리 장면 목록. 장면을 새로 추가하려면 밑그림 이미지를 assets/story에 넣고 여기에 항목을 하나 더 적는다
+// (DB에는 database/seeds/content.sql 로 그림 정보와 이미지 경로 reference_image_key 를 넣는다).
 // 장면마다 밑그림, 크기, 채점에서 뺄 영역, 따라 그리기 대상에서 뺄 영역을 정한다.
-import { drawingImageUrl } from "../lib/api";
+import forestGuide from "../assets/story/forest-guide.webp";
 import type { Rect } from "../lib/drawing/strokes";
 
 export type Scene = {
@@ -36,7 +36,7 @@ export const scenes: Scene[] = [
     drawingId: 1,
     title: "숲속의 노래",
     line: "소리에도 생명이 있구나!!",
-    guide: drawingImageUrl(1),
+    guide: forestGuide,
     width: 1500,
     height: 1049,
     scoreExclude: [{ x: 0, y: 0, w: 395, h: 115 }],

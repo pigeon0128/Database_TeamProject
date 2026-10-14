@@ -61,9 +61,6 @@ export type LeaderboardEntry = {
   playedAt: string;
 };
 
-/** DB에 저장된 밑그림 주소 (drawings.reference_image) */
-export const drawingImageUrl = (drawingId: number) => `/api/drawings/${drawingId}/image`;
-
 /** 기록에 저장된 완성 그림 주소 (<img src> 에 그대로 쓴다) */
 export const artworkUrl = (recordId: number) => `/api/artworks/${recordId}`;
 

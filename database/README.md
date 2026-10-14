@@ -33,7 +33,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 |---|---|
 | users | 사용자 ID 및 닉네임 |
 | chapters | 스토리 챕터 |
-| drawings | 챕터별 원본 그림 — 밑그림 이미지 자체도 `reference_image`(BYTEA)에 저장 (`migrations/008_drawing_images.sql`) |
+| drawings | 챕터별 원본 그림 — 밑그림 이미지의 경로(`reference_image_key`)를 보관하고, 이미지 파일은 앱(`src/assets/<경로>`)에 있음 |
 | play_records | 사용자별 그림 플레이 기록 |
 | user_artworks | 사용자가 완성한 작품 — 그림 자체(PNG, `image_data`) 또는 다른 저장소의 경로(`image_key`) (`migrations/005_artwork_images.sql`) |
 | user_settings | 사용자가 마지막으로 바꾼 그리기 설정과 단축키 (`migrations/003_user_settings.sql`, 단축키 `006_shortcut_settings.sql`) |
@@ -66,8 +66,8 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 - 저장하는 그림은 밑그림 없이 사용자가 그린 선만 담은 투명 배경 PNG입니다 (원본 크기, 한 장에 약 60KB). 리더보드에서 밑그림 위에 겹쳐 보여 줍니다.
 - 기록(`play_records`)과 그림(`user_artworks`)은 API 서버가 한 트랜잭션으로 함께 넣습니다. 하나가 실패하면 둘 다 저장되지 않습니다.
 - 그림은 리더보드에서 그 사람의 최고 기록에 붙은 것을 보여 줍니다 (`GET /api/artworks/:recordId`).
-- 밑그림(원본 그림)도 같은 이유로 `drawings.reference_image` 에 저장합니다 (`008_drawing_images.sql`). 원본 파일은 `seeds/guides/<reference_image_key>` 에 두고,
-  `pnpm db:migrate` 가 내용이 바뀐 것만 DB에 넣습니다. 앱은 `GET /api/drawings/:id/image` 로 받습니다.
+- 밑그림(원본 그림)은 처음 설계대로 경로(`reference_image_key`)만 DB에 두고, 이미지 파일은 앱의 `src/assets/<경로>` 에 둡니다.
+  (잠깐 이미지를 DB에 저장했던 `008` 은 지웠고, 그 칸은 `009_remove_drawing_images.sql` 이 정리합니다.)
 - 그림이 많아지면 DB 크기가 커지므로, 서비스로 키울 때는 파일 저장소(S3 등)로 옮기고 `image_key` 만 남기는 방식을 다시 검토합니다.
 
 ### Data Integrity

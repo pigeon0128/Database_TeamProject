@@ -8,13 +8,15 @@ type Props = {
   submission: Submission;
   sceneTitle: string;
   drawingId: number | undefined;
+  /** "장면 고르기"처럼 목록으로 돌아가는 버튼 */
+  back: { path: string; label: string };
   onResend: () => void;
   onRetry: () => void;
   /** 로그인이 끝났을 때(401) 로그인 화면으로 */
   onExpire: () => void;
 };
 
-export function SubmissionDialog({ submission, sceneTitle, drawingId, onResend, onRetry, onExpire }: Props) {
+export function SubmissionDialog({ submission, sceneTitle, drawingId, back, onResend, onRetry, onExpire }: Props) {
   return (
     <div role="dialog" aria-modal="true" aria-label="기록 저장" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-4xl bg-white p-7 text-center shadow-card-hover">
@@ -58,8 +60,8 @@ export function SubmissionDialog({ submission, sceneTitle, drawingId, onResend, 
               <button type="button" onClick={onRetry} className="rounded-2xl bg-sky-soft py-3 text-sm font-extrabold hover:bg-sky-haze">
                 🔁 다시 도전
               </button>
-              <button type="button" onClick={() => navigate("/story")} className="rounded-2xl bg-sky-soft py-3 text-sm font-extrabold hover:bg-sky-haze">
-                장면 고르기
+              <button type="button" onClick={() => navigate(back.path)} className="rounded-2xl bg-sky-soft py-3 text-sm font-extrabold hover:bg-sky-haze">
+                {back.label}
               </button>
             </div>
           )}

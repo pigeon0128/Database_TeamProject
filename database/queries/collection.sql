@@ -6,6 +6,7 @@
 WITH ranked_artworks AS (
     SELECT
         pr.drawing_id,
+        pr.record_id,
         pr.similarity_score,
         pr.duration_ms,
         ua.artwork_id,
@@ -30,6 +31,8 @@ SELECT
     d.drawing_order,
     (ra.artwork_id IS NOT NULL) AS is_collected,
     ra.image_key AS representative_image_key,
+    -- 005 이후 그림은 image_data 에 저장되어 image_key 가 비어 있을 수 있다. 앱은 이 기록 ID로 GET /api/artworks/:recordId 에서 그림을 받는다.
+    ra.record_id AS representative_record_id,
     ra.similarity_score AS best_score,
     ra.duration_ms AS best_duration_ms
 FROM drawings d
@@ -69,3 +72,58 @@ GROUP BY
     c.title,
     c.chapter_order
 ORDER BY c.chapter_order;
+
+
+-- =========================================================
+-- 3. 생물 도감 목록: 도감 정보 + 내 수집 현황
+-- (1번과 같은 대표 작품 규칙. 앱의 GET /api/collection 이 쓰는 쿼리, server/routes/collection.js)
+-- $1: user_id
+-- =========================================================
+
+WITH ranked_artworks AS (
+    SELECT
+        pr.drawing_id,
+        pr.record_id,
+        pr.similarity_score,
+        pr.duration_ms,
+        ROW_NUMBER() OVER (
+            PARTITION BY pr.drawing_id
+            ORDER BY
+                pr.similarity_score DESC,
+                pr.duration_ms ASC,
+                pr.record_id DESC
+        ) AS rn
+    FROM play_records pr
+    JOIN user_artworks ua
+        ON pr.record_id = ua.record_id
+    WHERE pr.user_id = $1
+)
+SELECT
+    d.drawing_id,
+    d.title,
+    p.slug,
+    p.category,
+    p.summary,
+    (ra.record_id IS NOT NULL) AS is_collected,
+    ra.record_id AS representative_record_id,
+    ra.similarity_score AS best_score,
+    ra.duration_ms AS best_duration_ms,
+    COALESCE((
+        SELECT json_agg(json_build_object('label', f.label, 'content', f.content) ORDER BY f.fact_order)
+        FROM creature_facts f
+        WHERE f.drawing_id = d.drawing_id
+    ), '[]'::json) AS facts,
+    COALESCE((
+        SELECT json_agg(t.content ORDER BY t.tip_order)
+        FROM creature_tips t
+        WHERE t.drawing_id = d.drawing_id
+    ), '[]'::json) AS tips
+FROM creature_profiles p
+JOIN drawings d
+    ON d.drawing_id = p.drawing_id
+JOIN chapters c
+    ON d.chapter_id = c.chapter_id
+LEFT JOIN ranked_artworks ra
+    ON d.drawing_id = ra.drawing_id
+    AND ra.rn = 1
+ORDER BY c.chapter_order, d.drawing_order;

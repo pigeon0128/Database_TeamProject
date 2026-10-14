@@ -9,6 +9,8 @@ export type Drawing = {
   referenceImageKey: string;
   order: number;
   chapter: { id: number; title: string; order: number };
+  /** 도감 생물이면 분류(DB creature_profiles.category), 스토리 장면이면 null */
+  category: "animal" | "plant" | "object" | null;
 };
 
 /** 그리기 설정 (DB user_settings 한 행과 같은 모양. 값 범위는 서버 readSettings, DB CHECK 와 같다) */
@@ -28,6 +30,24 @@ export type DrawingSettings = {
 };
 
 
+/** 생물 도감 한 항목: 도감 정보(DB creature_*)와 내 수집 현황 (GET /api/collection) */
+export type CreatureEntry = {
+  drawingId: number;
+  name: string;
+  /** 앱 주소·밑그림 파일 이름 (src/data/creatures.ts) */
+  slug: string;
+  category: "animal" | "plant" | "object";
+  summary: string;
+  facts: { label: string; content: string }[];
+  tips: string[];
+  /** 완성 그림이 저장된 기록이 있으면 수집 완료 */
+  collected: boolean;
+  /** 대표 작품의 기록 ID (그림은 artworkUrl 로) */
+  recordId: number | null;
+  bestScore: number | null;
+  bestDurationMs: number | null;
+};
+
 export type LeaderboardEntry = {
   ranking: number;
   /** 이 순위에 쓰인 기록 (그 사람의 최고 기록) */
@@ -40,6 +60,9 @@ export type LeaderboardEntry = {
   durationMs: number;
   playedAt: string;
 };
+
+/** DB에 저장된 밑그림 주소 (drawings.reference_image) */
+export const drawingImageUrl = (drawingId: number) => `/api/drawings/${drawingId}/image`;
 
 /** 기록에 저장된 완성 그림 주소 (<img src> 에 그대로 쓴다) */
 export const artworkUrl = (recordId: number) => `/api/artworks/${recordId}`;
@@ -101,5 +124,7 @@ export const api = {
     request<{ draft: { strokes: Stroke[]; name: string | null; savedAt: string } | null }>("GET", `/drafts/${encodeURIComponent(key)}`),
   saveDraft: (key: string, strokes: Stroke[], name: string | undefined, opts?: { keepalive?: boolean }) =>
     request<{ savedAt: string }>("PUT", `/drafts/${encodeURIComponent(key)}`, { strokes, name: name ?? null }, opts),
+  /** 생물 도감 목록과 내 수집 현황 */
+  collection: () => request<{ creatures: CreatureEntry[] }>("GET", "/collection"),
   deleteDraft: (key: string) => request<{ ok: true }>("DELETE", `/drafts/${encodeURIComponent(key)}`),
 };

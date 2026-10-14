@@ -33,11 +33,14 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 |---|---|
 | users | 사용자 ID 및 닉네임 |
 | chapters | 스토리 챕터 |
-| drawings | 챕터별 원본 그림 |
+| drawings | 챕터별 원본 그림 — 밑그림 이미지 자체도 `reference_image`(BYTEA)에 저장 (`migrations/008_drawing_images.sql`) |
 | play_records | 사용자별 그림 플레이 기록 |
 | user_artworks | 사용자가 완성한 작품 — 그림 자체(PNG, `image_data`) 또는 다른 저장소의 경로(`image_key`) (`migrations/005_artwork_images.sql`) |
 | user_settings | 사용자가 마지막으로 바꾼 그리기 설정과 단축키 (`migrations/003_user_settings.sql`, 단축키 `006_shortcut_settings.sql`) |
 | drawing_drafts | 다 그리기 전의 그림(획 목록, JSONB) — 이어서 그리기용 (`migrations/004_drawing_drafts.sql`) |
+| creature_profiles | 도감 생물 정보 — 그림(`drawings`) 하나에 분류·한 줄 소개를 붙임 (`migrations/007_creature_profiles.sql`) |
+| creature_facts | 도감 정보 항목 (분류, 사는 곳, 먹이 등 이름·내용) |
+| creature_tips | 그릴 때 살펴볼 점 |
 | schema_migrations | 실행한 마이그레이션 파일 목록 (`pnpm db:migrate` 가 만들고 관리) |
 
 ### Relationships
@@ -48,6 +51,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 - play_records (1) → (0..1) user_artworks
 - users (1) → (0..1) user_settings
 - users (1) → (N) drawing_drafts (그림 하나당 한 행: 키 `(user_id, draft_key)`)
+- drawings (1) → (0..1) creature_profiles (1) → (N) creature_facts, creature_tips
 
 ## 5. Design Decisions
 
@@ -62,6 +66,8 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 - 저장하는 그림은 밑그림 없이 사용자가 그린 선만 담은 투명 배경 PNG입니다 (원본 크기, 한 장에 약 60KB). 리더보드에서 밑그림 위에 겹쳐 보여 줍니다.
 - 기록(`play_records`)과 그림(`user_artworks`)은 API 서버가 한 트랜잭션으로 함께 넣습니다. 하나가 실패하면 둘 다 저장되지 않습니다.
 - 그림은 리더보드에서 그 사람의 최고 기록에 붙은 것을 보여 줍니다 (`GET /api/artworks/:recordId`).
+- 밑그림(원본 그림)도 같은 이유로 `drawings.reference_image` 에 저장합니다 (`008_drawing_images.sql`). 원본 파일은 `seeds/guides/<reference_image_key>` 에 두고,
+  `pnpm db:migrate` 가 내용이 바뀐 것만 DB에 넣습니다. 앱은 `GET /api/drawings/:id/image` 로 받습니다.
 - 그림이 많아지면 DB 크기가 커지므로, 서비스로 키울 때는 파일 저장소(S3 등)로 옮기고 `image_key` 만 남기는 방식을 다시 검토합니다.
 
 ### Data Integrity
@@ -85,7 +91,7 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 완료(기록 저장)하거나 새로 그리기를 고르면 행을 지웁니다. 조회·저장·삭제 SQL: `queries/drawing_drafts.sql`
 
 ### Content
-앱의 장면 목록(챕터·그림)은 `seeds/content.sql` 에 있고, `pnpm db:migrate` 가 매번 넣습니다 (이미 있으면 건너뜀).
+앱의 장면 목록(챕터·그림)과 도감 생물 15개(챕터 `생물 도감`, 그림 2~16번)와 그 도감 정보는 `seeds/content.sql` 에 있고, `pnpm db:migrate` 가 매번 넣습니다 (이미 있으면 건너뜀).
 앱(`src/data/scenes.ts`)의 `drawingId` 와 번호를 맞추므로 장면을 추가할 때 두 곳을 함께 고칩니다.
 
 ## 6. Leaderboard
@@ -117,7 +123,14 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 - 대표 작품 및 최고 기록 조회
 - 챕터별 전체 그림 수와 수집된 그림 수 집계
 
-별도의 도감 테이블을 생성하지 않고 기존 테이블 간 JOIN으로 구현합니다.
+별도의 수집 테이블을 생성하지 않고 기존 테이블 간 JOIN으로 구현합니다.
+
+### 생물 도감
+도감 생물도 그림(`drawings` 한 행)으로 넣어서, 그리기 기록·완성 그림·리더보드·수집 판단을 스토리 장면과 같은 표로 처리합니다.
+생물마다 붙는 도감 설명만 `creature_profiles`(분류, 한 줄 소개), `creature_facts`(정보 항목), `creature_tips`(그릴 때 살펴볼 점)에 둡니다.
+정보 항목은 생물마다 달라서(동물은 먹이, 무생물은 생기는 곳 등) 칸을 고정하지 않고 (이름, 내용) 행으로 저장합니다.
+앱은 `GET /api/collection`(`server/routes/collection.js`, `queries/collection.sql` 3번)으로 도감 정보와 내 수집 현황을 한 번에 받습니다.
+생물을 다 그리고 완료하면 `play_records`·`user_artworks` 에 저장되어 수집 완료가 됩니다.
 
 `005_artwork_images.sql` 이후 앱이 저장하는 그림은 `image_data` 에 들어가고 `image_key` 는 비어 있을 수 있습니다.
 이때 대표 작품 그림은 그 기록의 ID로 `GET /api/artworks/:recordId` 에서 불러옵니다.

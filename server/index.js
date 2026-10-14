@@ -5,10 +5,12 @@
 //   routes/records.js   /api/play-records, /api/artworks/:id, /api/leaderboard   기록·완성 그림·리더보드
 //   routes/settings.js  /api/settings    그리기 설정·단축키
 //   routes/drafts.js    /api/drafts/*    그리던 그림 (이어서 그리기)
+//   routes/collection.js /api/collection 생물 도감과 내 수집 현황
 import express from "express";
 import { pool } from "./db.js";
 import { errorHandler, notFound } from "./errors.js";
 import { authRoutes } from "./routes/auth.js";
+import { collectionRoutes } from "./routes/collection.js";
 import { draftRoutes } from "./routes/drafts.js";
 import { drawingRoutes } from "./routes/drawings.js";
 import { recordRoutes } from "./routes/records.js";
@@ -33,6 +35,7 @@ app.use("/api/drawings", drawingRoutes);
 app.use("/api", recordRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/drafts", draftRoutes);
+app.use("/api/collection", collectionRoutes);
 
 app.use("/api", notFound);
 app.use(errorHandler);

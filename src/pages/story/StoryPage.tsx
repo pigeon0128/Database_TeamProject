@@ -1,8 +1,8 @@
 // 스토리 장면 그리기 화면 (#/story/<id>). 밑그림의 흰 선을 따라 그리면 채점하고, 완료하면 기록과 그림을 저장한다.
-// 이 파일은 조각을 조립하고 툴바를 구성한다.
+// 이 파일은 조각을 조립하고 툴바를 구성한다. 도감 생물 그리기(pages/creatures)도 SceneAttempts 를 그대로 쓴다.
 //   채점·장면 준비: useSceneScoring / 타이머·기록 저장: useRecordSubmission / 이어 그리기: lib/drawingDraft
 //   점수 막대: ScoreBar / 저장 결과 창: SubmissionDialog / 완성 예시 창: ExampleDialog
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useAuth } from "../../auth";
 import { DrawingShell } from "../../components/drawing/DrawingShell";
 import { HistoryButtons, LineMenu, ShortcutList, SizeMenu } from "../../components/drawing/menus";
@@ -24,6 +24,8 @@ import { useSceneScoring } from "./useSceneScoring";
 
 const BACK_TO_LIST = { path: "/story", label: "장면 고르기" };
 
+type Back = { path: string; label: string };
+
 export default function StoryPage({ sceneId }: { sceneId: string }) {
   const scene = findScene(sceneId);
   if (!scene) {
@@ -41,16 +43,24 @@ export default function StoryPage({ sceneId }: { sceneId: string }) {
   return <SceneAttempts scene={scene} />;
 }
 
+type SceneProps = {
+  scene: Scene;
+  /** 돌아갈 곳 (툴바 왼쪽 끝, 저장 결과 창) */
+  back?: Back;
+  /** 그림판 오른쪽에 둘 정보 패널 (도감 카드). 좁은 화면에서는 툴바의 📖 메뉴로 연다 */
+  aside?: ReactNode;
+};
+
 /** "다시 도전"하면 그리기 화면을 통째로 새로 시작한다. */
-function SceneAttempts({ scene }: { scene: Scene }) {
+export function SceneAttempts(props: SceneProps) {
   const [attempt, setAttempt] = useState(0);
-  return <SceneDrawing key={attempt} scene={scene} onRetry={() => setAttempt((a) => a + 1)} />;
+  return <SceneDrawing key={attempt} {...props} onRetry={() => setAttempt((a) => a + 1)} />;
 }
 
-function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void }) {
+function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps & { onRetry: () => void }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
   // 따라 그리기는 채점하므로 선 끝 얇게를 쓰지 않는다 (손떨림 보정만).
-  const tools = useDrawingTools(canvasRef, { maxBrushSize: scene.maxBrushSize, fade: false });
+  const tools = useDrawingTools(canvasRef, { maxBrushSize: scene.maxBrushSize, brushScale: scene.brushScale, fade: false });
   const actions = tools.canvasProps.actions;
   // 이어서 그리기: 장면마다 그리던 그림을 따로 저장한다.
   const draft = useDrawingDraft(`story:${scene.id}`, { actions, replaceActions: tools.replaceActions });
@@ -92,8 +102,9 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
     <>
       <DrawingShell
         tools={tools}
-        back={BACK_TO_LIST}
+        back={back}
         aspect={scene.width / scene.height}
+        aside={aside}
         toolbarStart={
           <>
             <span className="mr-1 rounded-full bg-sun px-3 py-1 text-sm font-black text-ink">{scene.title}</span>
@@ -135,6 +146,13 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
             </ToolbarMenu>
             <ToolbarDivider />
             <HistoryButtons tools={tools} />
+            {aside && (
+              <span className="lg:hidden">
+                <ToolbarMenu title="도감 카드" label="📖 도감">
+                  {() => aside}
+                </ToolbarMenu>
+              </span>
+            )}
           </>
         }
         toolbarEnd={
@@ -213,6 +231,7 @@ function SceneDrawing({ scene, onRetry }: { scene: Scene; onRetry: () => void })
           submission={record.submission}
           sceneTitle={scene.title}
           drawingId={scene.drawingId}
+          back={back}
           onResend={record.resend}
           onRetry={onRetry}
           onExpire={expire}

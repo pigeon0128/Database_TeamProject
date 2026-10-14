@@ -1,10 +1,13 @@
 // 리더보드 화면 (#/leaderboard?drawing=<id>). 그림(장면)별로 사람마다 최고 기록 1개를 순위로 보여 준다.
 // 일치율이 높은 순, 같으면 빨리 그린 순. 내 기록이 10위 밖이면 표 아래에 따로 보여 준다. 데이터는 API 서버(server/)에서 받는다.
 // 기록마다 그린 그림(user_artworks)이 있으면 썸네일로 보여 주고, 누르면 밑그림과 겹쳐 크게 본다.
+// 위쪽에서 "스토리 장면 그리기 / 도감 생물 그리기"를 고르고, 도감은 동물·식물·무생물별 이름 목록에서 그림을 고른다.
 import { useCallback, useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../auth";
-import { findSceneByDrawing, type Scene } from "../data/scenes";
+import { CATEGORY_LABELS, type CreatureCategory } from "../data/creatures";
+import { findDrawingScene } from "../data/drawings";
+import type { Scene } from "../data/scenes";
 import { api, ApiError, artworkUrl, type Drawing, type LeaderboardEntry } from "../lib/api";
 import { formatDate, formatDuration, formatScore } from "../lib/format";
 import { loadScenePreview } from "../lib/drawing/sceneAssets";
@@ -14,7 +17,7 @@ const LIMIT = 10;
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 /** 앱의 장면 제목이 있으면 그것을, 없으면 DB 제목을 쓴다. */
-const drawingTitle = (d: Drawing) => findSceneByDrawing(d.id)?.title ?? d.title;
+const drawingTitle = (d: Drawing) => findDrawingScene(d.id)?.title ?? d.title;
 
 type Board = { top: LeaderboardEntry[]; me: LeaderboardEntry | null };
 
@@ -98,6 +101,71 @@ function Row({ entry, isMe, guideUrl, aspect, onOpen }: RowProps) {
   );
 }
 
+const pickButton = (active: boolean) =>
+  `rounded-full px-4 py-2 text-sm font-bold shadow-sm transition ${active ? "bg-sky-deep text-white" : "bg-white/80 text-ink hover:bg-white"}`;
+
+/** 그림 고르기: 큰 버튼 두 개(스토리 / 도감)와 그 아래 그림 목록. 고른 그림은 주소(?drawing=)에 남는다 */
+function DrawingPicker({ drawings, selected }: { drawings: Drawing[]; selected: Drawing }) {
+  const stories = drawings.filter((d) => d.category === null);
+  const creatures = drawings.filter((d) => d.category !== null);
+  const creatureMode = selected.category !== null;
+  const go = (d: Drawing | undefined) => d && navigate(`/leaderboard?drawing=${d.id}`);
+  const modes = [
+    { key: "story", label: "📖 스토리 장면 그리기", active: !creatureMode, first: stories[0] },
+    { key: "creature", label: "📗 도감 생물 그리기", active: creatureMode, first: creatures[0] },
+  ];
+
+  return (
+    <div className="mb-4">
+      <div className="mb-3 grid grid-cols-2 gap-3" role="tablist" aria-label="그리기 종류">
+        {modes.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            role="tab"
+            aria-selected={m.active}
+            disabled={!m.first}
+            onClick={() => !m.active && go(m.first)}
+            className={`rounded-3xl px-5 py-4 text-base font-black shadow-card transition sm:text-lg ${
+              m.active ? "bg-sky-deep text-white" : "bg-white/80 text-ink hover:-translate-y-0.5 hover:bg-white"
+            } disabled:opacity-40`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {creatureMode ? (
+        <div className="space-y-2 rounded-3xl bg-white/60 p-3">
+          {(Object.keys(CATEGORY_LABELS) as CreatureCategory[]).map((category) => {
+            const list = creatures.filter((d) => d.category === category);
+            if (!list.length) return null;
+            return (
+              <div key={category} className="flex flex-wrap items-center gap-2">
+                <span className="w-14 shrink-0 text-sm font-black text-ink-muted">{CATEGORY_LABELS[category]}</span>
+                {list.map((d) => (
+                  <button key={d.id} type="button" aria-pressed={d.id === selected.id} onClick={() => go(d)} className={pickButton(d.id === selected.id)}>
+                    {drawingTitle(d)}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {stories.map((d) => (
+            <button key={d.id} type="button" aria-pressed={d.id === selected.id} onClick={() => go(d)} className={pickButton(d.id === selected.id)}>
+              <span className="opacity-70">{d.chapter.title} · </span>
+              {drawingTitle(d)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LeaderboardPage() {
   const { user } = useAuth();
   const query = new URLSearchParams(usePath().split("?")[1] ?? "");
@@ -130,7 +198,7 @@ export default function LeaderboardPage() {
     if (selected) load(selected.id);
   }, [selected?.id, load]);
 
-  const scene = selected ? findSceneByDrawing(selected.id) : undefined;
+  const scene = selected ? findDrawingScene(selected.id) : undefined;
   const aspect = scene ? scene.width / scene.height : 4 / 3;
 
   // 그림 썸네일과 크게 보기에 깔 밑그림 (장면 고르기 화면과 같은 이미지)
@@ -151,25 +219,7 @@ export default function LeaderboardPage() {
 
   return (
     <PageLayout title="리더보드 확인하기">
-      {drawings && drawings.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="그림 고르기">
-          {drawings.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              role="tab"
-              aria-selected={d.id === selected?.id}
-              onClick={() => navigate(`/leaderboard?drawing=${d.id}`)}
-              className={`rounded-full px-4 py-2 text-sm font-bold shadow-sm transition ${
-                d.id === selected?.id ? "bg-sky-deep text-white" : "bg-white/80 text-ink hover:bg-white"
-              }`}
-            >
-              <span className="opacity-70">{d.chapter.title} · </span>
-              {drawingTitle(d)}
-            </button>
-          ))}
-        </div>
-      )}
+      {drawings && drawings.length > 0 && selected && <DrawingPicker drawings={drawings} selected={selected} />}
 
       <section className="overflow-hidden rounded-3xl border border-white/90 bg-white/80 shadow-card">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-haze px-5 py-4">

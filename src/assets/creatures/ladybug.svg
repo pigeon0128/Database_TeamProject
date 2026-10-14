@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
-<rect width="1200" height="900" fill="#b6b6b6"/>
-<g fill="none" stroke="#8e8e8e" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M150 760 C320 640 760 600 1080 700 C760 820 380 840 150 760 Z"/><path d="M190 755 C460 720 760 700 1040 705"/></g>
-<g fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><circle cx="600" cy="490" r="220"/><path d="M505 300 C515 215 685 215 695 300"/><path d="M600 272 L600 710"/><circle cx="562" cy="262" r="10"/><circle cx="638" cy="262" r="10"/><path d="M560 232 Q530 165 495 150 M640 232 Q670 165 705 150"/><circle cx="600" cy="345" r="36"/><circle cx="505" cy="410" r="36"/><circle cx="695" cy="410" r="36"/><circle cx="480" cy="530" r="36"/><circle cx="720" cy="530" r="36"/><circle cx="535" cy="640" r="36"/><circle cx="665" cy="640" r="36"/><path d="M395 420 L330 385 M382 500 L305 505 M402 600 L338 650"/><g transform="translate(1200,0) scale(-1,1)"><path d="M395 420 L330 385 M382 500 L305 505 M402 600 L338 650"/></g></g>
-</svg>

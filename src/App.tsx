@@ -1,11 +1,12 @@
 // 최상위 컴포넌트. 현재 주소(#/...)를 보고 어떤 페이지를 보여 줄지 고른다.
-// #/story/<장면 id>는 해당 장면의 그리기 화면, 나머지는 routes 표대로 연결하고 모르는 주소는 메인으로 보낸다.
+// #/story/<장면 id>는 장면 그리기, #/creatures/<생물>은 도감 생물 그리기 화면, 나머지는 routes 표대로 연결하고 모르는 주소는 메인으로 보낸다.
 import type { ComponentType } from "react";
 import { usePath } from "./router";
 import { AuthProvider, useAuth } from "./auth";
 import HomePage from "./pages/HomePage";
 import CharacterPage from "./pages/CharacterPage";
-import CreaturePage from "./pages/CreaturePage";
+import CreatureDrawPage from "./pages/creatures/CreatureDrawPage";
+import CreatureListPage from "./pages/creatures/CreatureListPage";
 import LoginPage from "./pages/LoginPage";
 import StoryPage from "./pages/story/StoryPage";
 import StorySelectPage from "./pages/StorySelectPage";
@@ -17,11 +18,12 @@ const routes: Record<string, ComponentType> = {
   "/character": CharacterPage,
   "/story": StorySelectPage,
   "/leaderboard": LeaderboardPage,
-  "/creatures": CreaturePage,
+  "/creatures": CreatureListPage,
   "/settings": SettingsPage,
 };
 
 const STORY_PREFIX = "/story/";
+const CREATURE_PREFIX = "/creatures/";
 
 function Routes() {
   const { user, checking } = useAuth();
@@ -38,6 +40,10 @@ function Routes() {
     const sceneId = decodeURIComponent(path.slice(STORY_PREFIX.length));
     // key로 장면이 바뀌면 그리기 상태를 새로 시작한다.
     return <StoryPage key={sceneId} sceneId={sceneId} />;
+  }
+  if (path.startsWith(CREATURE_PREFIX)) {
+    const slug = decodeURIComponent(path.slice(CREATURE_PREFIX.length));
+    return <CreatureDrawPage key={slug} slug={slug} />;
   }
   const Page = routes[path] ?? HomePage;
   return <Page />;

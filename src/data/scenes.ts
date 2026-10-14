@@ -1,6 +1,7 @@
-// 스토리 장면 목록. 장면을 새로 추가하려면 밑그림 이미지를 assets/story에 넣고 여기에 항목을 하나 더 적는다.
+// 스토리 장면 목록. 장면을 새로 추가하려면 밑그림 이미지를 database/seeds/guides/story 에 넣고(DB에 올라간다)
+// database/seeds/content.sql 과 여기에 항목을 하나씩 더 적는다. 밑그림은 DB에서 API로 받는다.
 // 장면마다 밑그림, 크기, 채점에서 뺄 영역, 따라 그리기 대상에서 뺄 영역을 정한다.
-import forestGuide from "../assets/story/forest-guide.webp";
+import { drawingImageUrl } from "../lib/api";
 import type { Rect } from "../lib/drawing/strokes";
 
 export type Scene = {
@@ -22,6 +23,11 @@ export type Scene = {
    * 흰 선 평균 두께 × 1.2 정도가 알맞다 (숲속의 노래: 흰 선 약 4.2픽셀 → 6이라 기본값 그대로).
    */
   maxBrushSize?: number;
+  /**
+   * 실제로 그려지는 선 굵기 = 굵기 설정 × 이 값 (기본 1). 밑그림마다 흰 선 두께가 달라서, 굵기 6이 흰 선 두께와 비슷해지도록 맞춘다.
+   * 흰 선 두께(px) ÷ 4.3 정도 (숲속의 노래: 흰 선 약 4.2px → 1).
+   */
+  brushScale?: number;
 };
 
 export const scenes: Scene[] = [
@@ -30,7 +36,7 @@ export const scenes: Scene[] = [
     drawingId: 1,
     title: "숲속의 노래",
     line: "소리에도 생명이 있구나!!",
-    guide: forestGuide,
+    guide: drawingImageUrl(1),
     width: 1500,
     height: 1049,
     scoreExclude: [{ x: 0, y: 0, w: 395, h: 115 }],
@@ -40,4 +46,3 @@ export const scenes: Scene[] = [
 ];
 
 export const findScene = (id: string) => scenes.find((s) => s.id === id);
-export const findSceneByDrawing = (drawingId: number) => scenes.find((s) => s.drawingId === drawingId);

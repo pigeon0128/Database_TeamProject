@@ -21,12 +21,13 @@ const SIZE_STEP = 2;
 /**
  * 그리기 상태와 동작을 한데 묶은 훅. 키보드 단축키도 여기서 등록한다.
  * maxBrushSize: 브러쉬 최대 굵기를 BRUSH_MAX_SIZE보다 더 낮출 때 (장면의 흰 선이 아주 가늘 때, scenes.ts). 지우개에는 적용하지 않는다.
+ * brushScale: 실제로 그려지는 굵기 = 굵기 설정 × brushScale (밑그림의 흰 선 두께에 맞춘다, scenes.ts). 화면에 보이는 굵기 숫자는 그대로다.
  * fade: false면 선 끝 얇게를 쓰지 않는다 (따라 그리기: 선 끝이 뾰족하면 짧게 끊어 그린 털선이 서로 안 겹쳐 감점을 피해 간다).
  *       저장된 선 끝 얇게 값은 그대로 두므로 캐릭터 그리기에서는 계속 쓴다.
  */
 export function useDrawingTools(
   canvasRef: RefObject<TracingCanvasHandle | null>,
-  { maxBrushSize = BRUSH_MAX_SIZE, fade: fadeEnabled = true }: { maxBrushSize?: number; fade?: boolean } = {},
+  { maxBrushSize = BRUSH_MAX_SIZE, fade: fadeEnabled = true, brushScale = 1 }: { maxBrushSize?: number; fade?: boolean; brushScale?: number } = {},
 ) {
   const [actions, setActions] = useState<DrawAction[]>([]);
   const [redoStack, setRedoStack] = useState<DrawAction[]>([]);
@@ -118,7 +119,7 @@ export function useDrawingTools(
     /** TracingCanvas에 그대로 넘기는 값 */
     canvasProps: {
       color: INK_COLOR,
-      size,
+      size: size * brushScale,
       erase,
       smoothing: smoothing / 100,
       fade: fadeEnabled ? fade * FADE_PX_PER_STEP : 0,

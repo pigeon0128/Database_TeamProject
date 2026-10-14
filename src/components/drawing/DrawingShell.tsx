@@ -1,4 +1,4 @@
-// 그리기 화면 틀: 위 툴바 / 왼쪽 도구 막대(브러쉬·지우개) + 가운데 그림판 / 아래 상태 막대.
+// 그리기 화면 틀: 위 툴바 / 왼쪽 도구 막대(브러쉬·지우개) + 가운데 그림판 (+ 오른쪽 정보 패널) / 아래 상태 막대.
 import type { ReactNode } from "react";
 import { comboText } from "../../lib/drawing/shortcuts";
 import { navigate } from "../../router";
@@ -35,6 +35,8 @@ type DrawingShellProps = {
   aspect: number;
   /** 아래 상태 막대 내용 */
   footer?: ReactNode;
+  /** 그림판 오른쪽 정보 패널 (넓은 화면에서만 보인다, 도감 카드 등) */
+  aside?: ReactNode;
   /** 그림판 (TracingCanvas) */
   children: ReactNode;
 };
@@ -45,7 +47,7 @@ type DrawingShellProps = {
  *   가운데: 왼쪽 도구 막대(브러쉬/지우개) + 남은 공간을 꽉 채우는 그림판
  *   아래: 상태 막대 (점수, 도움말 등)
  */
-export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, footer, children }: DrawingShellProps) {
+export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, footer, aside, children }: DrawingShellProps) {
   return (
     // 흰 바탕에 옅은 회색 점무늬(화이트보드 느낌), 그 위에 반투명 흰 카드와 진한 글자
     <div
@@ -74,8 +76,12 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
         <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center [container-type:size]">
           <div style={{ width: `min(100cqw, calc(100cqh * ${aspect}))` }}>{children}</div>
         </div>
-        {/* 그림판이 가운데 오도록 도구 막대만큼 오른쪽도 비워 둔다 */}
-        <div className="hidden w-[4.25rem] shrink-0 lg:block" aria-hidden="true" />
+        {aside ? (
+          <aside className="hidden w-72 shrink-0 overflow-y-auto rounded-3xl border border-white/90 bg-white/76 p-4 shadow-card backdrop-blur-sm lg:block">{aside}</aside>
+        ) : (
+          // 그림판이 가운데 오도록 도구 막대만큼 오른쪽도 비워 둔다
+          <div className="hidden w-[4.25rem] shrink-0 lg:block" aria-hidden="true" />
+        )}
       </div>
 
       {footer && (

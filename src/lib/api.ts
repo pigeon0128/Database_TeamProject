@@ -42,8 +42,10 @@ export type CreatureEntry = {
   tips: string[];
   /** 완성 그림이 저장된 기록이 있으면 수집 완료 */
   collected: boolean;
-  /** 대표 작품의 기록 ID (그림은 artworkUrl 로) */
+  /** 대표 작품의 기록 ID */
   recordId: number | null;
+  /** 대표 작품 그림의 경로 (DB user_artworks.image_key, 그림은 artworkUrl 로) */
+  imageKey: string | null;
   bestScore: number | null;
   bestDurationMs: number | null;
 };
@@ -52,8 +54,8 @@ export type LeaderboardEntry = {
   ranking: number;
   /** 이 순위에 쓰인 기록 (그 사람의 최고 기록) */
   recordId: number;
-  /** 그 기록에 완성 그림이 저장되어 있는지 */
-  hasArtwork: boolean;
+  /** 그 기록의 완성 그림 경로 (DB user_artworks.image_key). 그림이 없으면 null */
+  imageKey: string | null;
   userId: number;
   nickname: string;
   score: number;
@@ -61,8 +63,8 @@ export type LeaderboardEntry = {
   playedAt: string;
 };
 
-/** 기록에 저장된 완성 그림 주소 (<img src> 에 그대로 쓴다) */
-export const artworkUrl = (recordId: number) => `/api/artworks/${recordId}`;
+/** 완성 그림 주소: DB의 경로(image_key)를 API 서버의 /uploads 폴더 주소로 (<img src> 에 그대로 쓴다) */
+export const artworkUrl = (imageKey: string) => `/uploads/${imageKey}`;
 
 export class ApiError extends Error {
   status: number;
@@ -105,9 +107,9 @@ export const api = {
   changePassword: (loginId: string, currentPassword: string, newPassword: string) =>
     request<{ ok: true }>("POST", "/auth/password", { loginId, currentPassword, newPassword }),
   drawings: () => request<{ drawings: Drawing[] }>("GET", "/drawings"),
-  /** image: 완성 그림 (PNG data URL). 기록과 함께 한 번에 저장된다 */
+  /** image: 완성 그림 (PNG data URL). 이번 기록이 내 최고 기록일 때만 저장되고(isBest), 이전 최고 기록의 그림은 지워진다 */
   savePlayRecord: (drawingId: number, similarityScore: number, durationMs: number, image: string | null) =>
-    request<{ recordId: number; playedAt: string; hasArtwork: boolean }>("POST", "/play-records", { drawingId, similarityScore, durationMs, image }),
+    request<{ recordId: number; playedAt: string; isBest: boolean; imageKey: string | null }>("POST", "/play-records", { drawingId, similarityScore, durationMs, image }),
   leaderboard: (drawingId: number, limit = 10) =>
     request<{ top: LeaderboardEntry[]; me: LeaderboardEntry | null }>("GET", `/leaderboard?drawingId=${drawingId}&limit=${limit}`),
   /** 저장된 설정이 없으면 settings: null */

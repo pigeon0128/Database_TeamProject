@@ -28,7 +28,12 @@ export function SubmissionDialog({ submission, sceneTitle, drawingId, back, onRe
         <p className="mt-1 text-sm font-bold text-ink-muted">⏱ {formatDuration(submission.durationMs)}</p>
 
         {submission.status === "saving" && <p className="mt-5 text-sm font-bold text-ink-muted">기록을 저장하는 중…</p>}
-        {submission.status === "saved" && <p className="mt-5 text-base font-extrabold text-emerald-600">기록이 저장됐어요! 🎉</p>}
+        {submission.status === "saved" &&
+          (submission.isBest ? (
+            <p className="mt-5 text-base font-extrabold text-emerald-600">내 최고 기록이에요! 그림도 저장했어요 🎉</p>
+          ) : (
+            <p className="mt-5 text-sm font-bold text-ink-muted">기록이 저장됐어요. 최고 기록보다 낮아서 그림은 최고 기록 그림을 그대로 둬요.</p>
+          ))}
         {submission.status === "error" && (
           <p role="alert" className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
             {submission.message}

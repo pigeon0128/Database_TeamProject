@@ -1,6 +1,6 @@
 // 리더보드 화면 (#/leaderboard?drawing=<id>). 그림(장면)별로 사람마다 최고 기록 1개를 순위로 보여 준다.
 // 일치율이 높은 순, 같으면 빨리 그린 순. 내 기록이 10위 밖이면 표 아래에 따로 보여 준다. 데이터는 API 서버(server/)에서 받는다.
-// 기록마다 그린 그림(user_artworks)이 있으면 썸네일로 보여 주고, 누르면 밑그림과 겹쳐 크게 본다.
+// 기록마다 그린 그림이 있으면(user_artworks.image_key 경로의 파일) 썸네일로 보여 주고, 누르면 밑그림과 겹쳐 크게 본다.
 // 위쪽에서 "스토리 장면 그리기 / 도감 생물 그리기"를 고르고, 도감은 동물·식물·무생물별 이름 목록에서 그림을 고른다.
 import { useCallback, useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
@@ -23,7 +23,7 @@ type Board = { top: LeaderboardEntry[]; me: LeaderboardEntry | null };
 
 /** 기록의 그림: 흐린 밑그림 위에 그린 선을 겹친 작은 그림. 누르면 크게 본다 */
 function Thumbnail({ entry, guideUrl, aspect, onOpen }: { entry: LeaderboardEntry; guideUrl: string | null; aspect: number; onOpen: () => void }) {
-  if (!entry.hasArtwork) return <span className="text-xs font-semibold text-ink-muted">없음</span>;
+  if (!entry.imageKey) return <span className="text-xs font-semibold text-ink-muted">없음</span>;
   return (
     <button
       type="button"
@@ -33,7 +33,7 @@ function Thumbnail({ entry, guideUrl, aspect, onOpen }: { entry: LeaderboardEntr
       style={{ aspectRatio: aspect }}
     >
       {guideUrl && <img src={guideUrl} alt="" className="absolute inset-0 h-full w-full opacity-30" />}
-      <img src={artworkUrl(entry.recordId)} alt={`${entry.nickname}의 그림`} loading="lazy" className="absolute inset-0 h-full w-full" />
+      <img src={artworkUrl(entry.imageKey)} alt={`${entry.nickname}의 그림`} loading="lazy" className="absolute inset-0 h-full w-full" />
     </button>
   );
 }
@@ -58,7 +58,9 @@ function ArtworkViewer({ entry, scene, guideUrl, onClose }: { entry: Leaderboard
       <figure className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-card-hover" onClick={(e) => e.stopPropagation()}>
         <div className="relative w-full bg-white" style={{ aspectRatio: scene ? scene.width / scene.height : undefined }}>
           {showGuide && guideUrl && <img src={guideUrl} alt="" className="absolute inset-0 h-full w-full opacity-50" />}
-          <img src={artworkUrl(entry.recordId)} alt={`${entry.nickname}의 그림`} className={scene ? "absolute inset-0 h-full w-full" : "w-full"} />
+          {entry.imageKey && (
+            <img src={artworkUrl(entry.imageKey)} alt={`${entry.nickname}의 그림`} className={scene ? "absolute inset-0 h-full w-full" : "w-full"} />
+          )}
         </div>
         <figcaption className="flex flex-wrap items-center justify-between gap-3 p-4">
           <span className="text-sm font-bold">

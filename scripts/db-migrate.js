@@ -3,12 +3,14 @@
 //  2. DB(doroland_drawing 등)가 없으면 만든다
 //  3. database/migrations 의 SQL 중 아직 실행하지 않은 것만 번호 순서대로 실행하고 schema_migrations 표에 기록한다
 //  4. 앱의 장면 목록(database/seeds/content.sql)을 넣는다 (이미 있으면 건너뜀)
+// 마이그레이션 010 앞에서는 예전에 DB에 넣었던 완성 그림을 서버 폴더(uploads/)의 파일로 옮긴다.
 // psql 을 설치하거나 경로를 잡을 필요가 없다 (API 서버와 같은 pg 라이브러리로 접속한다).
 import { randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { artworkKey, saveFile, UPLOAD_DIR } from "../server/storage.js";
 
 // 오류는 긴 스택 대신 한 줄로 보여 준다.
 for (const event of ["uncaughtException", "unhandledRejection"]) {
@@ -91,6 +93,29 @@ const ALREADY_THERE = {
   "004_drawing_drafts.sql": "SELECT to_regclass('public.drawing_drafts') IS NOT NULL AS ok",
 };
 
+// 마이그레이션 SQL 을 실행하기 전에 할 일 (SQL 만으로는 할 수 없는 일)
+const BEFORE = {
+  // 005 때부터 DB(image_data)에 넣었던 완성 그림을 파일로 꺼내고 그 경로를 image_key 에 채운다.
+  // 그래야 010 이 image_data 칸을 지우고 image_key 를 필수로 바꿔도 그림을 잃지 않는다.
+  "010_artwork_files.sql": async () => {
+    const hasData = (
+      await client.query("SELECT 1 FROM information_schema.columns WHERE table_name = 'user_artworks' AND column_name = 'image_data'")
+    ).rows.length;
+    if (!hasData) return;
+    const { rows } = await client.query(
+      `SELECT a.artwork_id, a.record_id, p.user_id, a.image_data
+         FROM user_artworks a JOIN play_records p ON p.record_id = a.record_id
+        WHERE a.image_data IS NOT NULL AND (a.image_key IS NULL OR TRIM(a.image_key) = '')`,
+    );
+    for (const r of rows) {
+      const key = artworkKey(r.user_id, r.record_id);
+      await saveFile(key, r.image_data);
+      await client.query("UPDATE user_artworks SET image_key = $1 WHERE artwork_id = $2", [key, r.artwork_id]);
+    }
+    if (rows.length) console.log(`  완성 그림 ${rows.length}개를 파일로 옮겼어요 (${UPLOAD_DIR})`);
+  },
+};
+
 const files = readdirSync(join(dbDir, "migrations"))
   .filter((f) => f.endsWith(".sql"))
   .sort();
@@ -105,6 +130,7 @@ for (const file of files) {
     continue;
   }
   try {
+    await BEFORE[file]?.();
     await client.query(readFileSync(join(dbDir, "migrations", file), "utf8"));
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});

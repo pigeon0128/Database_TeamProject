@@ -10,7 +10,7 @@ export const collectionRoutes = Router();
 collectionRoutes.get("/", requireUser, async (req, res) => {
   const { rows } = await pool.query(
     `WITH ranked_artworks AS (
-        SELECT pr.drawing_id, pr.record_id, pr.similarity_score, pr.duration_ms,
+        SELECT pr.drawing_id, pr.record_id, pr.similarity_score, pr.duration_ms, ua.image_key,
                ROW_NUMBER() OVER (
                    PARTITION BY pr.drawing_id
                    ORDER BY pr.similarity_score DESC, pr.duration_ms ASC, pr.record_id DESC
@@ -22,6 +22,7 @@ collectionRoutes.get("/", requireUser, async (req, res) => {
      SELECT d.drawing_id, d.title, p.slug, p.category, p.summary,
             (ra.record_id IS NOT NULL) AS is_collected,
             ra.record_id AS representative_record_id,
+            ra.image_key AS representative_image_key,
             ra.similarity_score AS best_score,
             ra.duration_ms AS best_duration_ms,
             COALESCE((SELECT json_agg(json_build_object('label', f.label, 'content', f.content) ORDER BY f.fact_order)
@@ -46,6 +47,7 @@ collectionRoutes.get("/", requireUser, async (req, res) => {
       tips: r.tips,
       collected: r.is_collected,
       recordId: r.representative_record_id === null ? null : Number(r.representative_record_id),
+      imageKey: r.representative_image_key,
       bestScore: r.best_score === null ? null : Number(r.best_score),
       bestDurationMs: r.best_duration_ms,
     })),

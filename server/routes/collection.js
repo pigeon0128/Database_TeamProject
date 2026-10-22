@@ -1,5 +1,5 @@
 // 도감 API (/api/collection): 생물 도감 목록과 내 수집 현황.
-// database/queries/collection.sql 의 3번 쿼리와 같다 (대표 작품 규칙: 일치율↓ 시간↑ 기록ID↓).
+// database/queries/collection.sql 의 3번 쿼리와 같다 (대표 작품 규칙은 리더보드와 같다: 일치율↓ 시간↑ 완료시각↑ 기록ID↑).
 // 표: creature_profiles·creature_facts·creature_tips (migrations/007), drawings, play_records, user_artworks
 import { Router } from "express";
 import { requireUser } from "../auth.js";
@@ -13,7 +13,7 @@ collectionRoutes.get("/", requireUser, async (req, res) => {
         SELECT pr.drawing_id, pr.record_id, pr.similarity_score, pr.duration_ms, ua.image_key,
                ROW_NUMBER() OVER (
                    PARTITION BY pr.drawing_id
-                   ORDER BY pr.similarity_score DESC, pr.duration_ms ASC, pr.record_id DESC
+                   ORDER BY pr.similarity_score DESC, pr.duration_ms ASC, pr.played_at ASC, pr.record_id ASC
                ) AS rn
           FROM play_records pr
           JOIN user_artworks ua ON pr.record_id = ua.record_id

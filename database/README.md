@@ -27,6 +27,13 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 
 ![Database ERD](docs/erd.png)
 
+> `docs/erd.png` 는 마이그레이션 009 시점의 ERD 입니다. `010_artwork_files.sql` 이후 `user_artworks` 에는 `image_data`, `content_type` 칸이 없습니다
+> (그림 파일은 서버 폴더, DB에는 `image_key` 경로만).
+
+현재 구조(마이그레이션 001~010 적용 후)는 `docs/db_structure.svg` 입니다.
+
+![Current DB structure](docs/db_structure.svg)
+
 ## 4. Database Schema
 
 | 테이블 | 설명 |
@@ -115,7 +122,7 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 ### Collection Rules
 - `user_artworks`에 작품이 저장되면 수집 완료로 판단합니다.
 - 완성 작품은 사용자·그림마다 최고 기록 1개에만 남깁니다 (예전에는 같은 그림의 여러 작품을 보관할 수 있었음).
-- 대표 작품은 일치율 내림차순, 소요시간 오름차순, 기록 ID 내림차순으로 선정합니다.
+- 대표 작품은 리더보드와 같은 규칙(일치율 내림차순, 소요시간 오름차순, 완료 시각 오름차순, 기록 ID 오름차순)으로 선정합니다.
 - 미수집 그림도 도감 목록에 포함됩니다.
 
 ### Queries
@@ -162,5 +169,4 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 
 - 닉네임만으로는 사용자 소유권이나 인증을 보장하지 않습니다.
 - 공용 PostgreSQL 배포는 별도 작업이 필요합니다.
-- `docs/erd.png`에는 아직 `user_settings`, `drawing_drafts` 테이블이 없습니다.
 - 외부 이미지 파일 삭제는 DB의 ON DELETE CASCADE만으로 처리되지 않습니다.

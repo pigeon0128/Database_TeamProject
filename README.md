@@ -31,7 +31,7 @@ src/                      화면 (React)
   main.tsx, App.tsx         시작점, 주소별 화면 연결
   auth.tsx, router.ts       로그인 상태, 페이지 이동
   pages/                    화면 하나 = 파일 하나 (story/ 스토리 그리기, creatures/ 도감 생물 그리기)
-  components/               여러 화면이 같이 쓰는 부품 (그림판, 툴바, 입력 칸)
+  components/               여러 화면이 같이 쓰는 부품 (그림판, 툴바)
     drawing/                  그리기 화면 공용 (도구 상태, 메뉴, 화면 틀)
   lib/                      서버에 저장되는 상태와 도우미 (api, 설정, 이어 그리기, 날짜·시간 형식)
     drawing/                  그림·채점 엔진 (획, 채점, 밑그림 가공, 단축키) — 서버 없이 브라우저에서만 동작

@@ -5,14 +5,14 @@ import type { Scene } from "../../data/scenes";
 import { makeTracedExample, prepareGuide } from "./guideImage";
 import { buildGuideMasks, type GuideMasks } from "./traceScore";
 
-export type ScenePreview = {
+type ScenePreview = {
   /** 손질한 밑그림 (음표 등을 회색 선으로) */
   guideUrl: string;
   /** 완성 예시 (흰 선을 검은 선으로 칠한 그림) — 선택 화면 미리보기에도 쓴다 */
   exampleUrl: string;
 };
 
-export type SceneAssets = ScenePreview & {
+type SceneAssets = ScenePreview & {
   /** 채점용 흰 선 / 회색 구역 위치 */
   masks: GuideMasks;
 };

@@ -119,7 +119,12 @@ SELECT
         SELECT json_agg(t.content ORDER BY t.tip_order)
         FROM creature_tips t
         WHERE t.drawing_id = d.drawing_id
-    ), '[]'::json) AS tips
+    ), '[]'::json) AS tips,
+    COALESCE((
+        SELECT json_agg(json_build_object('citation', s.citation, 'url', s.url) ORDER BY s.source_order)
+        FROM creature_sources s
+        WHERE s.drawing_id = d.drawing_id
+    ), '[]'::json) AS sources
 FROM creature_profiles p
 JOIN drawings d
     ON d.drawing_id = p.drawing_id

@@ -1,6 +1,6 @@
 // 도감 API (/api/collection): 생물 도감 목록과 내 수집 현황.
 // database/queries/collection.sql 의 3번 쿼리와 같다 (대표 작품 규칙은 리더보드와 같다: 일치율↓ 시간↑ 완료시각↑ 기록ID↑).
-// 표: creature_profiles·creature_facts·creature_tips (migrations/007), drawings, play_records, user_artworks
+// 표: creature_profiles·creature_facts·creature_tips (migrations/007), creature_sources (migrations/011), drawings, play_records, user_artworks
 import { Router } from "express";
 import { requireUser } from "../auth.js";
 import { pool } from "../db.js";
@@ -28,7 +28,9 @@ collectionRoutes.get("/", requireUser, async (req, res) => {
             COALESCE((SELECT json_agg(json_build_object('label', f.label, 'content', f.content) ORDER BY f.fact_order)
                         FROM creature_facts f WHERE f.drawing_id = d.drawing_id), '[]'::json) AS facts,
             COALESCE((SELECT json_agg(t.content ORDER BY t.tip_order)
-                        FROM creature_tips t WHERE t.drawing_id = d.drawing_id), '[]'::json) AS tips
+                        FROM creature_tips t WHERE t.drawing_id = d.drawing_id), '[]'::json) AS tips,
+            COALESCE((SELECT json_agg(json_build_object('citation', s.citation, 'url', s.url) ORDER BY s.source_order)
+                        FROM creature_sources s WHERE s.drawing_id = d.drawing_id), '[]'::json) AS sources
        FROM creature_profiles p
        JOIN drawings d ON d.drawing_id = p.drawing_id
        JOIN chapters c ON d.chapter_id = c.chapter_id
@@ -45,6 +47,7 @@ collectionRoutes.get("/", requireUser, async (req, res) => {
       summary: r.summary,
       facts: r.facts,
       tips: r.tips,
+      sources: r.sources,
       collected: r.is_collected,
       recordId: r.representative_record_id === null ? null : Number(r.representative_record_id),
       imageKey: r.representative_image_key,

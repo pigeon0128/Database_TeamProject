@@ -30,7 +30,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 > `docs/erd.png` 는 마이그레이션 010 까지 적용한 지금 구조입니다. `user_artworks` 에는 그림 경로(`image_key`)만 있고
 > 그림 파일은 서버 폴더에 둡니다.
 
-현재 구조(마이그레이션 001~010 적용 후)는 `docs/db_structure.svg` 입니다.
+현재 구조(마이그레이션 001~010 적용 후)는 `docs/db_structure.svg` 입니다. 011 에서 더한 `creature_sources` 표는 아직 그림에 없습니다.
 
 ![Current DB structure](docs/db_structure.svg)
 
@@ -48,6 +48,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 | creature_profiles | 도감 생물 정보 — 그림(`drawings`) 하나에 분류·한 줄 소개를 붙임 (`migrations/007_creature_profiles.sql`) |
 | creature_facts | 도감 정보 항목 (분류, 사는 곳, 먹이 등 이름·내용) |
 | creature_tips | 그릴 때 살펴볼 점 |
+| creature_sources | 도감 정보의 출처 (출처 이름, 주소) — 도감 카드 아래에 보여 줌 (`migrations/011_creature_sources.sql`) |
 | schema_migrations | 실행한 마이그레이션 파일 목록 (`pnpm db:migrate` 가 만들고 관리) |
 
 ### Relationships
@@ -58,7 +59,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 - play_records (1) → (0..1) user_artworks
 - users (1) → (0..1) user_settings
 - users (1) → (N) drawing_drafts (그림 하나당 한 행: 키 `(user_id, draft_key)`)
-- drawings (1) → (0..1) creature_profiles (1) → (N) creature_facts, creature_tips
+- drawings (1) → (0..1) creature_profiles (1) → (N) creature_facts, creature_tips, creature_sources
 
 ## 5. Design Decisions
 
@@ -138,6 +139,8 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 도감 생물도 그림(`drawings` 한 행)으로 넣어서, 그리기 기록·완성 그림·리더보드·수집 판단을 스토리 장면과 같은 표로 처리합니다.
 생물마다 붙는 도감 설명만 `creature_profiles`(분류, 한 줄 소개), `creature_facts`(정보 항목), `creature_tips`(그릴 때 살펴볼 점)에 둡니다.
 정보 항목은 생물마다 달라서(동물은 먹이, 무생물은 생기는 곳 등) 칸을 고정하지 않고 (이름, 내용) 행으로 저장합니다.
+한 줄 소개와 정보 항목은 공신력 있는 출처에서 확인한 사실만 쓰고, 그 출처를 `creature_sources` 에 두어 도감 카드 아래에 보여 줍니다.
+어떤 출처를 왜 골랐는지, 사이트마다 이용 조건(출처 표시, 변경 금지 등)이 어떤지는 `creature-sources.md` 에 정리했습니다.
 앱은 `GET /api/collection`(`server/routes/collection.js`, `queries/collection.sql` 3번)으로 도감 정보와 내 수집 현황을 한 번에 받습니다.
 생물을 다 그리고 완료하면 `play_records`·`user_artworks` 에 저장되어 수집 완료가 됩니다.
 

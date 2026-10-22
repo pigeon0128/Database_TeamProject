@@ -25,3 +25,5 @@ logs/
 package-lock.json
 # 각자 컴퓨터의 Claude Code 설정
 /.claude/
+# 사용자가 그린 완성 그림 파일 (DB의 user_artworks.image_key 가 가리킨다, server/storage.js)
+/uploads/

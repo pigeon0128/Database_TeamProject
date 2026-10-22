@@ -1,11 +1,12 @@
 // 스토리 그리기의 타이머와 기록 저장.
 // 첫 획을 그을 때 타이머를 시작하고, 완료하면 점수·걸린 시간·완성 그림을 기록(play_records, user_artworks)으로 저장한다.
+// 완성 그림은 내 최고 기록이 됐을 때만 서버가 남긴다 (isBest).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 
 export type Submission =
   | { status: "saving"; score: number; durationMs: number }
-  | { status: "saved"; score: number; durationMs: number }
+  | { status: "saved"; score: number; durationMs: number; isBest: boolean }
   | { status: "error"; score: number; durationMs: number; message: string; expired: boolean };
 
 /** drawingId: DB drawings.drawing_id. 없으면(아직 DB에 없는 장면) 저장하지 않는다 */
@@ -31,7 +32,7 @@ export function useRecordSubmission(drawingId: number | undefined) {
       if (drawingId === undefined) return;
       setSubmission({ status: "saving", score, durationMs });
       api.savePlayRecord(drawingId, score, durationMs, artworkRef.current).then(
-        () => setSubmission({ status: "saved", score, durationMs }),
+        (r) => setSubmission({ status: "saved", score, durationMs, isBest: r.isBest }),
         (e: unknown) =>
           setSubmission({
             status: "error",

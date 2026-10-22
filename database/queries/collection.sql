@@ -31,7 +31,7 @@ SELECT
     d.drawing_order,
     (ra.artwork_id IS NOT NULL) AS is_collected,
     ra.image_key AS representative_image_key,
-    -- 005 이후 그림은 image_data 에 저장되어 image_key 가 비어 있을 수 있다. 앱은 이 기록 ID로 GET /api/artworks/:recordId 에서 그림을 받는다.
+    -- 그림 파일은 서버 폴더에 있고 image_key 는 그 경로다 (010_artwork_files.sql). 앱은 /uploads/<image_key> 로 그림을 받는다.
     ra.record_id AS representative_record_id,
     ra.similarity_score AS best_score,
     ra.duration_ms AS best_duration_ms

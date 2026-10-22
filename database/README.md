@@ -35,7 +35,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 | chapters | 스토리 챕터 |
 | drawings | 챕터별 원본 그림 — 밑그림 이미지의 경로(`reference_image_key`)를 보관하고, 이미지 파일은 앱(`src/assets/<경로>`)에 있음 |
 | play_records | 사용자별 그림 플레이 기록 |
-| user_artworks | 사용자가 완성한 작품 — 그림 자체(PNG, `image_data`) 또는 다른 저장소의 경로(`image_key`) (`migrations/005_artwork_images.sql`) |
+| user_artworks | 사용자가 완성한 작품의 저장 경로(`image_key`) — 파일은 서버 폴더 `uploads/` (`migrations/010_artwork_files.sql`) |
 | user_settings | 사용자가 마지막으로 바꾼 그리기 설정과 단축키 (`migrations/003_user_settings.sql`, 단축키 `006_shortcut_settings.sql`) |
 | drawing_drafts | 다 그리기 전의 그림(획 목록, JSONB) — 이어서 그리기용 (`migrations/004_drawing_drafts.sql`) |
 | creature_profiles | 도감 생물 정보 — 그림(`drawings`) 하나에 분류·한 줄 소개를 붙임 (`migrations/007_creature_profiles.sql`) |
@@ -59,16 +59,18 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 사용자, 콘텐츠, 플레이 기록을 별도 테이블로 분리하여 중복 데이터를 최소화하고 외래키를 통해 참조 무결성을 유지합니다.
 
 ### Image Storage
-처음에는 이미지 파일을 다른 저장소에 두고 경로(`image_key`)만 보관하는 설계였지만, 따로 파일 저장소를 두지 않도록
-`005_artwork_images.sql` 에서 그림 자체를 `image_data`(BYTEA)에 저장하도록 바꿨습니다. 경로만 있는 기존 행도 그대로 쓸 수 있도록
-"경로 또는 이미지 중 하나는 있어야 한다"는 CHECK 제약조건을 둡니다.
+이미지 파일 자체가 아니라 저장소의 파일 경로 또는 객체 키를 데이터베이스에 보관합니다 (`001_initial.sql` 의 처음 설계).
 
-- 저장하는 그림은 밑그림 없이 사용자가 그린 선만 담은 투명 배경 PNG입니다 (원본 크기, 한 장에 약 60KB). 리더보드에서 밑그림 위에 겹쳐 보여 줍니다.
-- 기록(`play_records`)과 그림(`user_artworks`)은 API 서버가 한 트랜잭션으로 함께 넣습니다. 하나가 실패하면 둘 다 저장되지 않습니다.
-- 그림은 리더보드에서 그 사람의 최고 기록에 붙은 것을 보여 줍니다 (`GET /api/artworks/:recordId`).
-- 밑그림(원본 그림)은 처음 설계대로 경로(`reference_image_key`)만 DB에 두고, 이미지 파일은 앱의 `src/assets/<경로>` 에 둡니다.
-  (잠깐 이미지를 DB에 저장했던 `008` 은 지웠고, 그 칸은 `009_remove_drawing_images.sql` 이 정리합니다.)
-- 그림이 많아지면 DB 크기가 커지므로, 서비스로 키울 때는 파일 저장소(S3 등)로 옮기고 `image_key` 만 남기는 방식을 다시 검토합니다.
+- **밑그림** (`drawings.reference_image_key`): 앱의 `src/assets/<경로>` 파일. 앱과 함께 배포됩니다.
+- **완성 그림** (`user_artworks.image_key`): API 서버 폴더(`uploads/`, `.env` 의 `UPLOAD_DIR` 로 바꿀 수 있음)의
+  `artworks/<user_id>/<record_id>.png` 파일. 브라우저는 `/uploads/<image_key>` 로 받습니다 (`server/storage.js`).
+- 완성 그림은 사용자·그림마다 최고 기록 1개에만 남깁니다. 새 기록이 최고 기록이 되면 그 그림 파일을 저장하고
+  이전 최고 기록의 행과 파일을 지우며, 최고 기록이 아니면 기록(점수·시간)만 저장합니다 (`server/routes/records.js`,
+  최고 기록 규칙은 리더보드와 같음).
+- 파일과 DB는 한 트랜잭션으로 묶을 수 없어서 "새 파일 쓰기 → DB 커밋 → 이전 파일 지우기" 순서로 맞추고, DB 저장이 실패하면 새 파일을 지웁니다.
+- 한동안(`005_artwork_images.sql` ~ `009`) 완성 그림을 DB(`image_data`)에 저장했지만 `010_artwork_files.sql` 에서 처음 설계로 되돌렸습니다.
+  `pnpm db:migrate` 가 010 을 실행하기 전에 DB에 있던 그림을 파일로 꺼내 `image_key` 를 채웁니다.
+- `uploads/` 폴더는 DB와 한 쌍입니다. DB를 백업·복사할 때 폴더도 함께 챙겨야 하고, git 에는 올리지 않습니다.
 
 ### Data Integrity
 일치율은 0~100 범위로 제한하고, 소요 시간에는 음수가 들어가지 않도록 CHECK 제약조건을 적용합니다.
@@ -112,7 +114,7 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 
 ### Collection Rules
 - `user_artworks`에 작품이 저장되면 수집 완료로 판단합니다.
-- 동일 그림의 여러 완성 작품을 보관할 수 있습니다.
+- 완성 작품은 사용자·그림마다 최고 기록 1개에만 남깁니다 (예전에는 같은 그림의 여러 작품을 보관할 수 있었음).
 - 대표 작품은 일치율 내림차순, 소요시간 오름차순, 기록 ID 내림차순으로 선정합니다.
 - 미수집 그림도 도감 목록에 포함됩니다.
 
@@ -132,8 +134,7 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 앱은 `GET /api/collection`(`server/routes/collection.js`, `queries/collection.sql` 3번)으로 도감 정보와 내 수집 현황을 한 번에 받습니다.
 생물을 다 그리고 완료하면 `play_records`·`user_artworks` 에 저장되어 수집 완료가 됩니다.
 
-`005_artwork_images.sql` 이후 앱이 저장하는 그림은 `image_data` 에 들어가고 `image_key` 는 비어 있을 수 있습니다.
-이때 대표 작품 그림은 그 기록의 ID로 `GET /api/artworks/:recordId` 에서 불러옵니다.
+대표 작품 그림은 `image_key` 경로의 파일이며, 앱은 `/uploads/<image_key>` 로 불러옵니다.
 
 ## 8. Local Setup
 

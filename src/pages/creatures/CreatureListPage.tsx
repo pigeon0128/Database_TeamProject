@@ -19,8 +19,8 @@ function CreatureCard({ creature }: { creature: CreatureEntry }) {
       {/* 밑그림 비율이 저마다 달라서 남는 칸은 밑그림 바탕과 같은 회색으로 (수집한 그림은 흐린 밑그림 위에 그림이 잘 보이게 흰색) */}
       <span className={`relative block ${creature.collected ? "bg-white" : "bg-[#b6b6b6]"}`} style={{ aspectRatio: "4 / 3" }}>
         {guide && <img src={guide} alt="" className={`absolute inset-0 h-full w-full object-contain ${creature.collected ? "opacity-30" : ""}`} />}
-        {creature.collected && creature.recordId !== null && (
-          <img src={artworkUrl(creature.recordId)} alt={`내가 그린 ${creature.name}`} className="absolute inset-0 h-full w-full object-contain" />
+        {creature.collected && creature.imageKey && (
+          <img src={artworkUrl(creature.imageKey)} alt={`내가 그린 ${creature.name}`} className="absolute inset-0 h-full w-full object-contain" />
         )}
         {creature.collected && (
           <span className="absolute right-2 top-2 rotate-6 rounded-full border-2 border-emerald-600 bg-white/90 px-2 py-0.5 text-[11px] font-black text-emerald-700">

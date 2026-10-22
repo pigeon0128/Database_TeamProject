@@ -2,12 +2,14 @@
 // 실행: pnpm dev:server  (기본 포트 3001, 개발 중에는 Vite가 /api 요청을 이 서버로 넘긴다)
 //   routes/auth.js      /api/auth/*      가입·로그인·로그아웃·내 정보·비밀번호 바꾸기
 //   routes/drawings.js  /api/drawings    장면 목록
-//   routes/records.js   /api/play-records, /api/artworks/:id, /api/leaderboard   기록·완성 그림·리더보드
+//   routes/records.js   /api/play-records, /api/leaderboard   기록·리더보드
+//   /uploads/*          완성 그림 파일 (서버 폴더, ./storage.js). DB에는 경로(user_artworks.image_key)만 있다
 //   routes/settings.js  /api/settings    그리기 설정·단축키
 //   routes/drafts.js    /api/drafts/*    그리던 그림 (이어서 그리기)
 //   routes/collection.js /api/collection 생물 도감과 내 수집 현황
 import express from "express";
 import { pool } from "./db.js";
+import { UPLOAD_DIR } from "./storage.js";
 import { errorHandler, notFound } from "./errors.js";
 import { authRoutes } from "./routes/auth.js";
 import { collectionRoutes } from "./routes/collection.js";
@@ -29,6 +31,9 @@ app.get("/api/health", async (_req, res) => {
   await pool.query("SELECT 1");
   res.json({ ok: true });
 });
+
+// 완성 그림 파일. 경로에 기록 번호가 들어가 한 번 저장된 파일은 바뀌지 않으므로 브라우저가 오래 보관해도 된다
+app.use("/uploads", express.static(UPLOAD_DIR, { immutable: true, maxAge: "365d", index: false, fallthrough: false }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/drawings", drawingRoutes);

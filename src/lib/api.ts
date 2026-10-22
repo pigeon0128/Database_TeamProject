@@ -40,6 +40,8 @@ export type CreatureEntry = {
   summary: string;
   facts: { label: string; content: string }[];
   tips: string[];
+  /** 도감 정보의 출처 (DB creature_sources) */
+  sources: { citation: string; url: string }[];
   /** 완성 그림이 저장된 기록이 있으면 수집 완료 */
   collected: boolean;
   /** 대표 작품의 기록 ID */

@@ -4,13 +4,14 @@
 //  3. database/migrations 의 SQL 중 아직 실행하지 않은 것만 번호 순서대로 실행하고 schema_migrations 표에 기록한다
 //  4. 앱의 장면 목록(database/seeds/content.sql)을 넣는다 (이미 있으면 건너뜀)
 // 마이그레이션 010 앞에서는 예전에 DB에 넣었던 완성 그림을 서버 폴더(uploads/)의 파일로 옮긴다.
+// 마이그레이션 012 뒤에서는 지운 대관람차 기록의 완성 그림 파일을 지운다.
 // psql 을 설치하거나 경로를 잡을 필요가 없다 (API 서버와 같은 pg 라이브러리로 접속한다).
 import { randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { artworkKey, saveFile, UPLOAD_DIR } from "../server/storage.js";
+import { artworkKey, removeFile, saveFile, UPLOAD_DIR } from "../server/storage.js";
 
 // 오류는 긴 스택 대신 한 줄로 보여 준다.
 for (const event of ["uncaughtException", "unhandledRejection"]) {
@@ -114,7 +115,24 @@ const BEFORE = {
     }
     if (rows.length) console.log(`  완성 그림 ${rows.length}개를 파일로 옮겼어요 (${UPLOAD_DIR})`);
   },
+  // 012 가 지우는 대관람차(그림 16번) 기록의 완성 그림 파일 경로를 기억해 두었다가, 마이그레이션이 성공한 뒤에 지운다.
+  "012_playground.sql": async () => {
+    const { rows } = await client.query(
+      `SELECT a.image_key
+         FROM user_artworks a
+         JOIN play_records p ON p.record_id = a.record_id
+         JOIN drawings d ON d.drawing_id = p.drawing_id
+        WHERE d.drawing_id = 16 AND d.title = '대관람차'`,
+    );
+    AFTER["012_playground.sql"] = async () => {
+      for (const r of rows) await removeFile(r.image_key);
+      if (rows.length) console.log(`  대관람차 완성 그림 파일 ${rows.length}개를 지웠어요`);
+    };
+  },
 };
+
+// 마이그레이션 SQL 이 성공한 뒤에 할 일 (BEFORE 에서 정한다)
+const AFTER = {};
 
 const files = readdirSync(join(dbDir, "migrations"))
   .filter((f) => f.endsWith(".sql"))
@@ -138,6 +156,7 @@ for (const file of files) {
     process.exit(1);
   }
   await client.query("INSERT INTO schema_migrations (filename) VALUES ($1)", [file]);
+  await AFTER[file]?.();
   console.log(`  실행함    ${file}`);
   ran++;
 }

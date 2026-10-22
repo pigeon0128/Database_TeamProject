@@ -1,4 +1,4 @@
-// 도감 카드: 생물 이름·분류·정보·그릴 때 살펴볼 점과 내 수집 현황. 그리기 화면 오른쪽 패널(좁은 화면은 📖 메뉴)에 보여 준다.
+// 도감 카드: 생물 이름·분류·정보·그릴 때 살펴볼 점·출처와 내 수집 현황. 그리기 화면 오른쪽 패널(좁은 화면은 📖 메뉴)에 보여 준다.
 import { CATEGORY_LABELS } from "../../data/creatures";
 import type { CreatureEntry } from "../../lib/api";
 import { formatDuration, formatScore } from "../../lib/format";
@@ -30,6 +30,20 @@ export function CreatureInfo({ creature }: { creature: CreatureEntry }) {
             ))}
           </ul>
         </div>
+      )}
+
+      {creature.sources.length > 0 && (
+        <p className="mt-3 text-xs font-medium leading-snug text-ink-muted">
+          📚 출처:{" "}
+          {creature.sources.map((s, i) => (
+            <span key={s.url}>
+              {i > 0 && " · "}
+              <a href={s.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
+                {s.citation}
+              </a>
+            </span>
+          ))}
+        </p>
       )}
 
       <p className="mt-4 text-xs font-bold text-ink-muted">

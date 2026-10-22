@@ -30,6 +30,10 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 > `docs/erd.png` 는 마이그레이션 009 시점의 ERD 입니다. `010_artwork_files.sql` 이후 `user_artworks` 에는 `image_data`, `content_type` 칸이 없습니다
 > (그림 파일은 서버 폴더, DB에는 `image_key` 경로만).
 
+현재 구조(마이그레이션 001~010 적용 후)는 `docs/db_structure.svg` 입니다.
+
+![Current DB structure](docs/db_structure.svg)
+
 ## 4. Database Schema
 
 | 테이블 | 설명 |

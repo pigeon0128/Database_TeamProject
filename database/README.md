@@ -27,8 +27,8 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 
 ![Database ERD](docs/erd.png)
 
-> `docs/erd.png` 는 마이그레이션 009 시점의 ERD 입니다. `010_artwork_files.sql` 이후 `user_artworks` 에는 `image_data`, `content_type` 칸이 없습니다
-> (그림 파일은 서버 폴더, DB에는 `image_key` 경로만).
+> `docs/erd.png` 는 마이그레이션 010 까지 적용한 지금 구조입니다. `user_artworks` 에는 그림 경로(`image_key`)만 있고
+> 그림 파일은 서버 폴더에 둡니다.
 
 현재 구조(마이그레이션 001~010 적용 후)는 `docs/db_structure.svg` 입니다.
 
@@ -152,7 +152,7 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 4. `queries/leaderboard.sql`로 리더보드 결과를 확인합니다.
 5. `queries/collection.sql`로 도감 조회 결과를 확인합니다.
 
-새 마이그레이션은 다음 번호(`007_...sql`)로 `migrations/` 에 추가하고, 파일 안에서 `BEGIN; ... COMMIT;` 으로 감쌉니다.
+새 마이그레이션은 다음 번호(`011_...sql`)로 `migrations/` 에 추가하고, 파일 안에서 `BEGIN; ... COMMIT;` 으로 감쌉니다.
 이미 실행한 마이그레이션 파일은 고치지 않습니다 (다른 사람 DB에는 다시 실행되지 않으므로 새 파일로 고칩니다).
 
 ## 9. Verification

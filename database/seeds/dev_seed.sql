@@ -13,8 +13,8 @@ INSERT INTO drawings (
 )
 VALUES (
     1,
-    '첫 번째 장면',
-    'references/chapter1/scene1.png',
+    '숲속의 노래',
+    'story/forest-guide.webp',
     1
 );
 

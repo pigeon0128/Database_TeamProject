@@ -7,8 +7,8 @@ import cactus from "../assets/creatures/cactus.png";
 import cat from "../assets/creatures/cat.png";
 import dandelion from "../assets/creatures/dandelion.png";
 import dog from "../assets/creatures/dog.png";
-import ferriswheel from "../assets/creatures/ferriswheel.png";
 import lion from "../assets/creatures/lion.png";
+import playground from "../assets/creatures/playground.png";
 import robot from "../assets/creatures/robot.png";
 import rose from "../assets/creatures/rose.png";
 import seaturtle from "../assets/creatures/seaturtle.png";
@@ -53,7 +53,7 @@ const CREATURE_GUIDES: CreatureGuide[] = [
   { slug: "sportscar", drawingId: 13, name: "스포츠카", guide: sportscar, width: 1500, height: 1500, lineWidth: 6 },
   { slug: "soccerball", drawingId: 14, name: "축구공", guide: soccerball, width: 1500, height: 1500, lineWidth: 6 },
   { slug: "robot", drawingId: 15, name: "로봇", guide: robot, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "ferriswheel", drawingId: 16, name: "대관람차", guide: ferriswheel, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "playground", drawingId: 17, name: "놀이터", guide: playground, width: 1500, height: 1500, lineWidth: 6 },
 ];
 
 /** 생물 하나를 그리기 화면에서 쓰는 장면으로. 채점에서 빼는 영역은 없다 (밑그림에 안내 문구가 없음) */

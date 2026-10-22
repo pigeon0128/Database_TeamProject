@@ -29,9 +29,9 @@
 | 스포츠카 | 엔진의 힘으로 바퀴를 돌려 도로를 달리는 자동차예요. | 분류: 무생물 · 탈것 (자동차) / 움직이는 원리: 휘발유나 경유로 엔진을 움직이고, 그 힘으로 바퀴를 돌려 달려요 / 우리나라 첫 자동차: 1911년쯤 미국산 승용차가 처음 들어온 것으로 짐작해요 / 처음 만든 국산차: 1955년에 시발자동차회사가 세워져 '첫걸음'이라는 뜻의 '시발' 자동차를 만들었어요 | 자동차, 『한국민족문화대백과사전』 |
 | 축구공 | 발로 차서 상대 골문에 넣는 축구 경기에 쓰는 둥근 공이에요. | 분류: 무생물 · 운동 도구 / 쓰임: 11명이 한 팀이 되어 공을 차서 상대편 골문에 넣는 축구 경기 / 크기: 둘레 68~71cm, 무게 369~453g / 특징: 1970년 월드컵 공 '텔스타'는 가죽 조각 32개를 이어 만들어 그때 가장 둥근 공이었어요 | 축구, 『한국민족문화대백과사전』 · FIFA |
 | 로봇 | 사람과 비슷한 모습과 기능을 가진 자동 기계예요. | 분류: 무생물 · 기계 / 쓰임: 공장에서 사람 대신 조립하거나 검사하고, 우주·깊은 바다·원자로처럼 위험한 곳에서도 일해요 / 특징: 우리나라에서는 2004년 카이스트(KAIST)에서 사람 모양 로봇 '휴보'를 만들었어요 | 로봇, 『한국민족문화대백과사전』 |
-| 대관람차 | 커다란 바퀴가 돌아가는 놀이 기구예요. | 분류: 무생물 · 놀이 기구 / 이름: 1893년 미국 시카고 박람회에서 조지 페리스 주니어가 만든 바퀴에서 영어 이름 '페리스 휠'이 왔어요 | Smithsonian Libraries |
+| 놀이터 | 그네·시소·미끄럼틀 같은 시설을 갖추고 안전하게 놀 수 있도록 따로 만든 곳이에요. | 분류: 무생물 · 놀이 시설 / 뜻: 안전하고 자유롭게 놀 수 있도록 시설을 갖추어 따로 마련한 곳이에요 / 시설: 그네, 시소, 미끄럼틀 등이 있어요 / 있는 곳: 아파트단지에는 놀이터가 빠짐없이 있어요 / 옛날 놀이터: 옛날에는 마당이 가장 중요한 놀이터였고, 마을 어귀의 당나무 아래나 도시의 골목길·빈터에서도 놀았어요 | 놀이터, 『한국민족문화대백과사전』 |
 
-대관람차의 한 줄 소개는 출처가 없는 일반 정의라서 최소한으로 줄였다 ("높은 곳에서 경치를 본다"는 지금 문구는 출처를 찾지 못해 뺐다).
+대관람차(그림 16번)는 `migrations/012_playground.sql` 에서 도감에서 빼고 놀이터(그림 17번)로 바꿨다.
 
 ## 출처 사이트와 이용 조건
 
@@ -39,7 +39,7 @@
 |---|---|---|---|
 | [한국민족문화대백과사전](https://encykorea.aks.ac.kr) | 한국학중앙연구원 (정부 출연 연구기관) | [콘텐츠 이용 안내](https://encykorea.aks.ac.kr/Guide/ContentUse): 연구원이 저작재산권 전부를 가진 항목 원고는 **저작권법 제24조의2(공공저작물 자유이용)** 에 따라 허락 없이 이용 가능. 출처는 `[항목명], 『한국민족문화대백과사전』` 형식으로 표시. 공공누리 마크가 없는 사진·미디어는 해당 저작권자에게 따로 허락받아야 함 | **가능** (본문 글, 출처 표시 필수). 사진은 쓰지 않는다 |
 | [미국 국립공원관리청 NPS](https://www.nps.gov) | 미국 연방정부 | [Disclaimer](https://www.nps.gov/aboutus/disclaimer.htm): NPS가 만든 자료는 "generally considered in the public domain", 출처로 NPS를 밝혀 주기를 권장 | **가능** (사와로 선인장) |
-| [스미스소니언 국립동물원](https://nationalzoo.si.edu) 및 [스미스소니언 도서관](https://www.sil.si.edu) | 스미스소니언 협회 (미국) | [Terms of Use](https://www.si.edu/termsofuse): CC0 표시가 없는 자료는 "personal, educational, and other non-commercial uses"(공정 이용 범위)로만 이용 | **교육·비상업 용도로만 가능**. 앱을 상업적으로 배포하면 다시 확인해야 함 |
+| [스미스소니언 국립동물원](https://nationalzoo.si.edu) | 스미스소니언 협회 (미국) | [Terms of Use](https://www.si.edu/termsofuse): CC0 표시가 없는 자료는 "personal, educational, and other non-commercial uses"(공정 이용 범위)로만 이용 | **교육·비상업 용도로만 가능**. 앱을 상업적으로 배포하면 다시 확인해야 함 |
 | [American Kennel Club](https://www.akc.org/dog-breeds/golden-retriever/) | 미국 애견 단체 | "© The American Kennel Club, Inc. All rights reserved." | **문장 복사 불가**. 사실(품종의 기원·역할)만 우리 말로 새로 쓰고 출처를 밝힌다 |
 | [Science 논문 (PubMed 초록)](https://pubmed.ncbi.nlm.nih.gov/27493185/) · [UC Davis 뉴스](https://www.ucdavis.edu/news/sunflowers-move-clock) | 미국과학진흥회(AAAS) 학술지 · 캘리포니아대 데이비스 | 둘 다 "All rights reserved" | **문장 복사 불가**. 연구로 밝혀진 사실만 우리 말로 새로 쓰고 출처를 밝힌다 (해바라기) |
 | [FIFA](https://inside.fifa.com/news/telstar-story-fifa-world-cup-ball-3073424) | 국제축구연맹 | 페이지에서 이용 조건을 찾지 못함 | 사실(조각 수)만 새로 쓰고 출처를 밝힌다 |
@@ -168,12 +168,16 @@
 | 특징 | 우리나라에서는 2004년 카이스트(KAIST)에서 사람 모양 로봇 "휴보"를 만들었어요 | [18] | 확인됨 |
 | (지금 문구) | "관절마다 모터가 있어서" | [18]에 없음 | **확인 못 함** |
 
-### 대관람차 (ferriswheel)
+### 놀이터 (playground)
+대관람차 대신 넣었다. 그림은 사용자가 준 이미지를 다른 밑그림과 같은 형식(1500×1500, 바탕 회색 182, 흰 선 6px)으로 바꾼 것이다 (오른쪽 아래의 Gemini 별 표시는 따라 그릴 선이 아니라서 지웠다).
 | 항목 | 제안 내용 | 근거 | 상태 |
 |---|---|---|---|
-| 분류 | 무생물 · 놀이 기구 | — | (분류명이라 출처 불필요) |
-| 특징 | 1893년 미국 시카고 박람회에서 조지 페리스 주니어가 만든 바퀴에서 "페리스 휠"이라는 이름이 왔어요 | [19] "built by George Ferris, Jr., at the 1893 exposition" | 확인됨 (이름 유래는 사람 이름과 같다는 점에서 확인) |
-| 크기·칸 수 | — | 미국 의회도서관 기록이 봇 확인 화면으로 막혀 직접 읽지 못함 | **확인 못 함** |
+| 분류 | 무생물 · 놀이 시설 | — | (분류명이라 출처 불필요) |
+| 뜻 | 안전하고 자유롭게 놀 수 있도록 시설을 갖추어 따로 마련한 곳이에요 | [19] "안전하고 자유로운 놀이를 위한 시설을 갖추어 별도로 마련한 고정적인 공간." | 확인됨 |
+| 시설 | 그네, 시소, 미끄럼틀 등이 있어요 | [19] "이러한 놀이터에는 으레 그네 · 시소 · 미끄럼틀 등이 있으나" | 확인됨 |
+| 있는 곳 | 아파트단지에는 놀이터가 빠짐없이 있어요 | [19] "아파트단지에는 이러한 놀이터가 빠짐없이 있다." | 확인됨 |
+| 옛날 놀이터 | 옛날에는 마당이 가장 중요한 놀이터였고, 마을 어귀의 당나무 아래나 도시의 골목길·빈터에서도 놀았어요 | [19] "전통적으로 가장 중요한 놀이터는 마당이다.", 당나무는 "평소에는 마을의 놀이터 구실을 한다", 도시는 "주로 골목길이나 빈터가 된다" | 확인됨 |
+| (뺀 내용) | 사전은 공공놀이터가 "적극적인 놀이를 벌이기에는 부적합하다"고 평가하지만, 사실이 아니라 집필자의 평가라서 넣지 않았다 | [19] | — |
 
 ## 출처 목록
 
@@ -197,6 +201,6 @@
 16. 축구, 『한국민족문화대백과사전』 — https://encykorea.aks.ac.kr/Article/E0057920 (집필 정찬모, 최종수정 2023-11-21)
 17. The adidas Telstar begins ball chain, FIFA — https://inside.fifa.com/news/telstar-story-fifa-world-cup-ball-3073424
 18. 로봇, 『한국민족문화대백과사전』 — https://encykorea.aks.ac.kr/Article/E0074082 (집필 송성수, 최종수정 2023-02-07)
-19. Revisiting the World's Fairs and International Expositions (World's Columbian Exhibition, Chicago 1893), Smithsonian Libraries — https://www.sil.si.edu/silpublications/worlds-fairs/WF_Selected_PF.cfm?categories=World%27s+Columbian+Exhibition%2C+Chicago+1893
+19. 놀이터, 『한국민족문화대백과사전』 — https://encykorea.aks.ac.kr/Article/E0013056 (집필 임재해, 1995 / 최종수정 2025-07-16)
 20. Atamian, H. S., Creux, N. M., Brown, R. I., Garner, A. G., Blackman, B. K., & Harmer, S. L. (2016). Circadian regulation of sunflower heliotropism, floral orientation, and pollinator visits. *Science*, 353(6299), 587–590. https://doi.org/10.1126/science.aaf9793 (초록 확인: https://pubmed.ncbi.nlm.nih.gov/27493185/)
 21. Andy Fell, "Sunflowers Move by the Clock", UC Davis News, 2016-08-04 — https://www.ucdavis.edu/news/sunflowers-move-clock

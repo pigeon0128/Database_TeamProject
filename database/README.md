@@ -101,8 +101,9 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 완료(기록 저장)하거나 새로 그리기를 고르면 행을 지웁니다. 조회·저장·삭제 SQL: `queries/drawing_drafts.sql`
 
 ### Content
-앱의 장면 목록(챕터·그림)과 도감 생물 15개(챕터 `생물 도감`, 그림 2~16번)와 그 도감 정보는 `seeds/content.sql` 에 있고, `pnpm db:migrate` 가 매번 넣습니다 (이미 있으면 건너뜀).
+앱의 장면 목록(챕터·그림)과 도감 생물 15개(챕터 `생물 도감`, 그림 2~15번과 17번)와 그 도감 정보는 `seeds/content.sql` 에 있고, `pnpm db:migrate` 가 매번 넣습니다 (이미 있으면 건너뜀).
 앱(`src/data/scenes.ts`)의 `drawingId` 와 번호를 맞추므로 장면을 추가할 때 두 곳을 함께 고칩니다.
+그림 16번(대관람차)은 `012_playground.sql` 에서 빼고 놀이터(17번)로 바꿨습니다. 지운 번호는 다시 쓰지 않습니다.
 
 ## 6. Leaderboard
 

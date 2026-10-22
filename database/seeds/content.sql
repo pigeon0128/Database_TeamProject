@@ -31,7 +31,7 @@ VALUES
     (13, 2, '스포츠카', 'creatures/sportscar.png', 12),
     (14, 2, '축구공', 'creatures/soccerball.png', 13),
     (15, 2, '로봇', 'creatures/robot.png', 14),
-    (16, 2, '대관람차', 'creatures/ferriswheel.png', 15)
+    (17, 2, '놀이터', 'creatures/playground.png', 15)
 ON CONFLICT DO NOTHING;
 
 -- 도감 정보는 번호와 이름이 둘 다 맞는 그림에만 붙인다 (다른 내용의 그림이 같은 번호를 쓰고 있으면 건너뜀).
@@ -52,7 +52,7 @@ FROM (VALUES
     (13, '스포츠카', 'sportscar', 'object', '엔진의 힘으로 바퀴를 돌려 도로를 달리는 자동차예요.'),
     (14, '축구공', 'soccerball', 'object', '발로 차서 상대 골문에 넣는 축구 경기에 쓰는 둥근 공이에요.'),
     (15, '로봇', 'robot', 'object', '사람과 비슷한 모습과 기능을 가진 자동 기계예요.'),
-    (16, '대관람차', 'ferriswheel', 'object', '커다란 바퀴가 돌아가는 놀이 기구예요.')
+    (17, '놀이터', 'playground', 'object', '그네·시소·미끄럼틀 같은 시설을 갖추고 안전하게 놀 수 있도록 따로 만든 곳이에요.')
 ) AS v (drawing_id, name, slug, category, summary)
 JOIN drawings d ON d.drawing_id = v.drawing_id AND d.title = v.name
 ON CONFLICT DO NOTHING;
@@ -116,8 +116,11 @@ FROM (VALUES
     ('robot', 1, '분류', '무생물 · 기계'),
     ('robot', 2, '쓰임', '공장에서 사람 대신 조립하거나 검사하고, 우주·깊은 바다·원자로처럼 위험한 곳에서도 일해요'),
     ('robot', 3, '특징', '우리나라에서는 2004년 카이스트(KAIST)에서 사람 모양 로봇 ''휴보''를 만들었어요'),
-    ('ferriswheel', 1, '분류', '무생물 · 놀이 기구'),
-    ('ferriswheel', 2, '이름', '1893년 미국 시카고 박람회에서 조지 페리스 주니어가 만든 바퀴에서 영어 이름 ''페리스 휠''이 왔어요')
+    ('playground', 1, '분류', '무생물 · 놀이 시설'),
+    ('playground', 2, '뜻', '안전하고 자유롭게 놀 수 있도록 시설을 갖추어 따로 마련한 곳이에요'),
+    ('playground', 3, '시설', '그네, 시소, 미끄럼틀 등이 있어요'),
+    ('playground', 4, '있는 곳', '아파트단지에는 놀이터가 빠짐없이 있어요'),
+    ('playground', 5, '옛날 놀이터', '옛날에는 마당이 가장 중요한 놀이터였고, 마을 어귀의 당나무 아래나 도시의 골목길·빈터에서도 놀았어요')
 ) AS v (slug, fact_order, label, content)
 JOIN creature_profiles p ON p.slug = v.slug
 ON CONFLICT DO NOTHING;
@@ -153,8 +156,8 @@ FROM (VALUES
     ('soccerball', 2, '공의 테두리는 크고 둥근 원이에요.'),
     ('robot', 1, '어깨와 무릎 같은 관절은 동그라미로 그려요.'),
     ('robot', 2, '팔과 다리는 여러 마디로 나뉘어 있어요.'),
-    ('ferriswheel', 1, '가운데 축에서 바큇살이 사방으로 뻗어요.'),
-    ('ferriswheel', 2, '바퀴 둘레에 사람이 타는 칸이 줄지어 달려 있어요.')
+    ('playground', 1, '미끄럼틀은 위에서 아래로 넓게 휘어지며 내려와요.'),
+    ('playground', 2, '사다리는 긴 기둥 두 개 사이에 가로대를 나란히 그려요.')
 ) AS v (slug, tip_order, content)
 JOIN creature_profiles p ON p.slug = v.slug
 ON CONFLICT DO NOTHING;
@@ -183,7 +186,7 @@ FROM (VALUES
     ('soccerball', 1, '축구, 『한국민족문화대백과사전』', 'https://encykorea.aks.ac.kr/Article/E0057920'),
     ('soccerball', 2, 'The adidas Telstar begins ball chain, FIFA', 'https://inside.fifa.com/news/telstar-story-fifa-world-cup-ball-3073424'),
     ('robot', 1, '로봇, 『한국민족문화대백과사전』', 'https://encykorea.aks.ac.kr/Article/E0074082'),
-    ('ferriswheel', 1, 'Revisiting the World''s Fairs and International Expositions, Smithsonian Libraries', 'https://www.sil.si.edu/silpublications/worlds-fairs/WF_Selected_PF.cfm?categories=World%27s+Columbian+Exhibition%2C+Chicago+1893')
+    ('playground', 1, '놀이터, 『한국민족문화대백과사전』', 'https://encykorea.aks.ac.kr/Article/E0013056')
 ) AS v (slug, source_order, citation, url)
 JOIN creature_profiles p ON p.slug = v.slug
 ON CONFLICT DO NOTHING;

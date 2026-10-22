@@ -16,7 +16,8 @@ WITH ranked_artworks AS (
             ORDER BY
                 pr.similarity_score DESC,
                 pr.duration_ms ASC,
-                pr.record_id DESC
+                pr.played_at ASC,
+                pr.record_id ASC
         ) AS rn
     FROM play_records pr
     JOIN user_artworks ua
@@ -91,7 +92,8 @@ WITH ranked_artworks AS (
             ORDER BY
                 pr.similarity_score DESC,
                 pr.duration_ms ASC,
-                pr.record_id DESC
+                pr.played_at ASC,
+                pr.record_id ASC
         ) AS rn
     FROM play_records pr
     JOIN user_artworks ua

@@ -221,6 +221,7 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
           {...tools.canvasProps}
           onStrokeStart={record.startTimer}
           onChange={scoring.handleCanvasChange}
+          onDrawing={scoring.handleDrawing}
         />
       </DrawingShell>
 

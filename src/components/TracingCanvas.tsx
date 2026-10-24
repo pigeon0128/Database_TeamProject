@@ -33,8 +33,10 @@ type Props = {
   onStrokeEnd: (stroke: Stroke) => void;
   /** 획을 긋기 시작할 때 (타이머용) */
   onStrokeStart?: () => void;
-  /** 획 목록이 바뀌어 다시 그린 뒤 호출 (획을 다 그었을 때, 되돌리기·지우기 등). 그리는 중에는 부르지 않는다 (채점용) */
+  /** 획 목록이 바뀌어 다시 그린 뒤 호출 (획을 다 그었을 때, 되돌리기·지우기 등) (채점용) */
   onChange?: (canvas: HTMLCanvasElement) => void;
+  /** 그리는 중에 펜이 움직여 캔버스에 그린 뒤 호출. stroke 는 아직 목록에 들어가지 않은, 그리는 중인 획 (실시간 채점용) */
+  onDrawing?: (canvas: HTMLCanvasElement, stroke: Stroke) => void;
 };
 
 // 채점할 때 픽셀을 자주 읽으므로 willReadFrequently로 연다.
@@ -109,7 +111,7 @@ type Mode = "none" | "draw" | "pan" | "pinch" | "blocked";
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
-  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onStrokeStart, onChange },
+  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onStrokeStart, onChange, onDrawing },
   ref,
 ) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -324,6 +326,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       const s = smoothed.current;
       addPoint(ctx, stroke, [s[0] + (raw[0] - s[0]) * follow, s[1] + (raw[1] - s[1]) * follow]);
     }
+    onDrawing?.(e.currentTarget, stroke);
   };
 
   const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {

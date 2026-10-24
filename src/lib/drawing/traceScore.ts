@@ -31,10 +31,10 @@ const GRAY_PENALTY_WEIGHT = 10;
 const PAINT_ALPHA_MIN = 40;
 /** 칠한 픽셀로 보이는 브러쉬 가장자리 (안티앨리어싱으로 반지름보다 조금 더 칠해진다) */
 const BRUSH_EDGE = 0.5;
-/** 겹침이 이 %까지는 감점하지 않는다 (획을 이어 그린 곳, 선이 만나는 곳 등) */
-const OVERLAP_FREE_PCT = 12;
+/** 겹침이 이 %까지는 감점하지 않는다 (획을 이어 그린 곳, 선이 만나는 곳 등). 넘은 만큼부터 감점한다 */
+const OVERLAP_FREE_PCT = 5;
 /** 겹침이 허용치보다 1%p 많을 때마다 깎는 점수 */
-const OVERLAP_PENALTY_WEIGHT = 0.6;
+const OVERLAP_PENALTY_WEIGHT = 1;
 /**
  * 같은 획 안에서 "되돌아왔다"고 보는 거리 = 브러쉬 굵기 × 이 값.
  * 붓이 지나가는 동안 한 픽셀은 1픽셀 간격으로 계속 칠해지므로, 그 픽셀을 떠난 뒤 이만큼 더 가서 다시 칠할 때만 겹침으로 센다.
@@ -141,8 +141,13 @@ export function buildGuideMasks(img: CanvasImageSource, width: number, height: n
   return { width, height, white, gray, whiteTotal, grayTotal };
 }
 
-/** 겹침 계산에 쓰는 픽셀별 기록. 밑그림마다 한 벌 만들어 두고 채점할 때마다 다시 쓴다. */
-type OverlapBuffers = {
+/**
+ * 겹침 계산에 쓰는 픽셀별 기록. 밑그림마다 한 벌 만들어 두고 계속 쓴다.
+ * 다 그은 획의 결과는 기록에 남겨 두고, 다음 채점 때는 새로 다 그은 획만 더한다 (획이 많아도 채점이 느려지지 않게).
+ * 그리는 중인 획은 잠깐 더해서 센 뒤 되돌린다 (아직 점이 늘어나는 중이라 기록에 남기지 않는다).
+ * 되돌리기·전체 지우기·이어 그리기 불러오기로 획 목록이 앞에서부터 같지 않으면 처음부터 다시 센다.
+ */
+type OverlapState = {
   /** 이 픽셀을 마지막으로 칠한 획 번호 (−1: 아직 안 칠함) */
   lastStroke: Int32Array;
   /** 그 획이 이 픽셀을 마지막으로 칠한 위치 (획 시작부터의 길이) */
@@ -150,29 +155,55 @@ type OverlapBuffers = {
   /** 이 픽셀을 칠한 횟수 / 그중 이미 칠한 곳을 다시 칠한 횟수 */
   passes: Uint8Array;
   overlaps: Uint8Array;
-  /** 이번 채점에서 건드린 픽셀 (끝나고 되돌릴 목록에 한 번만 넣으려고) */
-  seen: Uint8Array;
+  /** 모든 픽셀의 칠한 횟수 합 / 겹친 횟수 합 */
+  passTotal: number;
+  overlapTotal: number;
+  /** 기록에 반영된 다 그은 획 (그린 순서대로) */
+  strokes: Stroke[];
+  /** 다 그은 획이 건드린 픽셀 (처음부터 다시 셀 때 이 픽셀만 지운다) */
+  touched: number[];
+  touchedMark: Uint8Array;
+  /** 그리는 중인 획이 건드려서 원래 값을 적어 둔 픽셀 */
+  liveMark: Uint8Array;
 };
-const overlapBuffers = new WeakMap<GuideMasks, OverlapBuffers>();
+const overlapStates = new WeakMap<GuideMasks, OverlapState>();
 
-function getOverlapBuffers(masks: GuideMasks) {
-  let b = overlapBuffers.get(masks);
-  if (!b) {
+function getOverlapState(masks: GuideMasks) {
+  let st = overlapStates.get(masks);
+  if (!st) {
     const n = masks.width * masks.height;
-    b = {
+    st = {
       lastStroke: new Int32Array(n).fill(-1),
       lastArc: new Float32Array(n),
       passes: new Uint8Array(n),
       overlaps: new Uint8Array(n),
-      seen: new Uint8Array(n),
+      passTotal: 0,
+      overlapTotal: 0,
+      strokes: [],
+      touched: [],
+      touchedMark: new Uint8Array(n),
+      liveMark: new Uint8Array(n),
     };
-    overlapBuffers.set(masks, b);
+    overlapStates.set(masks, st);
   }
-  return b;
+  return st;
+}
+
+function resetOverlap(st: OverlapState) {
+  for (const i of st.touched) {
+    st.passes[i] = 0;
+    st.overlaps[i] = 0;
+    st.lastStroke[i] = -1;
+    st.touchedMark[i] = 0;
+  }
+  st.touched = [];
+  st.strokes = [];
+  st.passTotal = 0;
+  st.overlapTotal = 0;
 }
 
 /**
- * 획들을 순서대로 붓 모양으로 1픽셀 간격으로 찍으면서 겹침을 센다.
+ * 획 하나(번호 k)를 붓 모양으로 1픽셀 간격으로 찍으면서 기록에 더한다.
  * 붓 지름은 화면에 그려지는 것과 같다 (손떨림 보정된 점, 선 끝 얇게로 가늘어진 굵기). 보이는 대로 판정한다.
  * 선 끝 얇게를 쓰면 획 끝이 뾰족해져 짧게 끊어 그린 털선이 거의 안 겹치므로
  * (12픽셀 털선 이어 붙이기: 끔 29.7%, 2단계 2.0%) 채점하는 따라 그리기에서는 선 끝 얇게를 끈다 (StoryPage).
@@ -181,82 +212,123 @@ function getOverlapBuffers(masks: GuideMasks) {
  *  - 같은 획이 그 픽셀을 떠났다가 SELF_RETURN_BRUSH × 굵기 이상 더 가서 다시 칠하면 겹침 1번 (왔다 갔다 문지르기)
  * 지우개 획은 그 픽셀의 기록을 지운다. 지운 뒤 다시 그린 것은 겹침이 아니다.
  * 회색 구역은 침범 감점이 맡으므로 세지 않는다.
+ * beforeChange(i): 픽셀 i 의 기록을 바꾸기 직전에 불린다 (건드린 픽셀 목록, 되돌릴 값 저장용).
  */
-function countOverlap(masks: GuideMasks, strokes: Stroke[]) {
+function applyStroke(masks: GuideMasks, st: OverlapState, s: Stroke, k: number, beforeChange: (i: number) => void) {
   const { width, height, gray } = masks;
-  const { lastStroke, lastArc, passes, overlaps, seen } = getOverlapBuffers(masks);
-  const touched: number[] = [];
-
-  strokes.forEach((s, k) => {
-    const pts = s.points;
-    const returnGap = s.size * SELF_RETURN_BRUSH;
-    let total = 0;
-    for (let j = 1; j < pts.length; j++) total += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]);
-
-    const stamp = (cx: number, cy: number, arc: number) => {
-      const r = (s.size * taper(arc, total, s.fade)) / 2 + BRUSH_EDGE;
-      const r2 = r * r;
-      for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(height - 1, Math.ceil(cy + r)); y++) {
-        for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(width - 1, Math.ceil(cx + r)); x++) {
-          const dx = x + 0.5 - cx;
-          const dy = y + 0.5 - cy;
-          if (dx * dx + dy * dy > r2) continue;
-          const i = y * width + x;
-          if (gray[i]) continue;
-          if (!seen[i]) {
-            seen[i] = 1;
-            touched.push(i);
-          }
-          if (s.erase) {
-            passes[i] = 0;
-            overlaps[i] = 0;
-            lastStroke[i] = -1;
-            continue;
-          }
-          if (lastStroke[i] !== k) {
-            // 이 획이 처음 닿은 픽셀
-            if (passes[i] && overlaps[i] < 255) overlaps[i]++;
-            if (passes[i] < 255) passes[i]++;
-            lastStroke[i] = k;
-          } else if (arc - lastArc[i] > returnGap) {
-            // 같은 획이 떠났다가 되돌아옴
-            if (overlaps[i] < 255) overlaps[i]++;
-            if (passes[i] < 255) passes[i]++;
-          }
-          lastArc[i] = arc;
+  const { lastStroke, lastArc, passes, overlaps } = st;
+  const pts = s.points;
+  const returnGap = s.size * SELF_RETURN_BRUSH;
+  let total = 0;
+  for (let j = 1; j < pts.length; j++) total += Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]);
+  const stamp = (cx: number, cy: number, arc: number) => {
+    const r = (s.size * taper(arc, total, s.fade)) / 2 + BRUSH_EDGE;
+    const r2 = r * r;
+    for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(height - 1, Math.ceil(cy + r)); y++) {
+      for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(width - 1, Math.ceil(cx + r)); x++) {
+        const dx = x + 0.5 - cx;
+        const dy = y + 0.5 - cy;
+        if (dx * dx + dy * dy > r2) continue;
+        const i = y * width + x;
+        if (gray[i]) continue;
+        beforeChange(i);
+        if (s.erase) {
+          st.passTotal -= passes[i];
+          st.overlapTotal -= overlaps[i];
+          passes[i] = 0;
+          overlaps[i] = 0;
+          lastStroke[i] = -1;
+          continue;
         }
+        if (lastStroke[i] !== k) {
+          // 이 획이 처음 닿은 픽셀
+          if (passes[i] && overlaps[i] < 255) {
+            overlaps[i]++;
+            st.overlapTotal++;
+          }
+          if (passes[i] < 255) {
+            passes[i]++;
+            st.passTotal++;
+          }
+          lastStroke[i] = k;
+        } else if (arc - lastArc[i] > returnGap) {
+          // 같은 획이 떠났다가 되돌아옴
+          if (overlaps[i] < 255) {
+            overlaps[i]++;
+            st.overlapTotal++;
+          }
+          if (passes[i] < 255) {
+            passes[i]++;
+            st.passTotal++;
+          }
+        }
+        lastArc[i] = arc;
       }
-    };
-
-    stamp(pts[0][0], pts[0][1], 0);
-    let arc = 0;
-    for (let j = 1; j < pts.length; j++) {
-      const [x0, y0] = pts[j - 1];
-      const dx = pts[j][0] - x0;
-      const dy = pts[j][1] - y0;
-      const len = Math.hypot(dx, dy);
-      const steps = Math.max(1, Math.ceil(len));
-      for (let q = 1; q <= steps; q++) stamp(x0 + (dx * q) / steps, y0 + (dy * q) / steps, arc + (len * q) / steps);
-      arc += len;
     }
-  });
+  };
 
-  let passTotal = 0;
-  let overlapTotal = 0;
-  for (const i of touched) {
-    passTotal += passes[i];
-    overlapTotal += overlaps[i];
-    // 다음 채점을 위해 되돌려 둔다.
-    passes[i] = 0;
-    overlaps[i] = 0;
-    lastStroke[i] = -1;
-    seen[i] = 0;
+  stamp(pts[0][0], pts[0][1], 0);
+  let arc = 0;
+  for (let j = 1; j < pts.length; j++) {
+    const [x0, y0] = pts[j - 1];
+    const dx = pts[j][0] - x0;
+    const dy = pts[j][1] - y0;
+    const len = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(len));
+    for (let q = 1; q <= steps; q++) stamp(x0 + (dx * q) / steps, y0 + (dy * q) / steps, arc + (len * q) / steps);
+    arc += len;
   }
-  return (overlapTotal / Math.max(OVERLAP_MIN_PASSES, passTotal)) * 100;
 }
 
-/** strokes: 지금 캔버스에 보이는 획 (그린 순서대로, 지우개 획 포함) */
-export function scoreCanvas(canvas: HTMLCanvasElement, masks: GuideMasks, strokes: Stroke[] = []): TraceScore {
+const overlapPctOf = (st: OverlapState) => (st.overlapTotal / Math.max(OVERLAP_MIN_PASSES, st.passTotal)) * 100;
+
+/** 다 그은 획(strokes)과 그리는 중인 획(live)의 겹침(%) */
+function countOverlap(masks: GuideMasks, strokes: Stroke[], live?: Stroke) {
+  const st = getOverlapState(masks);
+  let samePrefix = st.strokes.length <= strokes.length;
+  for (let k = 0; samePrefix && k < st.strokes.length; k++) samePrefix = st.strokes[k] === strokes[k];
+  if (!samePrefix) resetOverlap(st);
+
+  const markTouched = (i: number) => {
+    if (st.touchedMark[i]) return;
+    st.touchedMark[i] = 1;
+    st.touched.push(i);
+  };
+  for (let k = st.strokes.length; k < strokes.length; k++) {
+    applyStroke(masks, st, strokes[k], k, markTouched);
+    st.strokes.push(strokes[k]);
+  }
+  if (!live) return overlapPctOf(st);
+
+  // 그리는 중인 획: 바꾸는 픽셀의 원래 값을 적어 두고, 더해서 센 뒤 되돌린다
+  const saved: number[] = [];
+  const savedVals: number[] = [];
+  const { passTotal, overlapTotal } = st;
+  applyStroke(masks, st, live, strokes.length, (i) => {
+    if (st.liveMark[i]) return;
+    st.liveMark[i] = 1;
+    saved.push(i);
+    savedVals.push(st.passes[i], st.overlaps[i], st.lastStroke[i], st.lastArc[i]);
+  });
+  const pct = overlapPctOf(st);
+  for (let j = 0; j < saved.length; j++) {
+    const i = saved[j];
+    st.passes[i] = savedVals[j * 4];
+    st.overlaps[i] = savedVals[j * 4 + 1];
+    st.lastStroke[i] = savedVals[j * 4 + 2];
+    st.lastArc[i] = savedVals[j * 4 + 3];
+    st.liveMark[i] = 0;
+  }
+  st.passTotal = passTotal;
+  st.overlapTotal = overlapTotal;
+  return pct;
+}
+
+/**
+ * strokes: 지금 캔버스에 보이는 다 그은 획 (그린 순서대로, 지우개 획 포함)
+ * live: 지금 그리는 중인 획 (그리는 동안 실시간으로 채점할 때). 캔버스에는 이미 그려져 있어야 한다
+ */
+export function scoreCanvas(canvas: HTMLCanvasElement, masks: GuideMasks, strokes: Stroke[] = [], live?: Stroke): TraceScore {
   const { width, height, white, gray } = masks;
   const data = canvas.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, width, height).data;
 
@@ -271,7 +343,7 @@ export function scoreCanvas(canvas: HTMLCanvasElement, masks: GuideMasks, stroke
   const whitePct = (whiteHits / Math.max(1, masks.whiteTotal)) * 100;
   const grayPct = (grayHits / Math.max(1, masks.grayTotal)) * 100;
   const penalty = grayPct * GRAY_PENALTY_WEIGHT;
-  const overlapPct = countOverlap(masks, strokes);
+  const overlapPct = countOverlap(masks, strokes, live);
   const overlapPenalty = Math.max(0, overlapPct - OVERLAP_FREE_PCT) * OVERLAP_PENALTY_WEIGHT;
   const exactScore = Math.round(Math.max(0, Math.min(100, whitePct - penalty - overlapPenalty)) * 100) / 100;
   return { score: Math.round(exactScore), exactScore, whitePct, grayPct, penalty, overlapPct, overlapPenalty, whiteHits, grayHits, whiteTotal: masks.whiteTotal };

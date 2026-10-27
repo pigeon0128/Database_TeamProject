@@ -15,6 +15,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { myRoomPreviewEnabled } from "./features/myroom/preview/enabled";
 
 const MyRoomPage = lazy(() => import("./features/myroom/MyRoomPage"));
+const PreviewMyRoomPage = lazy(() => import("./features/myroom/MyRoomPage").then((module) => ({ default: module.PreviewMyRoomPage })));
 
 const routes: Record<string, ComponentType> = {
   "/": HomePage,
@@ -33,10 +34,6 @@ function Routes() {
   const { user, checking } = useAuth();
   // 주소 뒤의 ?쿼리는 화면 고르기에 쓰지 않는다 (예: #/leaderboard?drawing=1)
   const path = usePath().split("?")[0];
-
-  if (import.meta.env.DEV && path === "/myroom" && myRoomPreviewEnabled) {
-    return <Suspense fallback={<main>마이룸 Preview를 준비하고 있어요…</main>}><MyRoomPage preview /></Suspense>;
-  }
 
   if (checking && !user) {
     return <main className="flex min-h-screen items-center justify-center bg-sky-soft text-sm font-bold text-ink-muted">불러오는 중…</main>;
@@ -62,6 +59,9 @@ function Routes() {
 }
 
 export default function App() {
+  if (import.meta.env.DEV && myRoomPreviewEnabled) {
+    return <Suspense fallback={<main>마이룸 Preview를 준비하고 있어요…</main>}><PreviewMyRoomPage /></Suspense>;
+  }
   return (
     <AuthProvider>
       <Routes />

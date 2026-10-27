@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { CATALOG, MAX_OBJECTS } from "../../../shared/myroom.js"
 import { navigate } from "../../router"
+import { useAuth } from "../../auth"
 import MyRoomViewport from "./MyRoomViewport"
 import { useMyRoom } from "./hooks/useMyRoom"
 import { myRoomPreviewEnabled } from "./preview/enabled"
@@ -10,9 +11,24 @@ import ArtworkPicker from "./ui/ArtworkPicker"
 import { Icon, Modal, ObjectThumbnail } from "./ui/RoomUI"
 import "./myroom.css"
 
-export default function MyRoomPage({ preview = false }: { preview?: boolean }) {
+export default function MyRoomPage() {
+  const { expire } = useAuth()
+  return <RoomPage onUnauthorized={expire} />
+}
+
+export function PreviewMyRoomPage() {
+  return <RoomPage preview />
+}
+
+function RoomPage({
+  preview = false,
+  onUnauthorized,
+}: {
+  preview?: boolean
+  onUnauthorized?: () => void
+}) {
   const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
-  const room = useMyRoom(isPreview)
+  const room = useMyRoom(isPreview, onUnauthorized)
   const [panel, setPanel] = useState<"inventory" | "artwork" | "help" | null>(
     null,
   )
@@ -97,13 +113,15 @@ export default function MyRoomPage({ preview = false }: { preview?: boolean }) {
         <div className="mr-mark" aria-hidden="true">
           D
         </div>
-        <button
-          aria-label="메인으로 돌아가기"
-          title="메인으로 돌아가기"
-          onClick={goBack}
-        >
-          <Icon name="home" />
-        </button>
+        {!isPreview && (
+          <button
+            aria-label="메인으로 돌아가기"
+            title="메인으로 돌아가기"
+            onClick={goBack}
+          >
+            <Icon name="home" />
+          </button>
+        )}
         <button
           className={panel === "inventory" ? "active" : ""}
           aria-label="인벤토리 열기"
@@ -131,14 +149,16 @@ export default function MyRoomPage({ preview = false }: { preview?: boolean }) {
         >
           <Icon name="reset" />
         </button>
-        <button
-          className="mr-exit"
-          aria-label="마이룸 나가기"
-          title="마이룸 나가기"
-          onClick={goBack}
-        >
-          <Icon name="home" />
-        </button>
+        {!isPreview && (
+          <button
+            className="mr-exit"
+            aria-label="마이룸 나가기"
+            title="마이룸 나가기"
+            onClick={goBack}
+          >
+            <Icon name="home" />
+          </button>
+        )}
       </nav>
       <header className="mr-topbar">
         <div>

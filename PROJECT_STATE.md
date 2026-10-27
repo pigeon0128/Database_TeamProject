@@ -36,3 +36,8 @@ Research/DOROBUS_MyRoom_Inspection/experiments/DORO-MYROOM-IMPL-20261027-01/.
 
 미커밋 Preview와 사용자 패치를 work/preview-resume-backup-20261028에 보존했다. Mock 샘플/로컬 저장 및 5개 Preview 테스트를 유지했으며 타입 검사, 기존 geometry 4개 테스트, production build를 다시 통과했다. 환경변수 true인 production JS에서 샘플과 로컬 저장 키가 제거되는 것을 확인했다. 이어서 AuthProvider 없는 개발 전용 진입과 플레이어를 별도 커밋으로 진행한다.
 
+
+## 2026-10-28 독립 개발 진입
+
+Preview는 App의 DEV 전용 분기에서 AuthProvider 없이 마운트한다. localhost:8443 루트와 직접 해시 진입을 브라우저에서 확인했고, 사용하지 않는 API 대상 39991에 대해 요청 감사 로그의 API/업로드 요청은 0건이었다. Preview 홈/나가기만 숨기고 실제 인증 래퍼와 서비스 이탈은 유지했다. production flag=true 빌드에서 Mock 데이터/저장 키가 제거됨을 다시 확인했다.
+

@@ -161,3 +161,5 @@ API 서버(`[api]`)와 화면(`[web]`)이 한 터미널에서 함께 켜집니�
 인벤토리에서 액자/가구를 배치하고 내 도감의 완성 작품을 전시한 뒤 **저장**을 눌러 주세요.
 새 기능을 사용하기 전에 `pnpm db:migrate`로 `019_myroom.sql`을 적용합니다.
 실행·데이터 계약·테스트·제약은 [마이룸 아키텍처](docs/myroom-architecture.md)와 [PROJECT_STATE](PROJECT_STATE.md)를 참고하세요.
+
+API/DB 없는 개발용 Preview는 `.env.local`에 `VITE_MYROOM_PREVIEW=true`를 넣고 `pnpm dev`를 실행한 뒤 `http://localhost:8443/`을 여세요. `#/myroom`도 지원합니다. 샘플 작품과 해당 브라우저의 로컬 저장만 사용하며 로그인/메인 이동 버튼은 표시하지 않습니다. 환경변수를 끄고 Vite를 재시작하면 기존 앱으로 돌아갑니다. production build에서는 이 플래그를 켜도 Preview가 활성화되지 않습니다.

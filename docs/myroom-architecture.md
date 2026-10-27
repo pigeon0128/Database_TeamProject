@@ -166,7 +166,7 @@ MYROOM_TEST_URL이 없으면 API 테스트는 skip된다. 외부 hostname은 허
 
 ## 14. 개발 Preview — 2026-10-28
 
-`VITE_MYROOM_PREVIEW=true`를 설정하고 Vite 개발 서버를 다시 시작하면 localhost의 `#/myroom`에서 로그인 없이 Mock 작품과 로컬 저장을 시험할 수 있다. production build에서는 DEV 조건이 false이므로 활성화할 수 없다. Mock 작품 모듈과 로컬 저장 키가 production JS에 없는지도 검사한다.
+`VITE_MYROOM_PREVIEW=true`를 설정하고 Vite 개발 서버를 다시 시작하면 localhost의 루트 또는 `#/myroom`에서 로그인 없이 Mock 작품과 로컬 저장을 시험할 수 있다. Preview 전용 App 분기가 AuthProvider를 마운트하지 않으므로 API 서버/DB 없이 실행되며 인증 API도 요청하지 않는다. 모든 해시 주소는 개발용 마이룸에 머물고 홈/나가기 컨트롤은 숨긴다. 실제 서비스는 기존 인증 래퍼와 이탈 흐름을 유지한다. production build에서는 DEV 조건이 false이므로 활성화할 수 없다. Mock 작품 모듈과 로컬 저장 키가 production JS에 없는지도 검사한다.
 
 Preview는 자체 SVG 샘플 2개와 `doroland:myroom-preview:v1` localStorage 항목만 사용한다. 실제 collection/myroom API와 PostgreSQL 데이터는 사용하지 않는다. 동일한 지오메트리 검증 및 revision 확인으로 잘못된 배치와 순차적인 stale 저장을 방어한다. localStorage의 읽기/쓰기 전체가 여러 탭 사이의 원자적 DB transaction인 것은 아니다. 손상된 저장본은 자동 덮어쓰기하지 않으며 실패 시 기존 편집 상태를 유지한다. 서버 데이터로 가져오거나 자동 동기화하지 않는다.
 

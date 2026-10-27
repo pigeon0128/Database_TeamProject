@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useAuth } from "../../../auth"
 import { api, ApiError } from "../../../lib/api"
 import { myroomApi } from "../api"
 import type { RoomArtwork } from "../artwork"
 import { myRoomPreviewEnabled } from "../preview/enabled"
 import type { RoomLayout, RoomState } from "../types"
 
-export function useMyRoom(preview = false) {
+const ignoreUnauthorized = () => {}
+
+export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
   const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
-  const { expire } = useAuth()
   const [layout, setLayout] = useState<RoomLayout>({ objects: [] })
   const [baseline, setBaseline] = useState(JSON.stringify({ objects: [] }))
   const [revision, setRevision] = useState(0),

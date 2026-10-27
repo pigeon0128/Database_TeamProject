@@ -1,18 +1,22 @@
 // 색칠하기의 구역 나누기. 밑그림의 선(검은·회색 선과 흰 선)을 벽으로 보고, 선으로 둘러싸인 바탕 부분끼리 한 구역으로 묶는다.
-// 붓을 대는 순간 그 자리의 구역을 정하고, 붓을 떼기 전까지는 그 구역 안에만 색이 칠해진다 (components/ColoringCanvas.tsx).
-// - 구역: 바탕 회색 픽셀을 상하좌우로 이어 붙인 덩어리 (대각선으로는 잇지 않아 가는 선 틈으로 새지 않는다)
-// - 구역 마스크: 구역 픽셀 + 붙어 있는 선 픽셀 DILATE 줄. 색이 선 밑까지 들어가 선과 색 사이에 틈이 보이지 않게 한다
-// - 선 그림(lines): 밑그림에서 선만 남긴 투명 그림. 색 위에 덮어서 칠해도 선이 보이게 한다
+// 붓을 대는 순간 그 자리의 구역을 정하고, 붓을 떼기 전까지는 그 구역 안에만 색이 칠해진다 (components/TracingCanvas.tsx, paint.ts).
+// - 벽: 바탕보다 조금이라도 어둡거나 밝은 픽셀 (흐린 선 포함)
+// - 구역: 벽이 아닌 픽셀을 상하좌우로 이어 붙인 덩어리 (대각선으로는 잇지 않아 가는 선 틈으로 새지 않는다)
+// - 구역 마스크: 구역 픽셀 + 붙어 있는 흐린 선 픽셀 EDGE_FILL 줄 (선 바로 옆까지 칠하게). 단, 진한 선 픽셀(선의 가운데)은 절대 칠하지 않는다
+// - 선 그림(lines): 밑그림에서 선만 남긴 투명 그림. 색 위에 덮어서 선의 흐린 가장자리도 보이게 한다
 
 /** 밑그림 바탕 회색의 밝기 (guideImage.ts 와 같음) */
 const BG = 182;
-/** 바탕에서 이만큼 넘게 어둡거나 밝으면 선(벽) */
-const DARK_EDGE = 40;
-const LIGHT_EDGE = 25;
+/** 구역을 나눌 때: 이 밝기보다 어둡거나(DARK_WALL) 밝으면(LIGHT_WALL) 벽 (숲속의 노래 바탕 회색은 175~190) */
+const DARK_WALL = 172;
+const LIGHT_WALL = 196;
+/** 구역 마스크를 흐린 선 쪽으로 넓히는 픽셀 수 */
+const EDGE_FILL = 2;
+/** 이 밝기보다 어둡거나 밝은 픽셀은 진한 선이라 어떤 구역도 칠하지 않는다 */
+const DARK_LINE = 142;
+const LIGHT_LINE = 207;
 /** 검은 선의 가장 진한 밝기 (선 그림에서 이 밝기를 완전히 불투명하게) */
 const DARK_CORE = 70;
-/** 구역 마스크를 선 쪽으로 넓히는 픽셀 수 */
-const DILATE = 2;
 /** 붓을 선 위에 댔을 때 가까운 구역을 찾는 거리 */
 const PICK_RADIUS = 10;
 
@@ -44,7 +48,11 @@ export function buildRegions(guide: HTMLCanvasElement): Regions {
 
   const value = new Uint8Array(n);
   for (let i = 0; i < n; i++) value[i] = (data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2]) / 3;
-  const isWall = (i: number) => value[i] < BG - DARK_EDGE || value[i] > BG + LIGHT_EDGE;
+  /** 진한 선 (칠하지 않는 곳) */
+  const isLine = (i: number) => value[i] < DARK_LINE || value[i] > LIGHT_LINE;
+
+  /** 벽 (흐린 선 포함) */
+  const isWall = (i: number) => value[i] < DARK_WALL || value[i] > LIGHT_WALL;
 
   // 구역 번호 붙이기 (0 = 선). 구역마다 사각형 범위도 기록한다.
   const labels = new Int32Array(n);
@@ -104,19 +112,21 @@ export function buildRegions(guide: HTMLCanvasElement): Regions {
     const hit = cache.get(id);
     if (hit) return hit;
     const [minX, minY, maxX, maxY] = boxes[id];
-    const x = Math.max(0, minX - DILATE);
-    const y = Math.max(0, minY - DILATE);
-    const w = Math.min(width, maxX + DILATE + 1) - x;
-    const h = Math.min(height, maxY + DILATE + 1) - y;
-    // 사각형 안에서: 구역 픽셀 = 1, 그 옆의 선 픽셀로 DILATE 번 넓힌다 (다른 구역 픽셀로는 넓히지 않는다)
+    const x = Math.max(0, minX - EDGE_FILL);
+    const y = Math.max(0, minY - EDGE_FILL);
+    const w = Math.min(width, maxX + EDGE_FILL + 1) - x;
+    const h = Math.min(height, maxY + EDGE_FILL + 1) - y;
+    // 사각형 안에서: 구역 픽셀 = 1. 붙어 있는 흐린 선 픽셀로 EDGE_FILL 번 넓혀 선 바로 옆까지 칠한다.
+    // 다른 구역 픽셀과 진한 선 픽셀로는 넓히지 않으므로 색이 선을 넘거나 선 위에 칠해지지 않는다.
     let inside = new Uint8Array(w * h);
     for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (labels[(y + yy) * width + x + xx] === id) inside[yy * w + xx] = 1;
-    for (let step = 0; step < DILATE; step++) {
+    for (let step = 0; step < EDGE_FILL; step++) {
       const grown = inside.slice();
       for (let yy = 0; yy < h; yy++)
         for (let xx = 0; xx < w; xx++) {
           const j = yy * w + xx;
-          if (inside[j] || labels[(y + yy) * width + x + xx]) continue;
+          const i = (y + yy) * width + x + xx;
+          if (inside[j] || labels[i] || isLine(i)) continue;
           if ((xx > 0 && inside[j - 1]) || (xx < w - 1 && inside[j + 1]) || (yy > 0 && inside[j - w]) || (yy < h - 1 && inside[j + w])) grown[j] = 1;
         }
       inside = grown;

@@ -12,20 +12,25 @@ import { Icon, Modal, ObjectThumbnail } from "./ui/RoomUI"
 import "./myroom.css"
 
 export default function MyRoomPage() {
-  const { expire } = useAuth()
-  return <RoomPage onUnauthorized={expire} />
+  const { user, expire } = useAuth()
+
+  return <RoomPage onUnauthorized={expire} nickname={user?.loginId ?? "나"} />
 }
 
 export function PreviewMyRoomPage() {
-  return <RoomPage preview />
+  return <RoomPage preview nickname="Preview" />
 }
 
 function RoomPage({
   preview = false,
   onUnauthorized,
+
+  nickname,
 }: {
   preview?: boolean
   onUnauthorized?: () => void
+
+  nickname: string
 }) {
   const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
   const room = useMyRoom(isPreview, onUnauthorized)
@@ -105,6 +110,8 @@ function RoomPage({
         selected={selectedId}
         placement={placement}
         reset={reset}
+        nickname={nickname}
+        blocked={busy || !!panel || exit || room.conflict}
         onSelect={select}
         onPlace={place}
         onHint={setHint}
@@ -338,7 +345,8 @@ function RoomPage({
         <div className="mr-bottom-tip">
           <Icon name="move" />
           <span>
-            드래그 회전 · 휠 확대 · <kbd>I</kbd> 인벤토리
+            <kbd>WASD / 방향키</kbd> 이동 · <kbd>Space</kbd> 점프 · 우클릭 회전
+            · <kbd>I</kbd> 인벤토리
           </span>
         </div>
       )}
@@ -378,7 +386,13 @@ function RoomPage({
           </header>
           <h3>주요 조작</h3>
           <p>
-            <kbd>마우스 드래그</kbd> 카메라 회전
+            <kbd>WASD / 방향키</kbd> 이동
+          </p>
+          <p>
+            <kbd>Space</kbd> 점프
+          </p>
+          <p>
+            <kbd>우클릭 드래그</kbd> 카메라 회전
           </p>
           <p>
             <kbd>휠</kbd> 확대 / 축소
@@ -401,8 +415,9 @@ function RoomPage({
             <kbd>ESC</kbd> 취소
           </p>
           <p className="mr-muted">
-            액자는 벽 방향에 맞춰 회전해요. 변경을 마치면 오른쪽 위 저장을 눌러
-            주세요.
+            3D 화면을 클릭한 뒤 이동해요. UI와 배치 중 이동·점프는 잠시 멈추며,
+            배치 중에도 우클릭과 휠로 카메라를 조절할 수 있어요. 액자는 벽
+            방향에 맞춰 회전해요. 변경을 마치면 오른쪽 위 저장을 눌러 주세요.
           </p>
         </aside>
       )}

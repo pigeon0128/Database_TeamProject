@@ -163,3 +163,5 @@ API 서버(`[api]`)와 화면(`[web]`)이 한 터미널에서 함께 켜집니�
 실행·데이터 계약·테스트·제약은 [마이룸 아키텍처](docs/myroom-architecture.md)와 [PROJECT_STATE](PROJECT_STATE.md)를 참고하세요.
 
 API/DB 없는 개발용 Preview는 `.env.local`에 `VITE_MYROOM_PREVIEW=true`를 넣고 `pnpm dev`를 실행한 뒤 `http://localhost:8443/`을 여세요. `#/myroom`도 지원합니다. 샘플 작품과 해당 브라우저의 로컬 저장만 사용하며 로그인/메인 이동 버튼은 표시하지 않습니다. 환경변수를 끄고 Vite를 재시작하면 기존 앱으로 돌아갑니다. production build에서는 이 플래그를 켜도 Preview가 활성화되지 않습니다.
+
+마이룸은 모드 전환 없는 단일 공간입니다. 3D 화면을 클릭한 뒤 WASD/방향키로 이동하고 Space로 점프합니다. 우클릭 드래그·휠로 카메라를 조절하고 I로 인벤토리를 여세요. 좌클릭으로 선택·배치하고 Esc로 취소합니다. 배치 중 이동·점프는 잠시 멈추며 변경 후 저장을 누릅니다. 플레이어 위치는 저장하지 않습니다. `pnpm test:myroom:player`로 이동·충돌·점프 계산을 검증합니다.

@@ -21,6 +21,8 @@ import type { Placement, RoomLayout, RoomObject } from "../types"
 import { createObject } from "../objects/createObject"
 import { createRoom } from "./room"
 
+import { createPlayerController } from "../player/controller"
+
 export function createRoomScene(
   canvas: HTMLCanvasElement,
   callbacks: {
@@ -28,6 +30,8 @@ export function createRoomScene(
     place: (object: RoomObject) => void
     hint: (value: string | null) => void
   },
+
+  nickname = "나",
 ) {
   const engine = new Engine(
     canvas,
@@ -77,6 +81,9 @@ export function createRoomScene(
     shadows.blurKernel = 24
     shadows.setDarkness(0.3)
     const room = createRoom(scene)
+
+    const player = createPlayerController(scene, camera, canvas, nickname)
+
     let layout: RoomLayout = { objects: [] },
       artworks: RoomArtwork[] = [],
       selected: string | null = null
@@ -175,6 +182,8 @@ export function createRoomScene(
       }
     })
     scene.onBeforeRenderObservable.add(() => {
+      player.update(engine.getDeltaTime() / 1000)
+
       for (const wall of room.walls) {
         const name = wall.metadata.wall as Wall
         const outside =
@@ -209,9 +218,9 @@ export function createRoomScene(
         })
       }
       if (shadows.getShadowMap())
-        shadows.getShadowMap()!.renderList = [...objects.values()].flatMap(
-          (o) => o.pieces,
-        )
+        shadows.getShadowMap()!.renderList = [...objects.values()]
+          .flatMap((o) => o.pieces)
+          .concat(player.pieces)
     }
     return {
       sync(
@@ -221,6 +230,9 @@ export function createRoomScene(
         nextPlacement: Placement | null,
       ) {
         layout = next
+
+        player.syncObjects(layout.objects)
+
         artworks = nextArtworks
         selected = nextSelected
         const changed = placing !== nextPlacement
@@ -240,32 +252,31 @@ export function createRoomScene(
             }
             preview = createObject(scene, o, undefined, true)
             preview.root.setEnabled(false)
-            camera.detachControl()
             callbacks.hint(
               placing.type === "frame"
                 ? "액자를 걸 벽을 가리켜 주세요."
                 : "가구를 놓을 바닥을 가리켜 주세요.",
             )
           } else {
-            camera.attachControl(canvas, true)
             callbacks.hint(null)
           }
         }
         if (placing) updateCandidate(scene.pointerX, scene.pointerY)
       },
       resetCamera() {
-        camera.inertialAlphaOffset = 0
-        camera.inertialBetaOffset = 0
-        camera.inertialRadiusOffset = 0
-        camera.alpha = -Math.PI / 2
-        camera.beta = Math.PI / 3
-        camera.radius = 13
-        camera.setTarget(Vector3.Zero())
+        player.resetCamera()
+      },
+
+      setInteraction(blocked: boolean, placing: boolean) {
+        player.setInteraction(blocked, placing)
       },
       dispose() {
         resize.disconnect()
         canvas.removeEventListener("contextmenu", onContext)
         scene.onPointerObservable.remove(pointer)
+
+        player.dispose()
+
         engine.stopRenderLoop()
         scene.dispose()
         engine.dispose()

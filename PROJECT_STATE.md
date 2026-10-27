@@ -32,6 +32,14 @@ PR 리뷰, 팀 migration 번호 재확인, 홈 진입 UX 합의, 저사양 성�
 Research/DOROBUS_MyRoom_Inspection/experiments/DORO-MYROOM-IMPL-20261027-01/.
 업로드·재다운로드 체크섬 검증 결과는 실험 산출물의 동기화 receipt를 따른다. 결과 보관 여부를 확인하기 전에는 성공으로 추정하지 않는다. 운영 DB/계정 정보는 산출물에 포함하지 않는다.
 
+## 2026-10-28 단일 조작으로 수정
+
+사용자가 거부한 0071c6d의 두 모드/사각 로봇 설계는 일반 revert 135f9fc로 되돌려 e7ac24d 기준 파일을 복구했다. Preview·Mock·로컬 저장·AuthProvider 분리는 보존했다. 새 구현은 사용자 제공 c1/c2 실제 화면을 직접 보고 자체 둥근 머리/작은 몸통/가는 팔다리·안테나/검은 원형 눈/닉네임으로 교체하며 별도 모드 없이 WASD/방향키·Space·우클릭·좌클릭·I·Esc를 연결한다.
+
+물리적 상승/낙하/착지, 공중 재점프 방지와 idle/walk/jump pose, 가구/벽 충돌을 런타임 메모리에서 관리한다. 실제 SDK 입력 회귀 테스트가 허용 버튼과 movement inputMap이 다른 Babylon 9.31의 문제를 포착하도록 추가됐고 최종 우클릭 동작은 사용자 실입력 확인을 받았다. 기존 실패한 두 모드 산출물은 삭제하지 않고 역사적 기록으로 남긴다.
+
+근거는 아키텍처 15절, 테스트 25건, 실제 브라우저 저장/복원·점프·충돌·단일 인벤토리·production 로그인 검증 및 실험 DORO-MYROOM-SINGLE-20261028-01이다. 서버/DB/Auth/Preview 저장 계약은 e7ac24d와 같다. 원본 표면/그림자/세부 신발 등 시각 차이와 가구 위 착지·모바일 이동·GPU 성능의 범위 제한은 보고서에 구분한다. main merge/force push/reset은 수행하지 않는다.
+
 ## 2026-10-28 Preview 재개
 
 미커밋 Preview와 사용자 패치를 work/preview-resume-backup-20261028에 보존했다. Mock 샘플/로컬 저장 및 5개 Preview 테스트를 유지했으며 타입 검사, 기존 geometry 4개 테스트, production build를 다시 통과했다. 환경변수 true인 production JS에서 샘플과 로컬 저장 키가 제거되는 것을 확인했다. 이어서 AuthProvider 없는 개발 전용 진입과 플레이어를 별도 커밋으로 진행한다.

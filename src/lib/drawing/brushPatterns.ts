@@ -274,36 +274,57 @@ function patternTile(slug: string, color: string) {
     g.stroke();
     g.restore();
   };
-  /** 같은 그림을 여러 자리에 놓는다: [x, y, 크기, (나비 색 순번)] */
-  const place = (spots: number[][], draw: (x: number, y: number, size: number, seed: number) => void) => spots.forEach(([x, y, size, seed = 0]) => draw(x, y, size, seed));
+  /**
+   * 칸 가장자리에 걸친 그림이 잘리지 않게, 칸 밖으로 나간 부분을 반대쪽 가장자리에 이어 그린다.
+   * 칸을 이어 깔면 잘린 두 조각이 맞붙어 온전한 모양이 된다 (불투명한 그림에만 쓴다: 겹쳐 그리면 반투명은 진해진다).
+   */
+  const wrapped = (draw: () => void) => {
+    for (const dy of [-TILE, 0, TILE])
+      for (const dx of [-TILE, 0, TILE]) {
+        g.save();
+        g.translate(dx, dy);
+        draw();
+        g.restore();
+      }
+  };
+  /** 같은 그림을 여러 자리에 놓는다: [x, y, 크기, (나비 색 순번)]. 가장자리에 걸친 그림은 반대쪽에 이어 그린다 */
+  const place = (spots: number[][], draw: (x: number, y: number, size: number, seed: number) => void) =>
+    wrapped(() => spots.forEach(([x, y, size, seed = 0]) => draw(x, y, size, seed)));
 
   if (slug === "flower") {
-    for (let y = 8, row = 0; y < TILE; y += 24, row++) for (let x = 8; x < TILE; x += 24) flower(x + (row % 2) * 4, y, 0.9);
+    wrapped(() => {
+      for (let y = 8, row = 0; y < TILE; y += 24, row++) for (let x = 8; x < TILE; x += 24) flower(x + (row % 2) * 4, y, 0.9);
+    });
   } else if (slug === "wave") {
-    for (let band = 0; band < 11; band++) {
-      const yAt = (x: number) => band * 9 + 5 + Math.sin((x / 48) * TAU + band * 0.6) * 3;
-      g.beginPath();
-      for (let x = 0; x <= TILE; x += 2) g.lineTo(x, yAt(x));
-      g.strokeStyle = band % 3 ? accent(band) : color;
-      g.lineWidth = 3.2;
-      g.stroke();
-      g.beginPath();
-      for (let x = 0; x <= TILE; x += 4) g.lineTo(x, yAt(x) + 2.1);
-      g.strokeStyle = "#fffdf9";
-      g.lineWidth = 0.7;
-      g.stroke();
+    // 물결 12줄 × 8픽셀 = 한 칸 높이라 위아래로 이어 깔아도 간격이 같다
+      wrapped(() => {
+      for (let band = 0; band < 12; band++) {
+        const yAt = (x: number) => band * 8 + 4 + Math.sin((x / 48) * TAU + band * 0.6) * 3;
+        g.beginPath();
+        for (let x = 0; x <= TILE; x += 2) g.lineTo(x, yAt(x));
+        g.strokeStyle = band % 3 ? accent(band) : color;
+        g.lineWidth = 3.2;
+        g.stroke();
+        g.beginPath();
+        for (let x = 0; x <= TILE; x += 4) g.lineTo(x, yAt(x) + 2.1);
+        g.strokeStyle = "#fffdf9";
+        g.lineWidth = 0.7;
+        g.stroke();
     }
+    });
   } else if (slug === "leaf") {
     const leafGreens = ["#4aa34d", "#72bf43", "#358e4b", "#9acb45", "#48ae64", "#78c84d", "#3f9b53"];
-    [
-      [14, 17, 0.48, -0.78],
-      [47, 12, 0.42, 0.38],
-      [81, 20, 0.49, 1.02],
-      [31, 48, 0.57, 0.16],
-      [68, 51, 0.5, -0.86],
-      [13, 82, 0.45, 1.12],
-      [80, 81, 0.44, 0.12],
-    ].forEach(([x, y, size, angle], i) => leaf(x, y, size, angle, leafGreens[i]));
+      wrapped(() =>
+      [
+        [14, 17, 0.48, -0.78],
+        [47, 12, 0.42, 0.38],
+        [81, 20, 0.49, 1.02],
+        [31, 48, 0.57, 0.16],
+        [68, 51, 0.5, -0.86],
+        [13, 82, 0.45, 1.12],
+        [80, 81, 0.44, 0.12],
+    ].forEach(([x, y, size, angle], i) => leaf(x, y, size, angle, leafGreens[i])),
+    );
   } else if (slug === "rainbow") {
     const colors = [color, "#f28c48", "#f6ce4c", "#65bd79", "#4ca9db", "#806bd2"];
     for (let i = 0; i < 12; i++) {
@@ -322,31 +343,36 @@ function patternTile(slug: string, color: string) {
       g.fill();
     }
     g.globalAlpha = 1;
-    for (let i = 0; i < 30; i++) dot((i * 31 + 5) % 96, (i * 43 + 9) % 96, 1.25, i % 2 ? "#fffdf9" : "#302c35");
-  } else if (slug === "stars") {
-    for (let row = 0; row < 6; row++)
-      for (let col = 0; col < 6; col++) {
-        const x = 8 + col * 16 + (row % 2) * 8;
-        const y = 8 + row * 16;
+    wrapped(() => {
+      for (let i = 0; i < 30; i++) dot((i * 31 + 5) % 96, (i * 43 + 9) % 96, 1.25, i % 2 ? "#fffdf9" : "#302c35");
+      });
+    } else if (slug === "stars") {
+      wrapped(() => {
+      for (let row = 0; row < 6; row++)
+        for (let col = 0; col < 6; col++) {
+          const x = 8 + col * 16 + (row % 2) * 8;
+          const y = 8 + row * 16;
         star(x, y, (row + col) % 3 === 0 ? 7 : 5.5, (row + col) % 4 === 0 ? color : accent(row * 3 + col));
         if ((row + col) % 2 === 0) dot(x + 7, y + 6, 1.5, "#fffdf9");
       }
-  } else if (slug === "hearts") {
-    for (let row = 0; row < 6; row++)
-      for (let col = 0; col < 6; col++) {
-        const x = 9 + col * 16 + (row % 2) * 4;
-        const y = 9 + row * 16;
+      });
+    } else if (slug === "hearts") {
+      wrapped(() => {
+      for (let row = 0; row < 6; row++)
+        for (let col = 0; col < 6; col++) {
+          const x = 9 + col * 16 + (row % 2) * 4;
+          const y = 9 + row * 16;
         heart(x, y, 10, (row + col) % 4 === 0 ? color : accent(row * 2 + col));
         if ((row + col) % 3 === 0) dot(x + 7, y + 6, 1.5, "#fffdf9");
       }
+    });
   } else if (slug === "rose") {
     place(
       [
         [23, 23, 0.76],
         [70, 21, 0.7],
         [46, 68, 0.78],
-        [4, 70, 0.55],
-        [89, 76, 0.55],
+        [0, 74, 0.55],
       ],
       rose,
     );
@@ -356,26 +382,26 @@ function patternTile(slug: string, color: string) {
         [23, 22, 0.68],
         [70, 20, 0.62],
         [47, 55, 0.78],
-        [2, 73, 0.48],
-        [91, 76, 0.5],
+        [0, 75, 0.5],
       ],
       cloud,
     );
-    for (const [x, y] of [
-      [48, 17],
-      [84, 45],
-      [13, 48],
-      [70, 87],
-    ])
-      dot(x, y, 1.7, "#fffdf9");
+    wrapped(() => {
+      for (const [x, y] of [
+        [48, 17],
+        [84, 45],
+        [13, 48],
+        [70, 87],
+      ])
+        dot(x, y, 1.7, "#fffdf9");
+    });
   } else if (slug === "butterflies") {
     place(
       [
         [23, 22, 0.72, 0],
         [70, 20, 0.66, 2],
         [45, 61, 0.78, 4],
-        [2, 77, 0.5, 1],
-        [91, 76, 0.52, 3],
+        [0, 77, 0.52, 1],
       ],
       butterfly,
     );
@@ -385,8 +411,7 @@ function patternTile(slug: string, color: string) {
         [22, 23, 0.72],
         [69, 20, 0.66],
         [45, 64, 0.78],
-        [1, 76, 0.5],
-        [91, 77, 0.52],
+        [0, 77, 0.52],
       ],
       strawberry,
     );

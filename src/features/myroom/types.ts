@@ -20,3 +20,4 @@ export type Placement = {
   original?: RoomObject
   rotation: number
 }
+export type RoomMode = "explore" | "decorate"

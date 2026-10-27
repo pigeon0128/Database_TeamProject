@@ -970,3 +970,33 @@
   width: 78px;
   height: 78px;
 }
+
+.mr-mode-switch {
+  position: absolute;
+  top: 110px;
+  left: calc(50% + 28px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 3px 16px #211a1610;
+}
+.mr-mode-switch button {
+  border: 0;
+  padding: 9px 16px;
+  border-radius: 10px;
+  white-space: nowrap;
+  color: #6c7582;
+  background: transparent;
+  font-weight: 700;
+}
+.mr-mode-switch button[aria-pressed="true"] {
+  background: #e8f2ff;
+  color: #2483ff;
+}
+@media (max-width: 600px) {
+  .mr-mode-switch { top: 98px; }
+  .mr-mode-switch button { padding: 8px 12px; font-size: 11px; }
+}

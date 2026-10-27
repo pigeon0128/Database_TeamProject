@@ -14,6 +14,7 @@
     "format": "oxfmt",
     "test:myroom": "node --test tests/myroom.test.js",
     "test:myroom:preview": "node --experimental-strip-types --test tests/myroom-preview.test.js",
+    "test:myroom:player": "node --experimental-strip-types --test tests/myroom-player.test.js",
     "test:myroom:api": "node --test tests/myroom-api.test.js",
     "typecheck": "tsc --noEmit"
   },

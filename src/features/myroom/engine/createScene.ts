@@ -17,7 +17,8 @@ import {
   type Wall,
 } from "../../../../shared/myroom.js"
 import type { RoomArtwork } from "../artwork"
-import type { Placement, RoomLayout, RoomObject } from "../types"
+import type { Placement, RoomLayout, RoomMode, RoomObject } from "../types"
+import { createPlayerController } from "../player/controller"
 import { createObject } from "../objects/createObject"
 import { createRoom } from "./room"
 
@@ -77,6 +78,8 @@ export function createRoomScene(
     shadows.blurKernel = 24
     shadows.setDarkness(0.3)
     const room = createRoom(scene)
+    const player = createPlayerController(scene, camera, canvas)
+    let mode: RoomMode = "explore"
     let layout: RoomLayout = { objects: [] },
       artworks: RoomArtwork[] = [],
       selected: string | null = null
@@ -154,10 +157,15 @@ export function createRoomScene(
       const e = info.event as PointerEvent
       if (info.type === PointerEventTypes.POINTERDOWN)
         down = { x: e.clientX, y: e.clientY }
-      if (info.type === PointerEventTypes.POINTERMOVE && placing)
+      if (
+        info.type === PointerEventTypes.POINTERMOVE &&
+        placing &&
+        mode === "decorate"
+      )
         updateCandidate(scene.pointerX, scene.pointerY)
       if (
         info.type === PointerEventTypes.POINTERUP &&
+        mode === "decorate" &&
         e.button === 0 &&
         Math.hypot(e.clientX - down.x, e.clientY - down.y) < 5
       ) {
@@ -175,6 +183,7 @@ export function createRoomScene(
       }
     })
     scene.onBeforeRenderObservable.add(() => {
+      player.update(engine.getDeltaTime() / 1000)
       for (const wall of room.walls) {
         const name = wall.metadata.wall as Wall
         const outside =
@@ -209,9 +218,9 @@ export function createRoomScene(
         })
       }
       if (shadows.getShadowMap())
-        shadows.getShadowMap()!.renderList = [...objects.values()].flatMap(
-          (o) => o.pieces,
-        )
+        shadows.getShadowMap()!.renderList = [...objects.values()]
+          .flatMap((o) => o.pieces)
+          .concat(player.pieces)
     }
     return {
       sync(
@@ -221,6 +230,7 @@ export function createRoomScene(
         nextPlacement: Placement | null,
       ) {
         layout = next
+        player.syncObjects(layout.objects)
         artworks = nextArtworks
         selected = nextSelected
         const changed = placing !== nextPlacement
@@ -240,32 +250,29 @@ export function createRoomScene(
             }
             preview = createObject(scene, o, undefined, true)
             preview.root.setEnabled(false)
-            camera.detachControl()
             callbacks.hint(
               placing.type === "frame"
                 ? "액자를 걸 벽을 가리켜 주세요."
                 : "가구를 놓을 바닥을 가리켜 주세요.",
             )
           } else {
-            camera.attachControl(canvas, true)
             callbacks.hint(null)
           }
         }
         if (placing) updateCandidate(scene.pointerX, scene.pointerY)
       },
       resetCamera() {
-        camera.inertialAlphaOffset = 0
-        camera.inertialBetaOffset = 0
-        camera.inertialRadiusOffset = 0
-        camera.alpha = -Math.PI / 2
-        camera.beta = Math.PI / 3
-        camera.radius = 13
-        camera.setTarget(Vector3.Zero())
+        player.resetCamera()
+      },
+      setInteraction(nextMode: RoomMode, blocked: boolean) {
+        mode = nextMode
+        player.setInteraction(mode, blocked)
       },
       dispose() {
         resize.disconnect()
         canvas.removeEventListener("contextmenu", onContext)
         scene.onPointerObservable.remove(pointer)
+        player.dispose()
         engine.stopRenderLoop()
         scene.dispose()
         engine.dispose()

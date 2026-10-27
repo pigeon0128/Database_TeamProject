@@ -4,7 +4,7 @@
 
 `#/myroom`에 직접 접속하는 로그인 사용자 전용 3D 전시 공간이다. 기존 홈의 2×2 메뉴는 유지한다. 그림 액자를 벽에 배치하고 내 도감의 완성 그림을 고르며, 의자·책상·나무를 바닥에 배치할 수 있다. 저장 버튼으로 PostgreSQL에 저장하고 재진입/새로고침 시 복원한다.
 
-그림은 **현재 대표 작품을 따라가는 정책 A**를 따른다. 레이아웃에는 `drawingId`만 보관하고 현재 이미지 경로는 기존 `/api/collection`에서 얻는다. 기존 그림판, 브러쉬, 기록 저장·이미지 삭제 정책은 수정하지 않았다. 아바타·점프·포털 이동·상점·멀티플레이는 범위 밖이다.
+그림은 **현재 대표 작품을 따라가는 정책 A**를 따른다. 레이아웃에는 `drawingId`만 보관하고 현재 이미지 경로는 기존 `/api/collection`에서 얻는다. 기존 그림판, 브러쉬, 기록 저장·이미지 삭제 정책은 수정하지 않았다. 클라이언트 전용 플레이어는 아래 15절에 추가했다. 점프·포털 이동·상점·멀티플레이는 범위 밖이다.
 
 ## 2. 코드 구조와 통합 경계
 
@@ -17,6 +17,10 @@ src/features/myroom/
   engine/createScene.ts          카메라, 조명, picking, 미리보기
   engine/room.ts                 방과 독립적인 procedural 나뭇결
   objects/createObject.ts        자체 Mesh, 액자·그림 텍스처
+  player/avatar.ts               독립 로봇 Mesh와 대기/걷기 애니메이션
+  player/movement.ts             순수 이동·충돌·카메라 경계 계산
+  player/controller.ts           입력, 이동, 추적 카메라, 모드 전환/cleanup
+  preview/enabled.ts / data.ts   DEV opt-in, Mock 작품과 localStorage
   ui/InventoryPanel.tsx          목록/선택/배치
   ui/ArtworkPicker.tsx           기존 도감 작품 선택
   ui/RoomUI.tsx                  아이콘, 자체 SVG 썸네일, 접근성 모달
@@ -171,3 +175,21 @@ MYROOM_TEST_URL이 없으면 API 테스트는 skip된다. 외부 hostname은 허
 Preview는 자체 SVG 샘플 2개와 `doroland:myroom-preview:v1` localStorage 항목만 사용한다. 실제 collection/myroom API와 PostgreSQL 데이터는 사용하지 않는다. 동일한 지오메트리 검증 및 revision 확인으로 잘못된 배치와 순차적인 stale 저장을 방어한다. localStorage의 읽기/쓰기 전체가 여러 탭 사이의 원자적 DB transaction인 것은 아니다. 손상된 저장본은 자동 덮어쓰기하지 않으며 실패 시 기존 편집 상태를 유지한다. 서버 데이터로 가져오거나 자동 동기화하지 않는다.
 
 `pnpm test:myroom:preview`는 Node 22의 type stripping으로 실제 Preview 저장 모듈을 검사한다. 기존 geometry/API 테스트와 함께 실행한다. `myroom-preview-wip.patch`는 사용자가 만든 백업이며 소스 커밋에 포함하지 않는다.
+
+## 15. 플레이어와 탐색/꾸미기 — 2026-10-28
+
+초기 모드는 **탐색**이다. 초록색 로봇은 자체 box Mesh/Material로 만들었고 대기 시 상체/팔의 작은 움직임, 이동 시 팔/다리의 교차 회전과 방향 전환을 적용한다. Inspection의 초록색 아바타·뒤쪽 위의 시점·WASD/방향키/우클릭 안내를 참고했다. 보관된 8개 캡처는 패널을 중심으로 잘려 있어 원본 로봇의 전체 상세 형상/치수를 확인할 수 없었다. 원본과 같은 모델이라는 주장이 아니며 원본 모델/텍스처/코드는 복제하지 않았다.
+
+- 탐색: WASD/방향키, 카메라 방향 기준 이동, 우클릭 드래그 시점 회전, 휠 줌, 부드러운 추적. 이동 입력 전에 3D 화면을 클릭한다.
+- 꾸미기: 기존 자유 카메라·인벤토리·배치·작품 선택·이동/회전/삭제·명시적 저장. 탐색의 이동 키는 동작하지 않는다. 모드 전환은 미완료 배치/선택/패널을 닫고 각 카메라 구도를 보존한다.
+- 로딩/저장, 패널/모달, 배치/충돌 해결 중에는 플레이어 입력을 멈춘다. 폼/버튼 입력, 창 blur/탭 숨김도 키를 비운다. 이탈 시 이벤트 리스너와 Mesh/Material을 dispose한다.
+
+플레이어 반경 0.42, 속도 3.2 unit/s. 지수 가속/감속과 frame delta(최대 50ms)로 이동한다. 벽 안쪽 경계와 기존 catalog footprint를 확장한 원-사각형 충돌을 작은 축별 step으로 계산해 벽을 따라 미끄러지고 가구를 통과하지 않는다. 가구가 현재 위치에 생기거나 저장본 복원 시 겹치면 가까운 빈 바닥으로 옮긴다. 물리 엔진/중력/점프/계단/가구 위 올라가기는 없다.
+
+탐색 카메라는 ArcRotateCamera의 target을 지수 보간하고, 원래 원하는 줌 거리와 벽/높이 여유를 함께 계산해 방 안에 둔다. 벽 가까이에서는 거리가 줄어들 수 있다. 꾸미기에는 기존 근접 벽 숨김과 자유 카메라를 유지한다. 가구 자체에 대한 카메라 가림 회피는 별도 구현하지 않았다.
+
+플레이어 위치/방향/애니메이션은 런타임 메모리만 사용한다. **RoomLayout, DB schema, 기존 Express API는 변경하지 않았다.** 새로고침 때 플레이어는 초기 빈 위치로 돌아가며 저장된 액자/그림/가구는 그대로 복원된다. Preview와 실제 인증 화면 모두 동일 player 모듈을 사용한다.
+
+최종 검증: geometry 4 + Preview 5 + player 5 + 실제 로컬 PostgreSQL/API 7 = **21 pass / 0 fail / 0 skip**. 타입 검사, 포맷 검사, production flag=true 빌드 및 Mock 제거 검사 통과. 큰 Babylon lazy chunk 경고는 남아 있다. 브라우저에서 루트/해시, 인증 API 0건, 초기 로봇, W/D/방향키 이동·추적, 책상 앞 정지, 벽 경계, 줌/초기화, 도움말 중 입력 차단, 두 모드 전환, Mock 액자 저장/복원을 확인했다. 실제 인증 세션에서도 기존 DB 방/작품과 로봇이 보이고 홈 복귀 시 canvas가 0개였으며 재진입했다. 비로그인 production 루트/해시는 로그인 화면을 유지했다.
+
+우클릭 전용 orbit는 Babylon pointer 입력을 button 2로 제한해 구현했다. 현재 브라우저 자동화 API는 우클릭을 유지한 드래그를 제공하지 않아 그 동작 자체의 자동 입력 검증은 하지 못했다. 실제 휴대폰/게임패드와 GPU 성능 계측도 미검증이다. 자료와 로그/화면은 실험 `DORO-MYROOM-PLAYER-20261028-01`에서 추적한다.

@@ -5,7 +5,7 @@ import { useAuth } from "../../auth"
 import MyRoomViewport from "./MyRoomViewport"
 import { useMyRoom } from "./hooks/useMyRoom"
 import { myRoomPreviewEnabled } from "./preview/enabled"
-import type { ObjectType, Placement, RoomObject } from "./types"
+import type { ObjectType, Placement, RoomMode, RoomObject } from "./types"
 import InventoryPanel from "./ui/InventoryPanel"
 import ArtworkPicker from "./ui/ArtworkPicker"
 import { Icon, Modal, ObjectThumbnail } from "./ui/RoomUI"
@@ -29,6 +29,7 @@ function RoomPage({
 }) {
   const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
   const room = useMyRoom(isPreview, onUnauthorized)
+  const [mode, setMode] = useState<RoomMode>("explore")
   const [panel, setPanel] = useState<"inventory" | "artwork" | "help" | null>(
     null,
   )
@@ -40,7 +41,7 @@ function RoomPage({
   const selected = room.layout.objects.find((o) => o.id === selectedId)
   const busy = room.loading || room.saving || !room.ready
   function select(id: string | null) {
-    if (busy) return
+    if (busy || mode !== "decorate") return
     setSelected(id)
     if (room.layout.objects.find((o) => o.id === id)?.type === "frame")
       setPanel("artwork")
@@ -55,7 +56,12 @@ function RoomPage({
     if (object.type === "frame" && !object.artworkDrawingId) setPanel("artwork")
   }
   function start(type: ObjectType, original?: RoomObject) {
-    if (busy || (!original && room.layout.objects.length >= MAX_OBJECTS)) return
+    if (
+      busy ||
+      mode !== "decorate" ||
+      (!original && room.layout.objects.length >= MAX_OBJECTS)
+    )
+      return
     setPanel(null)
     setPlacement({ type, original, rotation: original?.rotation ?? 0 })
   }
@@ -72,7 +78,7 @@ function RoomPage({
         setPlacement(null)
         setPanel(null)
       }
-      if (panel || exit || busy) return
+      if (panel || exit || busy || mode !== "decorate") return
       if (e.key.toLowerCase() === "i" && !placement) setPanel("inventory")
       if (e.key.toLowerCase() === "r" && placement?.type !== "frame")
         setPlacement((p) =>
@@ -83,7 +89,7 @@ function RoomPage({
     }
     window.addEventListener("keydown", key)
     return () => window.removeEventListener("keydown", key)
-  }, [panel, placement, exit, busy])
+  }, [panel, placement, exit, busy, mode])
   function downloadBackup() {
     const url = URL.createObjectURL(
       new Blob(
@@ -105,6 +111,8 @@ function RoomPage({
         selected={selectedId}
         placement={placement}
         reset={reset}
+        mode={mode}
+        blocked={busy || !!placement || !!panel || exit || room.conflict}
         onSelect={select}
         onPlace={place}
         onHint={setHint}
@@ -125,8 +133,12 @@ function RoomPage({
         <button
           className={panel === "inventory" ? "active" : ""}
           aria-label="인벤토리 열기"
-          title="인벤토리 (I)"
-          disabled={busy}
+          title={
+            mode === "decorate"
+              ? "인벤토리 (I)"
+              : "꾸미기 모드에서 인벤토리를 열어 주세요"
+          }
+          disabled={busy || mode !== "decorate"}
           onClick={() => {
             setPlacement(null)
             setPanel(panel === "inventory" ? null : "inventory")
@@ -193,6 +205,23 @@ function RoomPage({
           </button>
         </div>
       </header>
+      <div className="mr-mode-switch" role="group" aria-label="마이룸 모드">
+        {(["explore", "decorate"] as RoomMode[]).map((value) => (
+          <button
+            key={value}
+            aria-pressed={mode === value}
+            disabled={busy}
+            onClick={() => {
+              setPlacement(null)
+              setSelected(null)
+              setPanel(null)
+              setMode(value)
+            }}
+          >
+            {value === "explore" ? "탐색 모드" : "꾸미기 모드"}
+          </button>
+        ))}
+      </div>
       {room.loading && (
         <div className="mr-loading" role="status">
           <div className="mr-spinner" />
@@ -338,7 +367,15 @@ function RoomPage({
         <div className="mr-bottom-tip">
           <Icon name="move" />
           <span>
-            드래그 회전 · 휠 확대 · <kbd>I</kbd> 인벤토리
+            {mode === "explore" ? (
+              <>
+                <kbd>WASD / 방향키</kbd> 이동 · 우클릭 드래그 회전 · 휠 확대
+              </>
+            ) : (
+              <>
+                드래그 회전 · 휠 확대 · <kbd>I</kbd> 인벤토리
+              </>
+            )}
           </span>
         </div>
       )}
@@ -378,7 +415,13 @@ function RoomPage({
           </header>
           <h3>주요 조작</h3>
           <p>
-            <kbd>마우스 드래그</kbd> 카메라 회전
+            <kbd>WASD / 방향키</kbd> 탐색 모드 이동
+          </p>
+          <p>
+            <kbd>우클릭 드래그</kbd> 탐색 시점 회전
+          </p>
+          <p>
+            <kbd>마우스 드래그</kbd> 꾸미기 카메라 회전
           </p>
           <p>
             <kbd>휠</kbd> 확대 / 축소
@@ -401,8 +444,9 @@ function RoomPage({
             <kbd>ESC</kbd> 취소
           </p>
           <p className="mr-muted">
-            액자는 벽 방향에 맞춰 회전해요. 변경을 마치면 오른쪽 위 저장을 눌러
-            주세요.
+            3D 화면을 클릭한 뒤 이동해 주세요. UI를 열거나 꾸미는 동안 이동은
+            멈춰요. 액자는 벽 방향에 맞춰 회전해요. 변경을 마치면 오른쪽 위
+            저장을 눌러 주세요.
           </p>
         </aside>
       )}

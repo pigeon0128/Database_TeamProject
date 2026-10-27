@@ -1,5 +1,6 @@
 // 캐릭터 그리기 화면 (#/character). 밑그림·채점 없이 흰 도화지에 자유롭게 그리고, 이름을 붙여 PNG로 저장한다.
-import { useRef, useState } from "react";
+// 브러쉬 패널에서 색칠 붓·특수 브러쉬를 골라 도화지 어디든 칠할 수 있다 (펜 선 아래에 칠해진다).
+import { useMemo, useRef, useState } from "react";
 import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
 import { DrawingShell } from "../components/drawing/DrawingShell";
 import { HistoryButtons, LineMenu, ShortcutList, SizeMenu } from "../components/drawing/menus";
@@ -8,6 +9,7 @@ import { useDrawingTools } from "../components/drawing/useDrawingTools";
 import { ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
 import { downloadImage } from "../lib/download";
 import { useDrawingDraft } from "../lib/drawingDraft";
+import { wholeCanvasRegions } from "../lib/drawing/regions";
 
 /** 정사각형 도화지 (캔버스 픽셀) */
 const CANVAS_SIZE = 1200;
@@ -16,7 +18,9 @@ const BACK_TO_HOME = { path: "/", label: "메인으로" };
 
 export default function CharacterPage() {
   const canvasRef = useRef<TracingCanvasHandle>(null);
-  const tools = useDrawingTools(canvasRef);
+  // 색칠 붓·특수 브러쉬도 쓴다. 밑그림이 없으니 도화지 전체가 한 구역이다.
+  const tools = useDrawingTools(canvasRef, { paintable: true });
+  const regions = useMemo(() => wholeCanvasRegions(CANVAS_SIZE, CANVAS_SIZE), []);
   const [name, setName] = useState("");
   // 이어서 그리기: 그리던 캐릭터와 이름을 저장해 둔다.
   const draft = useDrawingDraft("character", { actions: tools.canvasProps.actions, replaceActions: tools.replaceActions }, name);
@@ -84,6 +88,7 @@ export default function CharacterPage() {
           guideOpacity={1}
           showGuide={false}
           {...tools.canvasProps}
+          regions={regions}
         />
       </DrawingShell>
       {draft.pending && (

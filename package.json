@@ -11,9 +11,13 @@
     "start:server": "node --env-file-if-exists=.env server/index.js",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "test:myroom": "node --test tests/myroom.test.js",
+    "test:myroom:api": "node --test tests/myroom-api.test.js",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@babylonjs/core": "9.31.0",
     "express": "^5.2.1",
     "pg": "^8.23.1",
     "react": "^19.0.0",

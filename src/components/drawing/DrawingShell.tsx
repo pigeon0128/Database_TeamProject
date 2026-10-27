@@ -15,6 +15,7 @@ function RailButton({
   shortcut,
   children,
   toggle,
+  more,
 }: {
   active: boolean;
   onClick: () => void;
@@ -23,20 +24,33 @@ function RailButton({
   children: ReactNode;
   /** 브러쉬 패널을 여닫는 버튼 (패널의 "바깥 누르면 닫기"에서 뺀다) */
   toggle?: boolean;
+  /** 옆으로 펼쳐지는 메뉴가 있으면 > 표시. true 면 펼쳐진 상태 (표시가 반대로 돈다) */
+  more?: { open: boolean };
 }) {
   return (
     <button
       type="button"
       data-brush-toggle={toggle || undefined}
+      aria-expanded={more ? more.open : undefined}
       onClick={onClick}
       aria-pressed={active}
       title={`${label} (${shortcut})`}
-      className={`flex w-14 flex-col items-center gap-0.5 rounded-2xl py-2 text-[11px] font-bold transition ${
+      className={`relative flex w-14 flex-col items-center gap-0.5 rounded-2xl py-2 text-[11px] font-bold transition ${
         active ? "bg-sky-haze text-sky-deep" : "text-ink-muted hover:bg-sky-soft"
       }`}
     >
       <span className="text-xl leading-none">{children}</span>
       {label}
+      {more && (
+        // 옆으로 브러쉬가 더 있다는 표시. 펼치면 반대로 돌아 "닫기"를 뜻한다
+        <svg
+          viewBox="0 0 12 12"
+          aria-hidden="true"
+          className={`absolute right-0.5 top-[38%] h-3 w-3 -translate-y-1/2 transition-transform duration-200 ${more.open ? "rotate-180" : ""}`}
+        >
+          <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
     </button>
   );
 }
@@ -92,6 +106,7 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
           <RailButton
             label="브러쉬"
             toggle
+            more={tools.paintable ? { open: brushPanel } : undefined}
             shortcut={comboText(tools.keys.brush)}
             active={!tools.erase}
             onClick={() => {

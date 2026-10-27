@@ -221,3 +221,21 @@ export function buildRegions(guide: HTMLCanvasElement): Regions {
 
   return { width, height, at, region, lines };
 }
+
+/**
+ * 밑그림이 없는 도화지(캐릭터 그리기)용: 도화지 전체가 한 구역이라 어디든 칠할 수 있다.
+ * 색칠 층은 펜 선 아래에 있으므로 칠해도 그린 선이 가려지지 않는다.
+ */
+export function wholeCanvasRegions(width: number, height: number): Regions {
+  const mask = document.createElement("canvas");
+  mask.width = width;
+  mask.height = height;
+  const ctx = mask.getContext("2d")!;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, width, height);
+  const lines = document.createElement("canvas");
+  lines.width = width;
+  lines.height = height;
+  const all: Region = { id: 1, x: 0, y: 0, w: width, h: height, mask };
+  return { width, height, at: () => 1, region: () => all, lines };
+}

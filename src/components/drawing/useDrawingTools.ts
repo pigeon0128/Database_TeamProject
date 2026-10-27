@@ -22,8 +22,8 @@ export const BASIC_COLORS = [
   { name: "검정", color: "#363636" },
   { name: "흰색", color: "#ffffff" },
 ];
-/** 색칠 붓 굵기 범위 (캔버스 픽셀). 구역을 넓게 칠하므로 펜보다 훨씬 굵다 */
-export const PAINT_MIN_SIZE = 10;
+/** 색칠 붓 굵기 범위 (캔버스 픽셀). 작은 곳은 아주 가늘게, 넓은 곳은 굵게 칠한다 (0이면 아무것도 칠해지지 않아 1부터) */
+export const PAINT_MIN_SIZE = 1;
 export const PAINT_MAX_SIZE = 120;
 
 /** 고른 브러쉬: 펜(따라 그리기 선), 색칠 붓(단색), 또는 특수 브러쉬 무늬 이름 (DB special_brushes.slug) */

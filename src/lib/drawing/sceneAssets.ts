@@ -37,8 +37,8 @@ const guides = new Map<string, Promise<HTMLCanvasElement>>();
 const previews = new Map<string, Promise<ScenePreview>>();
 const masks = new Map<string, Promise<GuideMasks>>();
 
-/** 원본 밑그림을 불러와 따라 그리지 않을 흰 선을 회색으로 바꾼 캔버스 */
-const loadGuide = (scene: Scene) =>
+/** 원본 밑그림을 불러와 따라 그리지 않을 흰 선을 회색으로 바꾼 캔버스 (색칠하기는 이 캔버스로 구역을 나눈다) */
+export const loadGuide = (scene: Scene) =>
   cached(guides, scene, () =>
     new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();

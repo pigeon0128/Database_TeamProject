@@ -2,6 +2,7 @@
 // 실행: pnpm dev:server  (기본 포트 3001, 개발 중에는 Vite가 /api 요청을 이 서버로 넘긴다)
 //   routes/auth.js      /api/auth/*      가입·로그인·로그아웃·내 정보·비밀번호 바꾸기
 //   routes/drawings.js  /api/drawings    장면 목록
+//   routes/brushes.js   /api/brushes     색칠하기 특수 브러쉬 목록
 //   routes/records.js   /api/play-records, /api/leaderboard   기록·리더보드
 //   /uploads/*          완성 그림 파일 (서버 폴더, ./storage.js). DB에는 경로(user_artworks.image_key)만 있다
 //   routes/settings.js  /api/settings    그리기 설정·단축키
@@ -12,6 +13,7 @@ import { pool } from "./db.js";
 import { UPLOAD_DIR } from "./storage.js";
 import { errorHandler, notFound } from "./errors.js";
 import { authRoutes } from "./routes/auth.js";
+import { brushRoutes } from "./routes/brushes.js";
 import { collectionRoutes } from "./routes/collection.js";
 import { draftRoutes } from "./routes/drafts.js";
 import { drawingRoutes } from "./routes/drawings.js";
@@ -37,6 +39,7 @@ app.use("/uploads", express.static(UPLOAD_DIR, { immutable: true, maxAge: "365d"
 
 app.use("/api/auth", authRoutes);
 app.use("/api/drawings", drawingRoutes);
+app.use("/api/brushes", brushRoutes);
 app.use("/api", recordRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/drafts", draftRoutes);

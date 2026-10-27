@@ -49,6 +49,8 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 | creature_facts | 도감 정보 항목 (분류, 사는 곳, 먹이 등 이름·내용) |
 | creature_tips | 그릴 때 살펴볼 점 |
 | creature_sources | 도감 정보의 출처 (출처 이름, 주소) — 도감 카드 아래에 보여 줌 (`migrations/011_creature_sources.sql`) |
+| special_brushes | 색칠하기 특수 브러쉬(무늬 브러쉬)와 가격(셀) (`migrations/018_special_brushes.sql`) |
+| user_brushes | 사용자가 셀로 산 특수 브러쉬. 행이 있으면 그 브러쉬를 쓸 수 있음 (`018`) |
 | schema_migrations | 실행한 마이그레이션 파일 목록 (`pnpm db:migrate` 가 만들고 관리) |
 
 ### Relationships
@@ -60,6 +62,7 @@ DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그
 - users (1) → (0..1) user_settings
 - users (1) → (N) drawing_drafts (그림 하나당 한 행: 키 `(user_id, draft_key)`)
 - drawings (1) → (0..1) creature_profiles (1) → (N) creature_facts, creature_tips, creature_sources
+- users (N) ↔ (M) special_brushes, 사이 표 user_brushes (키 `(user_id, brush_id)`)
 
 ## 5. Design Decisions
 
@@ -104,6 +107,19 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 앱의 장면 목록(챕터·그림)과 도감 생물 15개(챕터 `생물 도감`, 그림 2~15번과 17번)와 그 도감 정보는 `seeds/content.sql` 에 있고, `pnpm db:migrate` 가 매번 넣습니다 (이미 있으면 건너뜀).
 앱(`src/data/scenes.ts`)의 `drawingId` 와 번호를 맞추므로 장면을 추가할 때 두 곳을 함께 고칩니다.
 그림 16번(대관람차)은 `012_playground.sql` 에서 빼고 놀이터(17번)로 바꿨습니다. 지운 번호는 다시 쓰지 않습니다.
+
+### Special Brushes
+색칠하기의 특수 브러쉬는 재화 '셀'로 사서 쓰므로, 누가 어떤 브러쉬를 샀는지를 DB에 둡니다 (`migrations/018_special_brushes.sql`).
+
+- **셀** (`users.cells`): 사용자당 값 하나라 표를 따로 두지 않고 `users` 의 칸으로 둡니다. `CHECK (cells >= 0)` 로 음수가 되지 않습니다.
+- **브러쉬와 가격** (`special_brushes`): slug, 이름, 가격, 순서. 목록은 `seeds/content.sql` 이 넣습니다 (가격은 지금 모두 100셀, 임시 값).
+  무늬를 그리는 방법은 앱 코드(`src/lib/drawing/brushPatterns.ts`)가 slug 로 찾습니다.
+- **산 브러쉬** (`user_brushes`): 기본 키 `(user_id, brush_id)` 로 같은 브러쉬를 두 번 살 수 없습니다.
+  사용자를 지우면 함께 지워지고(CASCADE), 누군가 산 브러쉬는 지울 수 없습니다(RESTRICT).
+- **구매** (`POST /api/brushes/<slug>/purchase`, `server/routes/brushes.js`): 한 트랜잭션 안에서 사용자 행을 잠그고(`FOR UPDATE`)
+  이미 샀는지·셀이 충분한지 확인한 뒤, 셀을 빼고 `user_brushes` 에 넣습니다. 둘 중 하나만 저장되는 일이 없고, 동시에 눌러도 셀이 두 번 빠지지 않습니다.
+- 일반 색 브러쉬(빨·주·노·초 …)는 누구나 쓰는 색 값이라 DB에 두지 않습니다 (`src/pages/ColoringPage.tsx` 상수).
+- 셀을 얻는 방법과 구매 내역(언제 몇 셀에 샀는지)은 아직 없습니다. 구매 시각은 `user_brushes.purchased_at` 에 남습니다.
 
 ## 6. Leaderboard
 

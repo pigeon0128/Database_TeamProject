@@ -23,31 +23,41 @@ function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; 
   }, [scene]);
 
   return (
-    <button
-      type="button"
-      onClick={() => navigate(`/story/${scene.id}`)}
-      className="group overflow-hidden rounded-4xl border border-white/90 bg-white/80 text-left shadow-card transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-card-hover focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep"
-    >
-      <span className="relative block overflow-hidden bg-sky-haze" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}>
-        {preview ? (
-          <img src={preview} alt={`${scene.title} 완성 예시`} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
-        ) : (
-          <span className="flex h-full items-center justify-center text-sm font-bold text-ink-muted">미리보기 만드는 중…</span>
-        )}
-        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-0.5 text-xs font-black text-ink-muted shadow-sm">
-          {String(index + 1).padStart(2, "0")}
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => navigate(`/story/${scene.id}`)}
+        className="group w-full overflow-hidden rounded-4xl border border-white/90 bg-white/80 text-left shadow-card transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-card-hover focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep"
+      >
+        <span className="relative block overflow-hidden bg-sky-haze" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}>
+          {preview ? (
+            <img src={preview} alt={`${scene.title} 완성 예시`} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+          ) : (
+            <span className="flex h-full items-center justify-center text-sm font-bold text-ink-muted">미리보기 만드는 중…</span>
+          )}
+          <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-0.5 text-xs font-black text-ink-muted shadow-sm">
+            {String(index + 1).padStart(2, "0")}
+          </span>
         </span>
-      </span>
-      <span className="flex items-end justify-between gap-3 p-5">
-        <span>
-          <strong className="block text-xl font-extrabold tracking-[-0.025em]">{scene.title}</strong>
-          <span className="mt-1 block text-sm font-medium text-ink-muted">“{scene.line}”</span>
+        <span className="flex items-end justify-between gap-3 p-5">
+          <span>
+            <strong className="block text-xl font-extrabold tracking-[-0.025em]">{scene.title}</strong>
+            <span className="mt-1 block text-sm font-medium text-ink-muted">“{scene.line}”</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-deep px-4 py-2 text-sm font-bold text-white transition group-hover:translate-x-1">
+            {inProgress ? "이어 그리기 →" : "그리기 →"}
+          </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-deep px-4 py-2 text-sm font-bold text-white transition group-hover:translate-x-1">
-          {inProgress ? "이어 그리기 →" : "그리기 →"}
-        </span>
-      </span>
-    </button>
+      </button>
+      {/* 색칠하기: 카드 버튼 안에 버튼을 넣을 수 없어서 미리보기 오른쪽 위에 겹쳐 둔다 */}
+      <button
+        type="button"
+        onClick={() => navigate(`/color/${scene.id}`)}
+        className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-ink shadow-sm transition hover:bg-sun"
+      >
+        🎨 색칠하기
+      </button>
+    </div>
   );
 }
 

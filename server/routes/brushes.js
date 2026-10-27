@@ -1,4 +1,4 @@
-// 특수 브러쉬 API (/api/brushes): 색칠하기 화면의 무늬 브러쉬 목록과 구매 (migrations/018).
+// 특수 브러쉬 API (/api/brushes): 그리기 화면 브러쉬 패널의 무늬 브러쉬 목록과 구매 (migrations/018).
 // 표: special_brushes (브러쉬·가격), user_brushes (산 브러쉬), users.cells (가진 셀)
 import { Router } from "express";
 import { requireUser } from "../auth.js";

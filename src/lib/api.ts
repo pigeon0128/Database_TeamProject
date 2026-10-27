@@ -1,5 +1,5 @@
 // API 서버(server/, 경로별 코드는 server/routes/) 호출. 개발 중에는 Vite가 /api 요청을 API 서버로 넘긴다.
-import type { Stroke } from "./drawing/strokes";
+import type { PaintStroke, Stroke } from "./drawing/strokes";
 
 export type User = { id: number; loginId: string };
 
@@ -140,8 +140,8 @@ export const api = {
   drafts: () => request<{ drafts: { key: string; savedAt: string; strokeCount: number }[] }>("GET", "/drafts"),
   /** 없으면 draft: null */
   getDraft: (key: string) =>
-    request<{ draft: { strokes: Stroke[]; name: string | null; savedAt: string } | null }>("GET", `/drafts/${encodeURIComponent(key)}`),
-  saveDraft: (key: string, strokes: Stroke[], name: string | undefined, opts?: { keepalive?: boolean }) =>
+    request<{ draft: { strokes: (Stroke | PaintStroke)[]; name: string | null; savedAt: string } | null }>("GET", `/drafts/${encodeURIComponent(key)}`),
+  saveDraft: (key: string, strokes: (Stroke | PaintStroke)[], name: string | undefined, opts?: { keepalive?: boolean }) =>
     request<{ savedAt: string }>("PUT", `/drafts/${encodeURIComponent(key)}`, { strokes, name: name ?? null }, opts),
   /** 생물 도감 목록과 내 수집 현황 */
   collection: () => request<{ creatures: CreatureEntry[] }>("GET", "/collection"),

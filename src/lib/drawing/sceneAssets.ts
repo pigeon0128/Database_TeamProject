@@ -1,8 +1,10 @@
 // 장면 하나에 필요한 준비물을 만들고 캐시한다. 픽셀 계산이 무거우므로 장면마다 한 번만 하고 화면끼리 같이 쓴다.
 // - loadScenePreview: 손질한 밑그림과 완성 예시 이미지 (장면 고르기 화면은 이것만 쓴다)
 // - loadSceneAssets: 위 이미지 + 채점용 마스크 (그리기 화면)
+// - loadSceneRegions: 색칠할 구역 (그리기 화면)
 import type { Scene } from "../../data/scenes";
 import { makeTracedExample, prepareGuide } from "./guideImage";
+import { buildRegions, type Regions } from "./regions";
 import { buildGuideMasks, type GuideMasks } from "./traceScore";
 
 type ScenePreview = {
@@ -37,8 +39,8 @@ const guides = new Map<string, Promise<HTMLCanvasElement>>();
 const previews = new Map<string, Promise<ScenePreview>>();
 const masks = new Map<string, Promise<GuideMasks>>();
 
-/** 원본 밑그림을 불러와 따라 그리지 않을 흰 선을 회색으로 바꾼 캔버스 (색칠하기는 이 캔버스로 구역을 나눈다) */
-export const loadGuide = (scene: Scene) =>
+/** 원본 밑그림을 불러와 따라 그리지 않을 흰 선을 회색으로 바꾼 캔버스 (색칠할 구역도 이 캔버스로 나눈다) */
+const loadGuide = (scene: Scene) =>
   cached(guides, scene, () =>
     new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
@@ -57,6 +59,11 @@ export const loadScenePreview = (scene: Scene) =>
 
 const loadSceneMasks = (scene: Scene) =>
   cached(masks, scene, async () => buildGuideMasks(await loadGuide(scene), scene.width, scene.height, scene.scoreExclude));
+
+const regionCache = new Map<string, Promise<Regions>>();
+
+/** 색칠할 구역 (손질한 밑그림을 선으로 나눈 것) */
+export const loadSceneRegions = (scene: Scene) => cached(regionCache, scene, async () => buildRegions(await loadGuide(scene)));
 
 export async function loadSceneAssets(scene: Scene): Promise<SceneAssets> {
   const [preview, sceneMasks] = await Promise.all([loadScenePreview(scene), loadSceneMasks(scene)]);

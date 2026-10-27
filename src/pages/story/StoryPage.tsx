@@ -2,7 +2,7 @@
 // 이 파일은 조각을 조립하고 툴바를 구성한다. 도감 생물 그리기(pages/creatures)도 SceneAttempts 를 그대로 쓴다.
 //   채점·장면 준비: useSceneScoring / 타이머·기록 저장: useRecordSubmission / 이어 그리기: lib/drawingDraft
 //   점수 막대: ScoreBar / 저장 결과 창: SubmissionDialog / 완성 예시 창: ExampleDialog
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "../../auth";
 import { DrawingShell } from "../../components/drawing/DrawingShell";
 import { HistoryButtons, LineMenu, ShortcutList, SizeMenu } from "../../components/drawing/menus";
@@ -14,6 +14,8 @@ import TracingCanvas, { type TracingCanvasHandle } from "../../components/Tracin
 import { findScene, type Scene } from "../../data/scenes";
 import { downloadImage } from "../../lib/download";
 import { useDrawingDraft } from "../../lib/drawingDraft";
+import type { Regions } from "../../lib/drawing/regions";
+import { loadSceneRegions } from "../../lib/drawing/sceneAssets";
 import { useSavedSetting } from "../../lib/userSettings";
 import { navigate } from "../../router";
 import { ExampleDialog } from "./ExampleDialog";
@@ -59,8 +61,19 @@ export function SceneAttempts(props: SceneProps) {
 
 function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps & { onRetry: () => void }) {
   const canvasRef = useRef<TracingCanvasHandle>(null);
-  // 따라 그리기는 채점하므로 선 끝 얇게를 쓰지 않는다 (손떨림 보정만).
-  const tools = useDrawingTools(canvasRef, { maxBrushSize: scene.maxBrushSize, brushScale: scene.brushScale, fade: false });
+  // 따라 그리기는 채점하므로 선 끝 얇게를 쓰지 않는다 (손떨림 보정만). 같은 화면에서 구역 색칠도 한다 (채점하지 않음).
+  const tools = useDrawingTools(canvasRef, { maxBrushSize: scene.maxBrushSize, brushScale: scene.brushScale, fade: false, paintable: true });
+  const [regions, setRegions] = useState<Regions | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadSceneRegions(scene).then(
+      (r) => !cancelled && setRegions(r),
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [scene]);
   const actions = tools.canvasProps.actions;
   // 이어서 그리기: 장면마다 그리던 그림을 따로 저장한다.
   const draft = useDrawingDraft(`story:${scene.id}`, { actions, replaceActions: tools.replaceActions });
@@ -165,6 +178,10 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
                     <b>흰색 선</b>을 따라 칠할수록 점수가 올라가요. <b>회색 부분</b>(선과 바탕)을 칠하거나 <b>같은 곳을 여러 번 덧칠</b>하거나 <b>짧게 끊어서 사각사각</b>
                     그으면 점수가 깎여요. 선 하나는 한 번에 쭉 그어 보세요!
                   </p>
+                  <h2 className="mb-2 text-sm font-extrabold text-ink-muted">🎨 색칠하기</h2>
+                  <p className="mb-4 text-sm font-medium leading-relaxed">
+                    🖌️ 브러쉬를 눌러 <b>색칠 붓</b>이나 <b>특수 브러쉬</b>를 고르면, 붓을 댄 칸 안에만 색이 칠해져요. 색칠은 점수에 들어가지 않아요.
+                  </p>
                   <h2 className="mb-2 text-sm font-extrabold text-ink-muted">⌨️ 단축키</h2>
                   <ShortcutList keys={tools.keys} />
                 </>
@@ -219,6 +236,7 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
           guideOpacity={guideOpacityPct / 100}
           showGuide={showGuide}
           {...tools.canvasProps}
+          regions={regions}
           onStrokeStart={record.startTimer}
           onChange={scoring.handleCanvasChange}
           onDrawing={scoring.handleDrawing}

@@ -20,6 +20,9 @@
 | `src/components/TracingCanvas.tsx` | 그림판. 획을 그리고, 그리는 중인 획을 채점으로 넘김(`onDrawing`) |
 | `src/pages/story/ScoreBar.tsx` | 점수판 표시 |
 
+색칠(`regions.ts` 구역 나누기, `paint.ts` 색칠 층, `brushPatterns.ts` 특수 브러쉬 무늬)은 펜 선과 다른 캔버스에 그려서 채점에 들어가지 않습니다.
+지우개 획은 펜 선과 색을 함께 지우며, 채점에서는 지금처럼 펜 선 지우기로만 셉니다.
+
 ## 1. 흰 선 채움 (+)
 
 따라 그려야 할 흰 선 픽셀 중 칠한 비율이 그대로 점수가 됩니다 (1% = 1점).

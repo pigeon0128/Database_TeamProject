@@ -7,8 +7,9 @@ BEGIN;
 --   user_brushes      산 브러쉬 (users N : M special_brushes)
 -- 일반 색 브러쉬(빨·주·노·초 …)는 누구나 쓰는 색 값이라 표로 두지 않는다 (앱 상수).
 
+-- 처음 가진 셀은 10000. 이미 있는 사용자에게도 10000이 들어간다 (ADD COLUMN 의 DEFAULT 가 기존 행도 채운다).
 ALTER TABLE users
-    ADD COLUMN cells INTEGER NOT NULL DEFAULT 0;
+    ADD COLUMN cells INTEGER NOT NULL DEFAULT 10000;
 
 -- 셀은 음수가 될 수 없다 (가진 것보다 비싼 브러쉬는 살 수 없음)
 ALTER TABLE users

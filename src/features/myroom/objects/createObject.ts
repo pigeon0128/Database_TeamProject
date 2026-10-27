@@ -6,7 +6,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode"
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial"
 import type { Mesh } from "@babylonjs/core/Meshes/mesh"
 import type { Scene } from "@babylonjs/core/scene"
-import { artworkUrl, type CreatureEntry } from "../../../lib/api"
+import { roomArtworkImage, type RoomArtwork } from "../artwork"
 import { creatureGuide } from "../../../data/creatures"
 import type { RoomObject } from "../types"
 import { material } from "../engine/room"
@@ -22,7 +22,7 @@ const image = (url: string) =>
 export function createObject(
   scene: Scene,
   object: RoomObject,
-  artwork?: CreatureEntry,
+  artwork?: RoomArtwork,
   preview = false,
 ) {
   const root = new TransformNode(`object-${object.id}`, scene)
@@ -92,17 +92,17 @@ export function createObject(
       texture.update()
     }
     placeholder(
-      artwork?.imageKey
+      artwork && (artwork.imageKey || artwork.previewImageUrl)
         ? "그림을 불러오는 중…"
         : object.artworkDrawingId
           ? "작품을 불러올 수 없어요"
           : "그림을 골라 주세요",
     )
-    if (artwork?.imageKey && !preview) {
+    if (artwork && (artwork.imageKey || artwork.previewImageUrl) && !preview) {
       const guide = creatureGuide(artwork.slug)
       Promise.all([
         guide ? image(guide).catch(() => null) : null,
-        image(artworkUrl(artwork.imageKey)),
+        image(roomArtworkImage(artwork)),
       ])
         .then(([base, ink]) => {
           if (root.isDisposed()) return

@@ -163,3 +163,11 @@ MYROOM_TEST_URL이 없으면 API 테스트는 skip된다. 외부 hostname은 허
 홈 진입 버튼은 팀 전체 UI 조율 후 별도 PR로 추가한다. 새 가구는 shared catalog/검증/mesh/썸네일을 함께 추가한다. 작품 영구 보존이 필요하면 별도 보존 정책과 relation을 설계하고 기록 파일 삭제와 통합한다. 3D chunk와 저사양 성능을 프로파일링하고 선택 갱신 시 전체 재생성 대신 필요한 오브젝트만 갱신하는 최적화를 고려할 수 있다.
 
 `feature/myroom`을 PR로 리뷰하고 merge는 팀이 결정한다. 기존 main과 공유 파일을 대규모 포맷하지 않으며, 타 기능과의 충돌은 App route/서버 mount/package 및 migration 번호에 한정해 조율한다.
+
+## 14. 개발 Preview — 2026-10-28
+
+`VITE_MYROOM_PREVIEW=true`를 설정하고 Vite 개발 서버를 다시 시작하면 localhost의 `#/myroom`에서 로그인 없이 Mock 작품과 로컬 저장을 시험할 수 있다. production build에서는 DEV 조건이 false이므로 활성화할 수 없다. Mock 작품 모듈과 로컬 저장 키가 production JS에 없는지도 검사한다.
+
+Preview는 자체 SVG 샘플 2개와 `doroland:myroom-preview:v1` localStorage 항목만 사용한다. 실제 collection/myroom API와 PostgreSQL 데이터는 사용하지 않는다. 동일한 지오메트리 검증 및 revision 확인으로 잘못된 배치와 순차적인 stale 저장을 방어한다. localStorage의 읽기/쓰기 전체가 여러 탭 사이의 원자적 DB transaction인 것은 아니다. 손상된 저장본은 자동 덮어쓰기하지 않으며 실패 시 기존 편집 상태를 유지한다. 서버 데이터로 가져오거나 자동 동기화하지 않는다.
+
+`pnpm test:myroom:preview`는 Node 22의 type stripping으로 실제 Preview 저장 모듈을 검사한다. 기존 geometry/API 테스트와 함께 실행한다. `myroom-preview-wip.patch`는 사용자가 만든 백업이며 소스 커밋에 포함하지 않는다.

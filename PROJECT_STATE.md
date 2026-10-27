@@ -31,3 +31,8 @@ PR 리뷰, 팀 migration 번호 재확인, 홈 진입 UX 합의, 저사양 성�
 
 Research/DOROBUS_MyRoom_Inspection/experiments/DORO-MYROOM-IMPL-20261027-01/.
 업로드·재다운로드 체크섬 검증 결과는 실험 산출물의 동기화 receipt를 따른다. 결과 보관 여부를 확인하기 전에는 성공으로 추정하지 않는다. 운영 DB/계정 정보는 산출물에 포함하지 않는다.
+
+## 2026-10-28 Preview 재개
+
+미커밋 Preview와 사용자 패치를 work/preview-resume-backup-20261028에 보존했다. Mock 샘플/로컬 저장 및 5개 Preview 테스트를 유지했으며 타입 검사, 기존 geometry 4개 테스트, production build를 다시 통과했다. 환경변수 true인 production JS에서 샘플과 로컬 저장 키가 제거되는 것을 확인했다. 이어서 AuthProvider 없는 개발 전용 진입과 플레이어를 별도 커밋으로 진행한다.
+

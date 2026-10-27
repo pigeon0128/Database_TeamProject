@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAuth } from "../../../auth"
-import { api, ApiError, type CreatureEntry } from "../../../lib/api"
+import { api, ApiError } from "../../../lib/api"
 import { myroomApi } from "../api"
+import type { RoomArtwork } from "../artwork"
+import { myRoomPreviewEnabled } from "../preview/enabled"
 import type { RoomLayout, RoomState } from "../types"
 
-export function useMyRoom() {
+export function useMyRoom(preview = false) {
+  const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
   const { expire } = useAuth()
   const [layout, setLayout] = useState<RoomLayout>({ objects: [] })
   const [baseline, setBaseline] = useState(JSON.stringify({ objects: [] }))
   const [revision, setRevision] = useState(0),
-    [artworks, setArtworks] = useState<CreatureEntry[]>([])
+    [artworks, setArtworks] = useState<RoomArtwork[]>([])
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false)
   const [ready, setReady] = useState(false)
@@ -32,17 +35,26 @@ export function useMyRoom() {
     setLoading(true)
     setError("")
     try {
-      const [room, collection] = await Promise.all([
-        myroomApi.load(),
-        api.collection(),
-      ])
+      const source = isPreview
+        ? (await import("../preview/data")).createPreviewSource()
+        : null
+      const [room, collection] = source
+        ? [source.load(), source.artworks]
+        : await Promise.all([
+            myroomApi.load(),
+            api
+              .collection()
+              .then((c) =>
+                c.creatures.filter((a) => a.collected && a.imageKey),
+              ),
+          ])
       if (requestId !== generation.current) return
       if (room.schemaVersion !== 1)
         throw new Error("새 버전의 방이에요. 앱을 업데이트해 주세요.")
       setLayout(room.layout)
       setBaseline(JSON.stringify(room.layout))
       setRevision(room.revision)
-      setArtworks(collection.creatures.filter((a) => a.collected && a.imageKey))
+      setArtworks(collection)
       setSaved(false)
       setReady(true)
     } catch (e) {
@@ -50,7 +62,7 @@ export function useMyRoom() {
     } finally {
       if (requestId === generation.current) setLoading(false)
     }
-  }, [fail])
+  }, [fail, isPreview])
   useEffect(() => {
     void load()
     return () => {
@@ -73,7 +85,11 @@ export function useMyRoom() {
     setSaved(false)
     const snapshot = layout
     try {
-      const result = await myroomApi.save(snapshot, revision)
+      const result = isPreview
+        ? (await import("../preview/data"))
+            .createPreviewSource()
+            .save(snapshot, revision)
+        : await myroomApi.save(snapshot, revision)
       setRevision(result.revision)
       setBaseline(JSON.stringify(snapshot))
       setSaved(true)
@@ -86,7 +102,11 @@ export function useMyRoom() {
   }
   async function inspectConflict() {
     try {
-      setRemote(await myroomApi.load())
+      setRemote(
+        isPreview
+          ? (await import("../preview/data")).createPreviewSource().load()
+          : await myroomApi.load(),
+      )
     } catch (e) {
       fail(e)
     }

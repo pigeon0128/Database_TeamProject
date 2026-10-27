@@ -16,7 +16,7 @@ import {
   wallRotation,
   type Wall,
 } from "../../../../shared/myroom.js"
-import type { CreatureEntry } from "../../../lib/api"
+import type { RoomArtwork } from "../artwork"
 import type { Placement, RoomLayout, RoomObject } from "../types"
 import { createObject } from "../objects/createObject"
 import { createRoom } from "./room"
@@ -78,7 +78,7 @@ export function createRoomScene(
     shadows.setDarkness(0.3)
     const room = createRoom(scene)
     let layout: RoomLayout = { objects: [] },
-      artworks: CreatureEntry[] = [],
+      artworks: RoomArtwork[] = [],
       selected: string | null = null
     let placing: Placement | null = null,
       candidate: RoomObject | null = null
@@ -216,7 +216,7 @@ export function createRoomScene(
     return {
       sync(
         next: RoomLayout,
-        nextArtworks: CreatureEntry[],
+        nextArtworks: RoomArtwork[],
         nextSelected: string | null,
         nextPlacement: Placement | null,
       ) {

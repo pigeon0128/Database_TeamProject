@@ -3,14 +3,16 @@ import { CATALOG, MAX_OBJECTS } from "../../../shared/myroom.js"
 import { navigate } from "../../router"
 import MyRoomViewport from "./MyRoomViewport"
 import { useMyRoom } from "./hooks/useMyRoom"
+import { myRoomPreviewEnabled } from "./preview/enabled"
 import type { ObjectType, Placement, RoomObject } from "./types"
 import InventoryPanel from "./ui/InventoryPanel"
 import ArtworkPicker from "./ui/ArtworkPicker"
 import { Icon, Modal, ObjectThumbnail } from "./ui/RoomUI"
 import "./myroom.css"
 
-export default function MyRoomPage() {
-  const room = useMyRoom()
+export default function MyRoomPage({ preview = false }: { preview?: boolean }) {
+  const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
+  const room = useMyRoom(isPreview)
   const [panel, setPanel] = useState<"inventory" | "artwork" | "help" | null>(
     null,
   )
@@ -140,8 +142,12 @@ export default function MyRoomPage() {
       </nav>
       <header className="mr-topbar">
         <div>
-          <h1>마이룸</h1>
-          <span>나만의 작품을 전시하는 공간</span>
+          <h1>{isPreview ? "마이룸 Preview" : "마이룸"}</h1>
+          <span>
+            {isPreview
+              ? "샘플 작품 · 이 브라우저에만 저장 · DB 미사용"
+              : "나만의 작품을 전시하는 공간"}
+          </span>
         </div>
         <div className="mr-save-group">
           <span role="status" className={room.dirty ? "mr-unsaved" : ""}>
@@ -150,8 +156,12 @@ export default function MyRoomPage() {
               : room.dirty
                 ? "미저장 변경 사항"
                 : room.saved
-                  ? "저장 완료"
-                  : "저장된 방"}
+                  ? isPreview
+                    ? "로컬 저장 완료"
+                    : "저장 완료"
+                  : isPreview
+                    ? "Preview 로컬 저장"
+                    : "저장된 방"}
           </span>
           <button
             className="mr-primary"
@@ -320,6 +330,7 @@ export default function MyRoomPage() {
       )}
       {panel === "artwork" && selected?.type === "frame" && (
         <ArtworkPicker
+          preview={isPreview}
           artworks={room.artworks}
           current={selected.artworkDrawingId}
           onClose={() => setPanel(null)}

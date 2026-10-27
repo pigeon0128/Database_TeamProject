@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
-import type { CreatureEntry } from "../../lib/api"
+import type { RoomArtwork } from "./artwork"
 import type { Placement, RoomLayout, RoomObject } from "./types"
 import { createRoomScene } from "./engine/createScene"
 
 export default function MyRoomViewport(props: {
   layout: RoomLayout
-  artworks: CreatureEntry[]
+  artworks: RoomArtwork[]
   selected: string | null
   placement: Placement | null
   reset: number

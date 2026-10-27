@@ -1,4 +1,4 @@
-import { artworkUrl, type CreatureEntry } from "../../../lib/api"
+import { roomArtworkImage, type RoomArtwork } from "../artwork"
 import { creatureGuide } from "../../../data/creatures"
 import { Modal } from "./RoomUI"
 
@@ -7,8 +7,10 @@ export default function ArtworkPicker({
   current,
   onChoose,
   onClose,
+  preview = false,
 }: {
-  artworks: CreatureEntry[]
+  artworks: RoomArtwork[]
+  preview?: boolean
   current?: number
   onChoose: (id: number) => void
   onClose: () => void
@@ -20,8 +22,9 @@ export default function ArtworkPicker({
       className="mr-artwork-picker"
     >
       <p className="mr-policy">
-        내 도감의 완성 작품이에요. 새 최고 기록을 완성하면 전시 그림도 함께
-        갱신돼요.
+        {preview
+          ? "Preview 전용 Mock 작품이에요. 실제 도감·PostgreSQL 데이터가 아니며 이 브라우저에만 저장돼요."
+          : "내 도감의 완성 작품이에요. 새 최고 기록을 완성하면 전시 그림도 함께 갱신돼요."}
       </p>
       {artworks.length ? (
         <div className="mr-artwork-grid">
@@ -37,7 +40,7 @@ export default function ArtworkPicker({
                   <img src={creatureGuide(a.slug)!} alt="" className="guide" />
                 )}
                 <img
-                  src={artworkUrl(a.imageKey!)}
+                  src={roomArtworkImage(a)}
                   alt={a.name}
                   onError={(e) => {
                     e.currentTarget.style.visibility = "hidden"

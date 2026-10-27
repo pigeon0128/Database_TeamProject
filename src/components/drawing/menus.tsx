@@ -2,18 +2,18 @@
 // 단축키 표시는 사용자가 바꾼 키(tools.keys)를 따른다.
 import { Kbd, ToolbarButton, ToolbarMenu } from "../toolbar";
 import { comboKeys, comboText, SHORTCUT_ACTIONS, SHORTCUT_LABELS, type ShortcutMap } from "../../lib/drawing/shortcuts";
-import { BRUSH_MAX_SIZE, MIN_SIZE, type DrawingTools } from "./useDrawingTools";
+import { BRUSH_MAX_SIZE, type DrawingTools } from "./useDrawingTools";
 
 /** 툴바의 굵기 메뉴: 누르면 굵기 조절 바가 나온다 */
 export function SizeMenu({ tools }: { tools: DrawingTools }) {
-  const { size, sizeMax, erase, keys } = tools;
-  const name = erase ? "지우개" : "브러쉬";
+  const { size, sizeMax, erase, painting, keys } = tools;
+  const name = erase ? "지우개" : painting ? "색칠 붓" : "브러쉬";
   return (
     <ToolbarMenu
       title={`${name} 굵기`}
       label={
         <>
-          <span className="inline-block rounded-full bg-ink" style={{ width: 4 + size / 2, height: 4 + size / 2 }} aria-hidden="true" />
+          <span className="inline-block rounded-full bg-ink" style={{ width: 4 + Math.min(size, 24) / 2, height: 4 + Math.min(size, 24) / 2 }} aria-hidden="true" />
           굵기 {size}
         </>
       }
@@ -29,13 +29,13 @@ export function SizeMenu({ tools }: { tools: DrawingTools }) {
           </span>
           <input
             type="range"
-            min={MIN_SIZE}
+            min={tools.sizeMin}
             max={sizeMax}
             value={size}
             onChange={(e) => tools.setSize(Number(e.target.value))}
             className="mt-2 w-full accent-sky-deep"
           />
-          {!erase && sizeMax < BRUSH_MAX_SIZE && (
+          {!erase && !painting && sizeMax < BRUSH_MAX_SIZE && (
             <span className="mt-1 block text-xs font-medium text-ink-muted">흰 선 두께에 맞춰 브러쉬는 {sizeMax}까지만 굵게 할 수 있어요.</span>
           )}
         </label>

@@ -4,11 +4,12 @@
 // - loadDraft, draftKeys: 불러오기 / 그리던 그림 목록
 // - useDrawingDraft: 그리기 화면에서 자동 저장·이어 그리기를 맡는 훅
 import { useCallback, useEffect, useRef, useState } from "react";
-import { visibleStrokes, type DrawAction, type Stroke } from "./drawing/strokes";
+import { visibleActions, type DrawAction, type PaintStroke, type Stroke } from "./drawing/strokes";
 import { api } from "./api";
 
 export type Draft = {
-  strokes: Stroke[];
+  /** 펜 획과 색칠 획 (그린 순서대로) */
+  strokes: (Stroke | PaintStroke)[];
   /** 마지막으로 저장한 시각 (ms) */
   savedAt: number;
   /** 캐릭터 이름 등 그림에 딸린 값 */
@@ -18,11 +19,16 @@ export type Draft = {
 /** 저장 용량을 줄이려고 좌표를 소수 첫째 자리까지만 남긴다 (화면에서는 차이가 없다). */
 const round = (v: number) => Math.round(v * 10) / 10;
 
-const compactStrokes = (strokes: Stroke[]): Stroke[] =>
+const compactStrokes = (strokes: (Stroke | PaintStroke)[]): (Stroke | PaintStroke)[] =>
   strokes.map((s) => ({ ...s, points: s.points.map(([x, y]) => [round(x), round(y)]) }));
 
-const isStroke = (s: unknown): s is Stroke =>
-  !!s && typeof s === "object" && (s as Stroke).type === "stroke" && Array.isArray((s as Stroke).points) && (s as Stroke).points.length > 0;
+/** 펜 획(stroke)이나 색칠 획(paint) */
+const isStroke = (s: unknown): s is Stroke | PaintStroke =>
+  !!s &&
+  typeof s === "object" &&
+  ["stroke", "paint"].includes((s as Stroke).type) &&
+  Array.isArray((s as Stroke).points) &&
+  (s as Stroke).points.length > 0;
 
 /** 저장된 그림. 없거나 깨졌으면 null. 서버에 연결하지 못하면 예외를 던진다. */
 async function loadDraft(key: string): Promise<Draft | null> {
@@ -99,7 +105,7 @@ export function useDrawingDraft(
     ({ keepalive = false } = {}) => {
       const { actions, name, pending, loaded } = latest.current;
       if (!loaded || pending || finished.current) return;
-      const strokes = compactStrokes(visibleStrokes(actions));
+      const strokes = compactStrokes(visibleActions(actions));
       const body = strokes.length ? JSON.stringify({ strokes, name: name ?? null }) : "";
       if (body === lastSent.current) return;
       const previous = lastSent.current;

@@ -188,6 +188,22 @@ FROM (VALUES
 JOIN creature_profiles p ON p.slug = v.slug
 ON CONFLICT DO NOTHING;
 
+-- 색칠하기의 특수 브러쉬와 가격(셀) (migrations/018). slug 는 앱의 무늬 이름(src/lib/drawing/brushPatterns.ts)과 맞춘다.
+-- 가격은 임시 값이다. 이미 있는 브러쉬는 건너뛰므로, 가격을 바꾸려면 UPDATE 를 따로 쓴다.
+INSERT INTO special_brushes (slug, name, price, brush_order)
+VALUES
+    ('wave', '물결', 100, 1),
+    ('hearts', '하트', 100, 2),
+    ('stars', '별', 100, 3),
+    ('rainbow', '무지개', 100, 4),
+    ('leaf', '나뭇잎', 100, 5),
+    ('flower', '꽃', 100, 6),
+    ('clouds', '구름', 100, 7),
+    ('strawberries', '딸기', 100, 8),
+    ('butterflies', '나비', 100, 9),
+    ('rose', '장미', 100, 10)
+ON CONFLICT DO NOTHING;
+
 -- 번호를 직접 넣었으므로, 다음에 자동으로 붙일 번호를 가장 큰 번호 뒤로 맞춘다.
 SELECT setval(pg_get_serial_sequence('chapters', 'chapter_id'), (SELECT MAX(chapter_id) FROM chapters));
 SELECT setval(pg_get_serial_sequence('drawings', 'drawing_id'), (SELECT MAX(drawing_id) FROM drawings));

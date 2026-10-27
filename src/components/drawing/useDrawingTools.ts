@@ -1,11 +1,33 @@
 // 그리기 상태 훅 (스토리 장면, 캐릭터 그리기 공용): 굵기·지우개·획 목록·되돌리기 상태를 관리하고 키보드 단축키를 등록한다.
 // 단축키는 사용자가 설정 화면에서 바꾼 키를 쓴다 (lib/drawing/shortcuts.ts, 저장은 lib/userSettings).
-// 선화 연습이 목적이라 색은 검정 하나만 쓴다. 굵기·손떨림 보정·선 끝 얇게는 저장해 두고 다음에도 이어 쓴다 (lib/userSettings).
+// 펜(따라 그리기 선)은 검정 하나만 쓴다. 굵기·손떨림 보정·선 끝 얇게는 저장해 두고 다음에도 이어 쓴다 (lib/userSettings).
+// 밑그림을 구역으로 나눈 화면(paintable)에서는 색칠 붓과 특수 브러쉬도 고를 수 있다 (색칠은 채점하지 않는다).
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { actionForEvent, resolveShortcuts } from "../../lib/drawing/shortcuts";
-import { visibleStrokes, type DrawAction, type Stroke } from "../../lib/drawing/strokes";
+import { visibleActions, type DrawAction, type PaintStroke, type Stroke } from "../../lib/drawing/strokes";
 import { useSavedSetting } from "../../lib/userSettings";
-import type { TracingCanvasHandle } from "../TracingCanvas";
+import type { PaintBrush, TracingCanvasHandle } from "../TracingCanvas";
+
+/** 일반 색칠 붓의 색. 누구나 쓰는 색 값이라 DB에 두지 않는다 */
+export const BASIC_COLORS = [
+  { name: "빨강", color: "#e9474e" },
+  { name: "주황", color: "#f28c48" },
+  { name: "노랑", color: "#f6ce4c" },
+  { name: "초록", color: "#65bd79" },
+  { name: "파랑", color: "#3689e7" },
+  { name: "남색", color: "#3b4aa8" },
+  { name: "보라", color: "#8a55c8" },
+  { name: "분홍", color: "#f277aa" },
+  { name: "갈색", color: "#9a6a43" },
+  { name: "검정", color: "#363636" },
+  { name: "흰색", color: "#ffffff" },
+];
+/** 색칠 붓 굵기 범위 (캔버스 픽셀). 구역을 넓게 칠하므로 펜보다 훨씬 굵다 */
+export const PAINT_MIN_SIZE = 10;
+export const PAINT_MAX_SIZE = 120;
+
+/** 고른 브러쉬: 펜(따라 그리기 선), 색칠 붓(단색), 또는 특수 브러쉬 무늬 이름 (DB special_brushes.slug) */
+export type BrushChoice = "pen" | "color" | (string & {});
 
 /** 펜 색 (검정 고정) */
 const INK_COLOR = "#363636";
@@ -24,10 +46,16 @@ const SIZE_STEP = 2;
  * brushScale: 실제로 그려지는 굵기 = 굵기 설정 × brushScale (밑그림의 흰 선 두께에 맞춘다, scenes.ts). 화면에 보이는 굵기 숫자는 그대로다.
  * fade: false면 선 끝 얇게를 쓰지 않는다 (따라 그리기: 선 끝이 뾰족하면 짧게 끊어 그린 털선이 서로 안 겹쳐 감점을 피해 간다).
  *       저장된 선 끝 얇게 값은 그대로 두므로 캐릭터 그리기에서는 계속 쓴다.
+ * paintable: 색칠 붓·특수 브러쉬를 쓸 수 있는 화면인지 (밑그림을 구역으로 나눈 스토리·도감 그리기)
  */
 export function useDrawingTools(
   canvasRef: RefObject<TracingCanvasHandle | null>,
-  { maxBrushSize = BRUSH_MAX_SIZE, fade: fadeEnabled = true, brushScale = 1 }: { maxBrushSize?: number; fade?: boolean; brushScale?: number } = {},
+  {
+    maxBrushSize = BRUSH_MAX_SIZE,
+    fade: fadeEnabled = true,
+    brushScale = 1,
+    paintable = false,
+  }: { maxBrushSize?: number; fade?: boolean; brushScale?: number; paintable?: boolean } = {},
 ) {
   const [actions, setActions] = useState<DrawAction[]>([]);
   const [redoStack, setRedoStack] = useState<DrawAction[]>([]);
@@ -38,15 +66,38 @@ export function useDrawingTools(
   const [savedShortcuts] = useSavedSetting("shortcuts");
   const keys = useMemo(() => resolveShortcuts(savedShortcuts), [savedShortcuts]);
   const [erase, setErase] = useState(false);
+  const [brush, setBrushState] = useState<BrushChoice>("pen");
+  const [paintColor, setPaintColor] = useState(BASIC_COLORS[0].color);
+  // 색칠 붓 굵기는 펜과 범위가 달라 따로 둔다 (DB 설정에는 저장하지 않는다)
+  const [paintSize, setPaintSize] = useState(40);
+  /** 지금 색칠 중인지 (펜·지우개가 아님) */
+  const painting = paintable && brush !== "pen" && !erase;
 
-  // 브러쉬와 지우개가 굵기를 같이 쓰므로, 저장된 값은 두고 쓸 때만 상한으로 자른다.
-  const sizeMax = erase ? ERASER_MAX_SIZE : Math.min(BRUSH_MAX_SIZE, maxBrushSize);
-  const size = Math.min(rawSize, sizeMax);
-  const setSize = useCallback((v: number) => setRawSize(Math.max(MIN_SIZE, Math.min(sizeMax, v))), [sizeMax]);
+  /** 브러쉬를 고르면 지우개를 끈다 */
+  const setBrush = useCallback((next: BrushChoice) => {
+    setBrushState(next);
+    setErase(false);
+  }, []);
 
-  const hasDrawing = visibleStrokes(actions).length > 0;
+  // 브러쉬와 지우개가 굵기를 같이 쓰므로, 저장된 값은 두고 쓸 때만 상한으로 자른다. 색칠 붓은 따로 쓴다.
+  const sizeMin = painting ? PAINT_MIN_SIZE : MIN_SIZE;
+  const sizeMax = painting ? PAINT_MAX_SIZE : erase ? ERASER_MAX_SIZE : Math.min(BRUSH_MAX_SIZE, maxBrushSize);
+  const size = painting ? paintSize : Math.min(rawSize, sizeMax);
+  const setSize = useCallback(
+    (v: number) => {
+      const next = Math.max(sizeMin, Math.min(sizeMax, v));
+      if (painting) setPaintSize(next);
+      else setRawSize(next);
+    },
+    [sizeMin, sizeMax, painting],
+  );
 
-  const addStroke = useCallback((stroke: Stroke) => {
+  /** 펜 선이나 색이 하나라도 보이는지 (전체 지우기·저장) */
+  const hasDrawing = visibleActions(actions).length > 0;
+
+  const paintBrush: PaintBrush | null = painting ? { pattern: brush === "color" ? null : brush, color: paintColor, size: paintSize } : null;
+
+  const addStroke = useCallback((stroke: Stroke | PaintStroke) => {
     setActions((prev) => [...prev, stroke]);
     setRedoStack([]);
   }, []);
@@ -100,8 +151,15 @@ export function useDrawingTools(
 
   return {
     size,
+    sizeMin,
     sizeMax,
     erase,
+    paintable,
+    painting,
+    brush,
+    setBrush,
+    paintColor,
+    setPaintColor,
     smoothing,
     fade,
     fadeEnabled,
@@ -125,6 +183,7 @@ export function useDrawingTools(
       fade: fadeEnabled ? fade * FADE_PX_PER_STEP : 0,
       actions,
       onStrokeEnd: addStroke,
+      paintBrush,
     },
   };
 }

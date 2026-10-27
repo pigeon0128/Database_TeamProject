@@ -1,5 +1,5 @@
 // API 서버(server/, 경로별 코드는 server/routes/) 호출. 개발 중에는 Vite가 /api 요청을 API 서버로 넘긴다.
-import type { Stroke } from "./drawing/strokes";
+import type { PaintStroke, Stroke } from "./drawing/strokes";
 
 export type User = { id: number; loginId: string };
 
@@ -12,6 +12,20 @@ export type Drawing = {
   /** 도감 생물이면 분류(DB creature_profiles.category), 스토리 장면이면 null */
   category: "animal" | "plant" | "object" | null;
 };
+
+/** 색칠하기 특수 브러쉬 (DB special_brushes). 무늬는 앱이 slug 로 그린다 (lib/drawing/brushPatterns.ts) */
+export type SpecialBrush = {
+  id: number;
+  slug: string;
+  name: string;
+  /** 가격 (셀) */
+  price: number;
+  /** 내가 산 브러쉬인지 (DB user_brushes 에 행이 있음). 산 브러쉬만 쓸 수 있다 */
+  owned: boolean;
+};
+
+/** 내 셀(DB users.cells)과 특수 브러쉬 목록 */
+export type BrushState = { cells: number; brushes: SpecialBrush[] };
 
 /** 그리기 설정 (DB user_settings 한 행과 같은 모양. 값 범위는 서버 readSettings, DB CHECK 와 같다) */
 export type DrawingSettings = {
@@ -109,6 +123,10 @@ export const api = {
   changePassword: (loginId: string, currentPassword: string, newPassword: string) =>
     request<{ ok: true }>("POST", "/auth/password", { loginId, currentPassword, newPassword }),
   drawings: () => request<{ drawings: Drawing[] }>("GET", "/drawings"),
+  /** 내 셀과 색칠하기 특수 브러쉬 목록 (순서대로, 산 것인지 함께) */
+  specialBrushes: () => request<BrushState>("GET", "/brushes"),
+  /** 특수 브러쉬를 셀로 산다. 셀이 부족하거나 이미 샀으면 400. 산 뒤의 셀과 목록을 돌려준다 */
+  buyBrush: (slug: string) => request<BrushState>("POST", `/brushes/${encodeURIComponent(slug)}/purchase`),
   /** image: 완성 그림 (PNG data URL). 이번 기록이 내 최고 기록일 때만 저장되고(isBest), 이전 최고 기록의 그림은 지워진다 */
   savePlayRecord: (drawingId: number, similarityScore: number, durationMs: number, image: string | null) =>
     request<{ recordId: number; playedAt: string; isBest: boolean; imageKey: string | null }>("POST", "/play-records", { drawingId, similarityScore, durationMs, image }),
@@ -122,8 +140,8 @@ export const api = {
   drafts: () => request<{ drafts: { key: string; savedAt: string; strokeCount: number }[] }>("GET", "/drafts"),
   /** 없으면 draft: null */
   getDraft: (key: string) =>
-    request<{ draft: { strokes: Stroke[]; name: string | null; savedAt: string } | null }>("GET", `/drafts/${encodeURIComponent(key)}`),
-  saveDraft: (key: string, strokes: Stroke[], name: string | undefined, opts?: { keepalive?: boolean }) =>
+    request<{ draft: { strokes: (Stroke | PaintStroke)[]; name: string | null; savedAt: string } | null }>("GET", `/drafts/${encodeURIComponent(key)}`),
+  saveDraft: (key: string, strokes: (Stroke | PaintStroke)[], name: string | undefined, opts?: { keepalive?: boolean }) =>
     request<{ savedAt: string }>("PUT", `/drafts/${encodeURIComponent(key)}`, { strokes, name: name ?? null }, opts),
   /** 생물 도감 목록과 내 수집 현황 */
   collection: () => request<{ creatures: CreatureEntry[] }>("GET", "/collection"),

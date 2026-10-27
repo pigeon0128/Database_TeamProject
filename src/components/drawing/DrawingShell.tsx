@@ -1,15 +1,33 @@
 // 그리기 화면 틀: 위 툴바 / 왼쪽 도구 막대(브러쉬·지우개) + 가운데 그림판 (+ 오른쪽 정보 패널) / 아래 상태 막대.
-import type { ReactNode } from "react";
+// 색칠할 수 있는 화면(tools.paintable)에서는 브러쉬 버튼을 누르면 브러쉬 패널(BrushPanel)이 옆으로 펼쳐진다.
+import { useCallback, useState, type ReactNode } from "react";
 import { comboText } from "../../lib/drawing/shortcuts";
 import { navigate } from "../../router";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
+import { BrushPanel } from "./BrushPanel";
 import type { DrawingTools } from "./useDrawingTools";
 
 /** 왼쪽에 떠 있는 도구 막대의 버튼 */
-function RailButton({ active, onClick, label, shortcut, children }: { active: boolean; onClick: () => void; label: string; shortcut: string; children: ReactNode }) {
+function RailButton({
+  active,
+  onClick,
+  label,
+  shortcut,
+  children,
+  toggle,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  shortcut: string;
+  children: ReactNode;
+  /** 브러쉬 패널을 여닫는 버튼 (패널의 "바깥 누르면 닫기"에서 뺀다) */
+  toggle?: boolean;
+}) {
   return (
     <button
       type="button"
+      data-brush-toggle={toggle || undefined}
       onClick={onClick}
       aria-pressed={active}
       title={`${label} (${shortcut})`}
@@ -48,6 +66,8 @@ type DrawingShellProps = {
  *   아래: 상태 막대 (점수, 도움말 등)
  */
 export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, footer, aside, children }: DrawingShellProps) {
+  const [brushPanel, setBrushPanel] = useState(false);
+  const closeBrushPanel = useCallback(() => setBrushPanel(false), []);
   return (
     // 흰 바탕에 옅은 회색 점무늬(화이트보드 느낌), 그 위에 반투명 흰 카드와 진한 글자
     <div
@@ -64,10 +84,24 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
       </header>
 
       <div className="flex min-h-0 flex-1 gap-3">
-        <nav aria-label="그리기 도구" className="flex flex-col gap-1 self-start rounded-3xl border border-white/90 bg-white/76 p-1.5 shadow-card backdrop-blur-sm">
-          <RailButton label="브러쉬" shortcut={comboText(tools.keys.brush)} active={!tools.erase} onClick={() => tools.setErase(false)}>
+        <nav
+          aria-label="그리기 도구"
+          className="relative z-20 flex flex-col gap-1 self-start rounded-3xl border border-white/90 bg-white/76 p-1.5 shadow-card backdrop-blur-sm"
+        >
+          {/* 색칠할 수 있는 화면에서는 브러쉬 버튼을 누르면 옆으로 브러쉬 패널이 펼쳐진다 */}
+          <RailButton
+            label="브러쉬"
+            toggle
+            shortcut={comboText(tools.keys.brush)}
+            active={!tools.erase}
+            onClick={() => {
+              tools.setErase(false);
+              if (tools.paintable) setBrushPanel((open) => !open);
+            }}
+          >
             🖌️
           </RailButton>
+          {brushPanel && <BrushPanel tools={tools} onClose={closeBrushPanel} />}
           <RailButton label="지우개" shortcut={comboText(tools.keys.eraser)} active={tools.erase} onClick={() => tools.setErase(true)}>
             🧽
           </RailButton>

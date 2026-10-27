@@ -2,8 +2,16 @@
 // - 밑그림 이미지를 아래에 깔고, 그 위 투명 캔버스에 사용자의 획을 그린다.
 // - 획은 점 배열(Stroke)로 저장해 두고, 되돌리기 등으로 목록이 바뀌면 처음부터 다시 그린다.
 // - 손떨림 보정, 시작·끝 흐리기(Fade), 확대/이동(마우스 휠로 확대, 오른쪽 버튼 드래그로 이동, 터치는 두 손가락), 이미지 내보내기를 담당한다.
+// - 색칠(regions 가 있는 밑그림): 밑그림과 펜 선 사이의 색칠 층에 색·무늬를 칠한다. 붓을 댄 구역 안에만 칠해진다 (lib/drawing/paint.ts).
+//   색칠 층 위에 밑그림의 선만 다시 덮어서 칠해도 따라 그릴 흰 선이 보인다. 채점은 펜 선 캔버스만 읽으므로 색칠은 점수에 영향이 없다.
+//   층 순서: 밑그림 → 색칠 → 밑그림 선 → 펜 선
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { taper, visibleStrokes, type DrawAction, type Point, type Stroke } from "../lib/drawing/strokes";
+import { applyClipped, drawMarks, makeCanvas, regionOf, renderPaint } from "../lib/drawing/paint";
+import type { Region, Regions } from "../lib/drawing/regions";
+import { taper, visibleActions, visibleStrokes, type DrawAction, type PaintStroke, type Point, type Stroke } from "../lib/drawing/strokes";
+
+/** 색칠 브러쉬 (null 이면 펜) */
+export type PaintBrush = Pick<PaintStroke, "pattern" | "color" | "size">;
 
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */
@@ -30,7 +38,12 @@ type Props = {
   /** 시작·끝 흐리기 길이(캔버스 픽셀) */
   fade: number;
   actions: DrawAction[];
-  onStrokeEnd: (stroke: Stroke) => void;
+  /** 펜 획이나 색칠 획을 다 그었을 때 */
+  onStrokeEnd: (stroke: Stroke | PaintStroke) => void;
+  /** 색칠할 구역 (밑그림을 나눈 것). 없으면 색칠하지 않는다 (캐릭터 그리기) */
+  regions?: Regions | null;
+  /** 고른 색칠 브러쉬. null 이면 펜으로 그린다 (지우개일 때는 무시) */
+  paintBrush?: PaintBrush | null;
   /** 획을 긋기 시작할 때 (타이머용) */
   onStrokeStart?: () => void;
   /** 획 목록이 바뀌어 다시 그린 뒤 호출 (획을 다 그었을 때, 되돌리기·지우기 등) (채점용) */
@@ -106,17 +119,27 @@ const MAX_ZOOM = 6;
 const ZOOM_STEP = 1.25;
 
 type View = { z: number; tx: number; ty: number };
-type Mode = "none" | "draw" | "pan" | "pinch" | "blocked";
+type Mode = "none" | "draw" | "paint" | "pan" | "pinch" | "blocked";
+
+/** 그리는 중인 색칠 획: 붓 자국(marks)과 구역으로 자른 결과(clip) 캔버스, 이미 그린 점 수 */
+type LivePaint = { stroke: PaintStroke; region: Region; marks: HTMLCanvasElement; clip: HTMLCanvasElement; drawn: number };
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
-  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onStrokeStart, onChange, onDrawing },
+  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onStrokeStart, onChange, onDrawing, regions, paintBrush },
   ref,
 ) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const guideRef = useRef<HTMLImageElement>(null);
+  /** 색칠 층 (보이는 캔버스)과 밑그림 선 층 */
+  const paintRef = useRef<HTMLCanvasElement>(null);
+  const linesRef = useRef<HTMLCanvasElement>(null);
+  /** 다 그은 색칠 획만 모은 캔버스 (그리는 중에는 여기에 이번 획을 겹쳐 보여 준다) */
+  const paintDone = useRef<HTMLCanvasElement | null>(null);
+  const livePaint = useRef<LivePaint | null>(null);
+  const paintFrame = useRef(0);
   const current = useRef<Stroke | null>(null);
   /** 그리는 중인 획의 누적 길이 */
   const dists = useRef<number[]>([0]);
@@ -172,6 +195,61 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
 
   useEffect(redraw, [redraw]);
 
+  /** 보이는 색칠 층. 지우개가 남긴 지우기 모드(destination-out)를 되돌려 놓고 준다 */
+  const paintDisplay = () => {
+    const ctx = paintRef.current!.getContext("2d")!;
+    ctx.globalCompositeOperation = "source-over";
+    return ctx;
+  };
+
+  // 밑그림 선 층은 구역을 나눌 때 한 번 그린다
+  useEffect(() => {
+    if (regions && linesRef.current) linesRef.current.getContext("2d")!.drawImage(regions.lines, 0, 0);
+  }, [regions]);
+
+  // 색칠 층: 획 목록이 바뀌면 처음부터 다시 그린다 (되돌리기·지우기·이어 그리기 불러오기 포함)
+  useEffect(() => {
+    if (!regions || !paintRef.current) return;
+    paintDone.current ??= makeCanvas(width, height);
+    renderPaint(paintDone.current.getContext("2d")!, visibleActions(actions), regions);
+    const ctx = paintDisplay();
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(paintDone.current, 0, 0);
+  }, [actions, regions, width, height]);
+
+  useEffect(() => () => cancelAnimationFrame(paintFrame.current), []);
+
+  /** 그리는 중인 색칠 획: 그 구역 사각형만 (다 그은 색 + 이번 획)으로 다시 그린다 */
+  const paintLive = () => {
+    paintFrame.current = 0;
+    const live = livePaint.current;
+    if (!live || !paintRef.current || !paintDone.current) return;
+    const { stroke, region: r, marks, clip } = live;
+    drawMarks(marks, stroke, r, live.drawn);
+    live.drawn = stroke.points.length;
+    const ctx = paintDisplay();
+    ctx.clearRect(r.x, r.y, r.w, r.h);
+    ctx.drawImage(paintDone.current, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    applyClipped(ctx, marks, clip, r);
+  };
+  const schedulePaint = () => {
+    if (!paintFrame.current) paintFrame.current = requestAnimationFrame(paintLive);
+  };
+  /** 그리던 색칠 획을 버린다 (두 손가락 확대가 시작될 때) */
+  const cancelPaint = () => {
+    const live = livePaint.current;
+    if (!live) return;
+    livePaint.current = null;
+    cancelAnimationFrame(paintFrame.current);
+    paintFrame.current = 0;
+    const { x, y, w, h } = live.region;
+    const ctx = paintDisplay();
+    ctx.clearRect(x, y, w, h);
+    ctx.drawImage(paintDone.current!, x, y, w, h, x, y, w, h);
+  };
+  /** 지우개는 펜 선과 함께 색도 지운다: 그리는 동안 색칠 층에도 같은 자국을 낼 캔버스 (색칠이 없으면 null) */
+  const paintEraseCtx = () => (regions && paintRef.current ? paintRef.current.getContext("2d")! : null);
+
   useImperativeHandle(ref, () => ({
     exportImage(withGuide) {
       const canvas = canvasRef.current;
@@ -186,6 +264,10 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
         ctx.globalAlpha = guideOpacity;
         ctx.drawImage(guideRef.current, 0, 0, width, height);
         ctx.globalAlpha = 1;
+      }
+      if (regions && paintDone.current) {
+        ctx.drawImage(paintDone.current, 0, 0);
+        if (withGuide) ctx.drawImage(regions.lines, 0, 0);
       }
       ctx.drawImage(canvas, 0, 0);
       return out.toDataURL("image/png");
@@ -251,7 +333,14 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       if (current.current) {
         current.current = null;
         redraw();
+        // 지우개였으면 색칠 층에 낸 자국도 되돌린다
+        if (paintDone.current && paintRef.current) {
+          const ctx = paintDisplay();
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(paintDone.current, 0, 0);
+        }
       }
+      cancelPaint();
       mode.current = "pinch";
       gesture.current = { view: viewRef.current, ...pinchInfo() };
       return;
@@ -268,10 +357,22 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     }
     if (e.button !== 0) return;
 
+    const start = toCanvasPoint(e);
+    // 색칠: 붓을 댄 자리의 구역을 정하고, 붓을 뗄 때까지 그 구역 안에만 칠한다. 선 위에서 멀리 떨어진 곳이면 칠하지 않는다.
+    if (regions && paintBrush && !erase) {
+      const stroke: PaintStroke = { type: "paint", ...paintBrush, points: [start] };
+      const region = regionOf(regions, stroke.points);
+      if (!region) return;
+      mode.current = "paint";
+      onStrokeStart?.();
+      livePaint.current = { stroke, region, marks: makeCanvas(region.w, region.h), clip: makeCanvas(region.w, region.h), drawn: 0 };
+      schedulePaint();
+      return;
+    }
+
     mode.current = "draw";
     onStrokeStart?.();
     const ctx = getCtx(e.currentTarget);
-    const start = toCanvasPoint(e);
     const stroke: Stroke = { type: "stroke", color, size, erase, fade, points: [start] };
     current.current = stroke;
     dists.current = [0];
@@ -279,6 +380,11 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     rawLast.current = start;
     applyStyle(ctx, stroke);
     drawDot(ctx, start, size * taper(0, Infinity, fade));
+    const paintCtx = erase ? paintEraseCtx() : null;
+    if (paintCtx) {
+      applyStyle(paintCtx, stroke);
+      drawDot(paintCtx, start, size * taper(0, Infinity, fade));
+    }
   };
 
   /** 보정된 점 p를 획에 붙이고 그 구간을 바로 그린다. 너무 가까운 점은 건너뛴다. */
@@ -291,7 +397,13 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     pts.push(p);
     dists.current.push(dists.current[dists.current.length - 1] + step);
     const i = pts.length - 1;
-    drawSegment(ctx, pts, i, stroke.size * taper(dists.current[i - 1], Infinity, stroke.fade));
+    const w = stroke.size * taper(dists.current[i - 1], Infinity, stroke.fade);
+    drawSegment(ctx, pts, i, w);
+    const paintCtx = stroke.erase ? paintEraseCtx() : null;
+    if (paintCtx) {
+      applyStyle(paintCtx, stroke);
+      drawSegment(paintCtx, pts, i, w);
+    }
   };
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -313,6 +425,20 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       return;
     }
 
+    const live = livePaint.current;
+    if (mode.current === "paint" && live) {
+      // 색칠은 손떨림 보정 없이 그대로 따라간다 (구역 안에서 칠하는 것이라 흔들려도 괜찮다)
+      const pts = live.stroke.points;
+      const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
+      for (const ev of events.length ? events : [e.nativeEvent]) {
+        const p = toCanvasPoint(ev);
+        const last = pts[pts.length - 1];
+        if (Math.hypot(p[0] - last[0], p[1] - last[1]) >= 1) pts.push(p);
+      }
+      schedulePaint();
+      return;
+    }
+
     const stroke = current.current;
     if (mode.current !== "draw" || !stroke) return;
     const ctx = getCtx(e.currentTarget);
@@ -331,6 +457,14 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
 
   const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     pointers.current.delete(e.pointerId);
+    const live = livePaint.current;
+    if (mode.current === "paint" && live) {
+      cancelAnimationFrame(paintFrame.current);
+      paintLive();
+      livePaint.current = null;
+      // 목록에 넣으면 색칠 층을 다시 그리는 효과가 다 그은 색에 이 획을 더한다
+      onStrokeEnd(live.stroke);
+    }
     const stroke = current.current;
     if (mode.current === "draw" && stroke) {
       current.current = null;
@@ -364,6 +498,19 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
             className="pointer-events-none absolute inset-0 h-full w-full select-none transition-opacity"
             style={{ opacity: showGuide ? guideOpacity : 0 }}
           />
+        )}
+        {regions && (
+          <>
+            <canvas ref={paintRef} width={width} height={height} className="pointer-events-none absolute inset-0 h-full w-full" />
+            {/* 색 위에 밑그림의 선만 다시 덮는다 (밑그림 보이기·진하기를 따른다) */}
+            <canvas
+              ref={linesRef}
+              width={width}
+              height={height}
+              className="pointer-events-none absolute inset-0 h-full w-full transition-opacity"
+              style={{ opacity: showGuide ? guideOpacity : 0 }}
+            />
+          </>
         )}
         <canvas
           ref={canvasRef}

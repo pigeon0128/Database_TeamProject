@@ -3,6 +3,7 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { comboText } from "../../lib/drawing/shortcuts";
 import { navigate } from "../../router";
+import DorobusBackdrop from "../DorobusBackdrop";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
 import { BrushPanel } from "./BrushPanel";
 import { DrawingCoach, type CoachMode } from "./DrawingCoach";
@@ -91,11 +92,15 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
   return (
     // 흰 바탕에 옅은 회색 점무늬(화이트보드 느낌), 그 위에 반투명 흰 카드와 진한 글자
     <div
-      className="relative flex h-dvh flex-col gap-3 overflow-hidden bg-white p-3 text-ink"
-      style={{ backgroundImage: "radial-gradient(#d4d4d4 1px, transparent 1.2px)", backgroundSize: "12px 12px" }}
+      className="relative flex h-dvh flex-col gap-3 overflow-hidden bg-[#eef7ff] p-3 text-ink"
     >
+      <DorobusBackdrop />
       <DrawingSceneDecor mode={backgroundScene} />
       <header className="relative z-30 flex flex-wrap items-center gap-1 rounded-3xl border border-white/90 bg-white/76 px-2 py-1.5 shadow-card backdrop-blur-sm">
+        <button type="button" onClick={() => navigate("/studio")} aria-label="AI 화실" className="mr-1 flex items-center gap-1 px-1 text-lg font-black tracking-[-0.04em] text-[#64a5ff] sm:px-2">
+          <span className="text-xl">💨</span><span className="hidden xl:inline">DOROBUS</span>
+        </button>
+        <ToolbarDivider />
         <ToolbarButton title={back.label} onClick={() => navigate(back.path)}>
           ← <span className="hidden sm:inline">{back.label}</span>
         </ToolbarButton>

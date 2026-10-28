@@ -5,6 +5,8 @@ import { comboText } from "../../lib/drawing/shortcuts";
 import { navigate } from "../../router";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
 import { BrushPanel } from "./BrushPanel";
+import { DrawingCoach, type CoachMode } from "./DrawingCoach";
+import DrawingSceneDecor, { type DrawingSceneDecorMode } from "./DrawingSceneDecor";
 import type { DrawingTools } from "./useDrawingTools";
 
 /** 왼쪽에 떠 있는 도구 막대의 버튼 */
@@ -71,6 +73,10 @@ type DrawingShellProps = {
   aside?: ReactNode;
   /** 그림판 (TracingCanvas) */
   children: ReactNode;
+  /** 기능과 점수 규칙을 단계별로 설명하는 안내 캐릭터 */
+  coachMode?: CoachMode;
+  /** 도화지 바깥의 Dorobus 캐릭터 배경 */
+  backgroundScene?: DrawingSceneDecorMode;
 };
 
 /**
@@ -79,15 +85,16 @@ type DrawingShellProps = {
  *   가운데: 왼쪽 도구 막대(브러쉬/지우개) + 남은 공간을 꽉 채우는 그림판
  *   아래: 상태 막대 (점수, 도움말 등)
  */
-export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, footer, aside, children }: DrawingShellProps) {
+export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, footer, aside, children, coachMode, backgroundScene = "free" }: DrawingShellProps) {
   const [brushPanel, setBrushPanel] = useState(false);
   const closeBrushPanel = useCallback(() => setBrushPanel(false), []);
   return (
     // 흰 바탕에 옅은 회색 점무늬(화이트보드 느낌), 그 위에 반투명 흰 카드와 진한 글자
     <div
-      className="flex h-dvh flex-col gap-3 bg-white p-3 text-ink"
+      className="relative flex h-dvh flex-col gap-3 overflow-hidden bg-white p-3 text-ink"
       style={{ backgroundImage: "radial-gradient(#d4d4d4 1px, transparent 1.2px)", backgroundSize: "12px 12px" }}
     >
+      <DrawingSceneDecor mode={backgroundScene} />
       <header className="relative z-30 flex flex-wrap items-center gap-1 rounded-3xl border border-white/90 bg-white/76 px-2 py-1.5 shadow-card backdrop-blur-sm">
         <ToolbarButton title={back.label} onClick={() => navigate(back.path)}>
           ← <span className="hidden sm:inline">{back.label}</span>
@@ -97,7 +104,7 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
         <div className="ml-auto flex flex-wrap items-center gap-1">{toolbarEnd}</div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-3">
+      <div className="relative z-10 flex min-h-0 flex-1 gap-3">
         <nav
           aria-label="그리기 도구"
           className="relative z-20 flex flex-col gap-1 self-start rounded-3xl border border-white/90 bg-white/76 p-1.5 shadow-card backdrop-blur-sm"
@@ -131,10 +138,11 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
           // 그림판이 가운데 오도록 도구 막대만큼 오른쪽도 비워 둔다
           <div className="hidden w-[4.25rem] shrink-0 lg:block" aria-hidden="true" />
         )}
+        {coachMode && <DrawingCoach mode={coachMode} />}
       </div>
 
       {footer && (
-        <footer className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-3xl border border-white/90 bg-white/76 px-4 py-2 shadow-card backdrop-blur-sm">{footer}</footer>
+        <footer className="relative z-10 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-3xl border border-white/90 bg-white/76 px-4 py-2 shadow-card backdrop-blur-sm">{footer}</footer>
       )}
     </div>
   );

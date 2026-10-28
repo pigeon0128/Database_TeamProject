@@ -35,6 +35,8 @@ export default function CharacterPage() {
       <DrawingShell
         tools={tools}
         back={BACK_TO_HOME}
+        coachMode="free"
+        backgroundScene="free"
         aspect={1}
         toolbarStart={
           <>

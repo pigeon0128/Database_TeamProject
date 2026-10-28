@@ -36,6 +36,7 @@ export default function CharacterPage() {
         tools={tools}
         back={BACK_TO_HOME}
         coachMode="free"
+        coachCharacter="codex"
         backgroundScene="free"
         aspect={1}
         toolbarStart={

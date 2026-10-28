@@ -1,6 +1,13 @@
 import { useState } from "react";
 
 export type CoachMode = "trace" | "free";
+export type CoachCharacter = "codex" | "rico" | "naty";
+
+const coaches: Record<CoachCharacter, { name: string; image: string; alt: string }> = {
+  codex: { name: "CODEX", image: "/assets/dorobus/drawing/codex-pose.png", alt: "캐릭터 그리기를 안내하는 코덱스" },
+  rico: { name: "RICO", image: "/assets/dorobus/drawing/rico-pose.png", alt: "스토리 장면 그리기를 안내하는 리코" },
+  naty: { name: "NATY", image: "/assets/dorobus/drawing/naty-pose.png", alt: "도감 생물 그리기를 안내하는 나티" },
+};
 
 const messages: Record<CoachMode, Array<{ title: string; body: string }>> = {
   trace: [
@@ -15,20 +22,24 @@ const messages: Record<CoachMode, Array<{ title: string; body: string }>> = {
   ],
 };
 
-export function DrawingCoach({ mode }: { mode: CoachMode }) {
+export function DrawingCoach({ mode, character }: { mode: CoachMode; character: CoachCharacter }) {
   const [step, setStep] = useState(0);
   const [open, setOpen] = useState(true);
   const item = messages[mode][step];
+  const coach = coaches[character];
 
   if (!open) {
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setStep(0);
+          setOpen(true);
+        }}
         className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-black text-blue-600 shadow-lg"
       >
-        <img src="/assets/dorobus/drawing/codex-guide.svg" alt="" className="h-10 w-10 object-contain" />
-        도로버스 도움말
+        <img src={coach.image} alt="" className="h-10 w-10 object-contain" />
+        {coach.name} 도움말
       </button>
     );
   }
@@ -42,7 +53,7 @@ export function DrawingCoach({ mode }: { mode: CoachMode }) {
         <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#66b5ff,#8ce2d0,#fee36e)]" />
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Art guide · CODEX</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">Art guide · {coach.name}</p>
             <h2 className="mt-1 text-base font-black text-white sm:text-lg">{item.title}</h2>
           </div>
           <button type="button" onClick={() => setOpen(false)} className="rounded-full px-1.5 text-xl font-bold text-white/55 hover:text-white" aria-label="안내 접기">×</button>
@@ -50,14 +61,18 @@ export function DrawingCoach({ mode }: { mode: CoachMode }) {
         <p className="mt-1.5 text-xs font-semibold leading-relaxed text-white/80 sm:text-sm">{item.body}</p>
         <div className="mt-3 flex items-center justify-between">
           <div className="flex gap-1">{messages[mode].map((_, index) => <span key={index} className={`h-1.5 rounded-full ${index === step ? "w-6 bg-sky-300" : "w-1.5 bg-white/25"}`} />)}</div>
-          <button type="button" onClick={() => setStep((current) => (current + 1) % messages[mode].length)} className="rounded-full bg-white px-4 py-2 text-[11px] font-black text-blue-700 transition hover:-translate-y-0.5">
-            {step === messages[mode].length - 1 ? "다시 보기" : "다음 설명 →"}
+          <button
+            type="button"
+            onClick={() => (step === messages[mode].length - 1 ? setOpen(false) : setStep((current) => current + 1))}
+            className="rounded-full bg-white px-4 py-2 text-[11px] font-black text-blue-700 transition hover:-translate-y-0.5"
+          >
+            {step === messages[mode].length - 1 ? "대화 종료" : "다음 설명 →"}
           </button>
         </div>
       </div>
       <img
-        src="/assets/dorobus/drawing/codex-guide.svg"
-        alt="Dorobus 그리기 안내 캐릭터 코덱스"
+        src={coach.image}
+        alt={coach.alt}
         className="pointer-events-none absolute bottom-0 left-0 z-10 h-full w-40 object-contain drop-shadow-xl sm:w-60"
       />
     </section>

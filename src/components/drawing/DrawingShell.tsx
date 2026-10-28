@@ -6,7 +6,7 @@ import { navigate } from "../../router";
 import DorobusBackdrop from "../DorobusBackdrop";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
 import { BrushPanel } from "./BrushPanel";
-import { DrawingCoach, type CoachMode } from "./DrawingCoach";
+import { DrawingCoach, type CoachCharacter, type CoachMode } from "./DrawingCoach";
 import DrawingSceneDecor, { type DrawingSceneDecorMode } from "./DrawingSceneDecor";
 import type { DrawingTools } from "./useDrawingTools";
 
@@ -76,6 +76,8 @@ type DrawingShellProps = {
   children: ReactNode;
   /** 기능과 점수 규칙을 단계별로 설명하는 안내 캐릭터 */
   coachMode?: CoachMode;
+  /** 콘텐츠를 담당하는 도로버스 안내 캐릭터 */
+  coachCharacter?: CoachCharacter;
   /** 도화지 바깥의 Dorobus 캐릭터 배경 */
   backgroundScene?: DrawingSceneDecorMode;
 };
@@ -86,7 +88,19 @@ type DrawingShellProps = {
  *   가운데: 왼쪽 도구 막대(브러쉬/지우개) + 남은 공간을 꽉 채우는 그림판
  *   아래: 상태 막대 (점수, 도움말 등)
  */
-export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, footer, aside, children, coachMode, backgroundScene = "free" }: DrawingShellProps) {
+export function DrawingShell({
+  tools,
+  back,
+  toolbarStart,
+  toolbarEnd,
+  aspect,
+  footer,
+  aside,
+  children,
+  coachMode,
+  coachCharacter = "codex",
+  backgroundScene = "free",
+}: DrawingShellProps) {
   const [brushPanel, setBrushPanel] = useState(false);
   const closeBrushPanel = useCallback(() => setBrushPanel(false), []);
   return (
@@ -143,7 +157,7 @@ export function DrawingShell({ tools, back, toolbarStart, toolbarEnd, aspect, fo
           // 그림판이 가운데 오도록 도구 막대만큼 오른쪽도 비워 둔다
           <div className="hidden w-[4.25rem] shrink-0 lg:block" aria-hidden="true" />
         )}
-        {coachMode && <DrawingCoach mode={coachMode} />}
+        {coachMode && <DrawingCoach mode={coachMode} character={coachCharacter} />}
       </div>
 
       {footer && (

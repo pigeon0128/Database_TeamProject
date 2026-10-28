@@ -29,6 +29,8 @@ type CreatureGuide = {
   drawingId: number;
   /** DB drawings.title 과 같은 이름 (DB를 불러오기 전이나 리더보드에서 쓴다) */
   name: string;
+  /** DB creature_profiles.category. API가 없는 로컬 미리보기에서도 목록을 나누기 위해 함께 둔다. */
+  category: CreatureCategory;
   /** 밑그림 이미지 */
   guide: string;
   /** 밑그림 크기 (px). 도감 밑그림은 모두 1500x1500 정사각형 */
@@ -39,22 +41,25 @@ type CreatureGuide = {
 };
 
 const CREATURE_GUIDES: CreatureGuide[] = [
-  { slug: "lion", drawingId: 2, name: "사자", guide: lion, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "zebra", drawingId: 3, name: "얼룩말", guide: zebra, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "cat", drawingId: 4, name: "고양이", guide: cat, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "seaturtle", drawingId: 5, name: "바다거북", guide: seaturtle, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "dog", drawingId: 6, name: "골든 리트리버", guide: dog, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "sunflower", drawingId: 7, name: "해바라기", guide: sunflower, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "rose", drawingId: 8, name: "장미", guide: rose, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "cactus", drawingId: 9, name: "사와로 선인장", guide: cactus, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "tree", drawingId: 10, name: "느티나무", guide: tree, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "dandelion", drawingId: 11, name: "민들레", guide: dandelion, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "airplane", drawingId: 12, name: "비행기", guide: airplane, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "sportscar", drawingId: 13, name: "스포츠카", guide: sportscar, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "soccerball", drawingId: 14, name: "축구공", guide: soccerball, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "robot", drawingId: 15, name: "로봇", guide: robot, width: 1500, height: 1500, lineWidth: 6 },
-  { slug: "playground", drawingId: 17, name: "놀이터", guide: playground, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "lion", drawingId: 2, name: "사자", category: "animal", guide: lion, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "zebra", drawingId: 3, name: "얼룩말", category: "animal", guide: zebra, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "cat", drawingId: 4, name: "고양이", category: "animal", guide: cat, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "seaturtle", drawingId: 5, name: "바다거북", category: "animal", guide: seaturtle, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "dog", drawingId: 6, name: "골든 리트리버", category: "animal", guide: dog, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "sunflower", drawingId: 7, name: "해바라기", category: "plant", guide: sunflower, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "rose", drawingId: 8, name: "장미", category: "plant", guide: rose, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "cactus", drawingId: 9, name: "사와로 선인장", category: "plant", guide: cactus, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "tree", drawingId: 10, name: "느티나무", category: "plant", guide: tree, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "dandelion", drawingId: 11, name: "민들레", category: "plant", guide: dandelion, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "airplane", drawingId: 12, name: "비행기", category: "object", guide: airplane, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "sportscar", drawingId: 13, name: "스포츠카", category: "object", guide: sportscar, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "soccerball", drawingId: 14, name: "축구공", category: "object", guide: soccerball, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "robot", drawingId: 15, name: "로봇", category: "object", guide: robot, width: 1500, height: 1500, lineWidth: 6 },
+  { slug: "playground", drawingId: 17, name: "놀이터", category: "object", guide: playground, width: 1500, height: 1500, lineWidth: 6 },
 ];
+
+/** API·DB가 없는 로컬 미리보기에서 보여 줄 최소 도감 목록. */
+export const localCreatureCatalog = CREATURE_GUIDES.map(({ drawingId, name, slug, category }) => ({ drawingId, name, slug, category }));
 
 /** 생물 하나를 그리기 화면에서 쓰는 장면으로. 채점에서 빼는 영역은 없다 (밑그림에 안내 문구가 없음) */
 const toScene = (c: CreatureGuide): Scene => ({

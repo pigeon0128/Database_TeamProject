@@ -3,10 +3,23 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../auth";
 import PageLayout from "../../components/PageLayout";
-import { CATEGORY_LABELS, creatureGuide, type CreatureCategory } from "../../data/creatures";
+import { CATEGORY_LABELS, creatureGuide, localCreatureCatalog, type CreatureCategory } from "../../data/creatures";
 import { api, ApiError, artworkUrl, type CreatureEntry } from "../../lib/api";
 import { formatScore } from "../../lib/format";
 import { navigate } from "../../router";
+
+const LOCAL_CREATURES: CreatureEntry[] = localCreatureCatalog.map((creature) => ({
+  ...creature,
+  summary: "",
+  facts: [],
+  tips: [],
+  sources: [],
+  collected: false,
+  recordId: null,
+  imageKey: null,
+  bestScore: null,
+  bestDurationMs: null,
+}));
 
 function CreatureCard({ creature }: { creature: CreatureEntry }) {
   const guide = creatureGuide(creature.slug);
@@ -41,14 +54,15 @@ function CreatureCard({ creature }: { creature: CreatureEntry }) {
 export default function CreatureListPage() {
   const { expire } = useAuth();
   const [creatures, setCreatures] = useState<CreatureEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [usingLocalCatalog, setUsingLocalCatalog] = useState(false);
 
   useEffect(() => {
     api.collection().then(
       (r) => setCreatures(r.creatures),
       (e: unknown) => {
         if (e instanceof ApiError && e.status === 401) return expire();
-        setError(e instanceof ApiError ? e.message : "도감을 불러오지 못했어요.");
+        setCreatures(LOCAL_CREATURES);
+        setUsingLocalCatalog(true);
       },
     );
   }, [expire]);
@@ -66,8 +80,12 @@ export default function CreatureListPage() {
         )}
       </div>
 
-      {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{error}</p>}
-      {!creatures && !error && <p className="py-10 text-center text-sm font-bold text-ink-muted">도감을 불러오는 중…</p>}
+      {usingLocalCatalog && (
+        <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          로컬 미리보기 모드예요. 생물을 골라 그리기는 할 수 있지만, 수집 기록·작품 저장·랭킹은 DB 서버가 연결되면 활성화돼요.
+        </p>
+      )}
+      {!creatures && <p className="py-10 text-center text-sm font-bold text-ink-muted">도감을 불러오는 중…</p>}
       {creatures && creatures.length === 0 && (
         <p className="rounded-2xl bg-white/80 px-4 py-6 text-center text-sm font-bold text-ink-muted">
           도감에 생물이 없어요. 터미널에서 pnpm db:migrate 를 실행해 주세요.

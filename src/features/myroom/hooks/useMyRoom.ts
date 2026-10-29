@@ -3,7 +3,7 @@ import { api, ApiError } from "../../../lib/api"
 import { myroomApi } from "../api"
 import type { RoomArtwork } from "../artwork"
 import { myRoomPreviewEnabled } from "../preview/enabled"
-import type { RoomLayout, RoomState } from "../types"
+import type { ColoredSpec, RoomLayout, RoomState, StoredSummary } from "../types"
 
 const ignoreUnauthorized = () => {}
 
@@ -12,7 +12,8 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
   const [layout, setLayout] = useState<RoomLayout>({ objects: [] })
   const [baseline, setBaseline] = useState(JSON.stringify({ objects: [] }))
   const [revision, setRevision] = useState(0),
-    [artworks, setArtworks] = useState<RoomArtwork[]>([])
+    [artworks, setArtworks] = useState<RoomArtwork[]>([]),
+    [stored, setStored] = useState<StoredSummary[]>([])
   const [loading, setLoading] = useState(true),
     [saving, setSaving] = useState(false)
   const [ready, setReady] = useState(false)
@@ -38,8 +39,8 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
       const source = isPreview
         ? (await import("../preview/data")).createPreviewSource()
         : null
-      const [room, collection] = source
-        ? [source.load(), source.artworks]
+      const [room, collection, storage] = source
+        ? [source.load(), source.artworks, [] as StoredSummary[]]
         : await Promise.all([
             myroomApi.load(),
             api
@@ -47,6 +48,7 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
               .then((c) =>
                 c.creatures.filter((a) => a.collected && a.imageKey),
               ),
+            myroomApi.storage(),
           ])
       if (requestId !== generation.current) return
       if (room.schemaVersion !== 1)
@@ -55,6 +57,7 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
       setBaseline(JSON.stringify(room.layout))
       setRevision(room.revision)
       setArtworks(collection)
+      setStored(storage)
       setSaved(false)
       setReady(true)
     } catch (e) {
@@ -111,6 +114,21 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
       fail(e)
     }
   }
+  /** 수납함에서 지운다. 못 지우면 이유(한국어 메시지)를 돌려주고, 지웠으면 null */
+  async function removeStored(id: number): Promise<string | null> {
+    if (layout.objects.some((o) => o.storedObjectId === id))
+      return "방에 놓여 있어요. 방에서 제거한 뒤 삭제해 주세요."
+    try {
+      await myroomApi.removeStored(id)
+      setStored((list) => list.filter((s) => s.id !== id))
+      return null
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) expire()
+      if (e instanceof ApiError && e.status === 404)
+        setStored((list) => list.filter((s) => s.id !== id))
+      return e instanceof Error ? e.message : "삭제하지 못했어요."
+    }
+  }
   function acceptRemote() {
     if (!remote) return
     setBackup(layout)
@@ -126,6 +144,8 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
     layout,
     setLayout,
     artworks,
+    stored,
+    removeStored,
     revision,
     dirty,
     loading,

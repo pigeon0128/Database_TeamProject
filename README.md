@@ -155,3 +155,13 @@ API 서버(`[api]`)와 화면(`[web]`)이 한 터미널에서 함께 켜집니�
 | 존재하지 않는 그림이거나 사용자예요 | `pnpm db:migrate` 를 실행 (장면 목록이 DB에 없음) |
 | `Port 8443 is already in use` | 다른 터미널에서 이미 화면이 실행 중입니다. 그 창을 쓰거나 `Ctrl + C` 로 끄고 다시 실행 |
 | `bad option: --env-file-if-exists` | Node.js 버전이 낮습니다. 22.9 이상으로 업데이트 |
+## 3D 마이룸
+
+로그인 후 기존 개발 주소의 `#/myroom`으로 직접 접속할 수 있습니다. 홈의 네 가지 메뉴는 유지합니다.
+인벤토리에서 액자/가구를 배치하고 내 도감의 완성 작품을 전시한 뒤 **저장**을 눌러 주세요.
+새 기능을 사용하기 전에 `pnpm db:migrate`로 `019_myroom.sql`을 적용합니다.
+실행·데이터 계약·테스트·제약은 [마이룸 아키텍처](docs/myroom-architecture.md)와 [PROJECT_STATE](PROJECT_STATE.md)를 참고하세요.
+
+API/DB 없는 개발용 Preview는 `.env.local`에 `VITE_MYROOM_PREVIEW=true`를 넣고 `pnpm dev`를 실행한 뒤 `http://localhost:8443/`을 여세요. `#/myroom`도 지원합니다. 샘플 작품과 해당 브라우저의 로컬 저장만 사용하며 로그인/메인 이동 버튼은 표시하지 않습니다. 환경변수를 끄고 Vite를 재시작하면 기존 앱으로 돌아갑니다. production build에서는 이 플래그를 켜도 Preview가 활성화되지 않습니다.
+
+마이룸은 모드 전환 없는 단일 공간입니다. 3D 화면을 클릭한 뒤 WASD/방향키로 이동하고 Space로 점프합니다. 우클릭 드래그·휠로 카메라를 조절하고 I로 인벤토리를 여세요. 좌클릭으로 선택·배치하고 Esc로 취소합니다. 배치 중 이동·점프는 잠시 멈추며 변경 후 저장을 누릅니다. 플레이어 위치는 저장하지 않습니다. `pnpm test:myroom:player`로 이동·충돌·점프 계산을 검증합니다.

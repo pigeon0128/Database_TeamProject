@@ -19,6 +19,7 @@ import { draftRoutes } from "./routes/drafts.js";
 import { drawingRoutes } from "./routes/drawings.js";
 import { recordRoutes } from "./routes/records.js";
 import { settingsRoutes } from "./routes/settings.js";
+import { myroomRoutes } from "./routes/myroom.js";
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use("/api", recordRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/drafts", draftRoutes);
 app.use("/api/collection", collectionRoutes);
+app.use("/api/myroom", myroomRoutes);
 
 app.use("/api", notFound);
 app.use(errorHandler);

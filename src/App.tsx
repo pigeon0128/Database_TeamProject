@@ -12,6 +12,7 @@ import StoryPage from "./pages/story/StoryPage";
 import StorySelectPage from "./pages/StorySelectPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import SettingsPage from "./pages/SettingsPage";
+import StudioPage from "./pages/StudioPage";
 import { myRoomPreviewEnabled } from "./features/myroom/preview/enabled";
 
 const MyRoomPage = lazy(() => import("./features/myroom/MyRoomPage"));
@@ -24,6 +25,7 @@ const routes: Record<string, ComponentType> = {
   "/leaderboard": LeaderboardPage,
   "/creatures": CreatureListPage,
   "/settings": SettingsPage,
+  "/studio": StudioPage,
   "/myroom": MyRoomPage,
 };
 

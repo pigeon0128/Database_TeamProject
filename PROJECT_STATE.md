@@ -57,3 +57,9 @@ Preview는 App의 DEV 전용 분기에서 AuthProvider 없이 마운트한다. l
 기존 JSONB schemaVersion 1과 revision 및 작품 소유권 쿼리가 종류와 무관하게 작동하여 서버/DB/인증/Preview 저장 모듈 변경 및 신규 migration 없이 구현했다. 기존 4종 가구 레이아웃도 그대로 읽는다. geometry 6, Preview 6, player 10, 격리 PostgreSQL/API 8(부모 테스트 포함), 타입 검사와 production flag=true 빌드가 통과했다. 실제 브라우저에서 기존 액자 보존, 설치/교체/이동/90도 회전/겹침 차단/플레이어 충돌/점프/로컬 저장 복원/삭제, 기울기 측면 및 production 로그인 화면을 확인했다.
 
 실험 ID: DORO-MYROOM-EASEL-20261029-01. 근거와 한계는 docs/myroom-easel.md 및 별도 outputs/myroom-easel/README.md에 기록한다. 이전 수직 캔버스 스크린샷은 초기 실험 기록이며 최종 측면 근거는 12/13번이다. main merge는 수행하지 않는다.
+
+## 2026-10-29 최신 main 통합
+
+동일 feature/myroom에서 origin/main bb4767c를 일반 Merge했다. PR #13은 bb4767c로 이미 Merge된 상태임을 읽기 전용 조회로 확인했다. 팀원의 studio/App 라우팅·미니게임·도감·리더보드·인증/서버/DB는 main과 동일하게 보존하고, 이젤/공통 텍스처/플레이어/Preview 및 테스트는 8f28336과 동일하게 유지했다. 코드 충돌은 없었다. 최초 sandbox의 Git LFS 실행 제한은 중간 생성 파일을 별도 보존하고 정상 권한으로 재시도해 해결했다. Git LFS PNG 원본도 정상 checkout됐다.
+
+타입 검사, geometry 6/Preview 6/player 10/격리 PostgreSQL API 8(부모 포함), production build를 통과했다. 실제 브라우저에서 인증, 캐릭터 입력·Undo/Redo, 스토리 입력·채점, studio 경로, 도감 완성·기록 저장·리더보드와 완성 작품의 이젤 연결·회전·DB 저장/복원, Mock 별도 저장/복원 및 이동/점프를 검증했다. 테스트 증거는 실험 DORO-MYROOM-MAIN-20261029-01의 outputs/myroom-main-integration에 남긴다. 대규모 게임 플레이/실기기 성능 검증을 의미하지 않는다. 사용자 백업 패치는 원본 및 별도 사본의 SHA256 동일성을 확인하고 추적하지 않았다. Git 작성자 설정과 기존 커밋은 변경하지 않고 Co-authored-by를 추가하지 않았다. 새 브랜치/PR 생성 및 기존 PR 수정, main Push/Merge는 수행하지 않는다.

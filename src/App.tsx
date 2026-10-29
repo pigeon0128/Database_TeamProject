@@ -12,6 +12,7 @@ import StoryPage from "./pages/story/StoryPage";
 import StorySelectPage from "./pages/StorySelectPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import SettingsPage from "./pages/SettingsPage";
+import StudioPage from "./pages/StudioPage";
 
 const routes: Record<string, ComponentType> = {
   "/": HomePage,
@@ -20,6 +21,7 @@ const routes: Record<string, ComponentType> = {
   "/leaderboard": LeaderboardPage,
   "/creatures": CreatureListPage,
   "/settings": SettingsPage,
+  "/studio": StudioPage,
 };
 
 const STORY_PREFIX = "/story/";

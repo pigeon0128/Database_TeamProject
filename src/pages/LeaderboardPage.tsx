@@ -5,10 +5,10 @@
 import { useCallback, useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../auth";
-import { CATEGORY_LABELS, type CreatureCategory } from "../data/creatures";
+import { CATEGORY_LABELS, localCreatureCatalog, type CreatureCategory } from "../data/creatures";
 import { findDrawingScene } from "../data/drawings";
-import type { Scene } from "../data/scenes";
-import { api, ApiError, artworkUrl, type Drawing, type LeaderboardEntry } from "../lib/api";
+import { scenes, type Scene } from "../data/scenes";
+import { api, artworkUrl, type Drawing, type LeaderboardEntry } from "../lib/api";
 import { formatDate, formatDuration, formatScore } from "../lib/format";
 import { loadScenePreview } from "../lib/drawing/sceneAssets";
 import { navigate, usePath } from "../router";
@@ -20,6 +20,22 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 const drawingTitle = (d: Drawing) => findDrawingScene(d.id)?.title ?? d.title;
 
 type Board = { top: LeaderboardEntry[]; me: LeaderboardEntry | null };
+
+const LOCAL_DRAWINGS: Drawing[] = [
+  ...scenes.flatMap((scene, index) =>
+    scene.drawingId
+      ? [{ id: scene.drawingId, title: scene.title, referenceImageKey: "", order: index + 1, chapter: { id: 1, title: "스토리", order: 1 }, category: null }]
+      : [],
+  ),
+  ...localCreatureCatalog.map((creature, index) => ({
+    id: creature.drawingId,
+    title: creature.name,
+    referenceImageKey: "",
+    order: index + 1,
+    chapter: { id: 2, title: "도감", order: 2 },
+    category: creature.category,
+  })),
+];
 
 /** 기록의 그림: 흐린 밑그림 위에 그린 선을 겹친 작은 그림. 누르면 크게 본다 */
 function Thumbnail({ entry, guideUrl, aspect, onOpen }: { entry: LeaderboardEntry; guideUrl: string | null; aspect: number; onOpen: () => void }) {
@@ -175,13 +191,16 @@ export default function LeaderboardPage() {
 
   const [drawings, setDrawings] = useState<Drawing[] | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [usingLocalData, setUsingLocalData] = useState(false);
 
   useEffect(() => {
     api.drawings().then(
       (r) => setDrawings(r.drawings),
-      (e: unknown) => setError(e instanceof ApiError ? e.message : "그림 목록을 불러오지 못했어요."),
+      () => {
+        setDrawings(LOCAL_DRAWINGS);
+        setUsingLocalData(true);
+      },
     );
   }, []);
 
@@ -189,10 +208,12 @@ export default function LeaderboardPage() {
 
   const load = useCallback((drawingId: number) => {
     setLoading(true);
-    setError(null);
     api
       .leaderboard(drawingId, LIMIT)
-      .then(setBoard, (e: unknown) => setError(e instanceof ApiError ? e.message : "리더보드를 불러오지 못했어요."))
+      .then(setBoard, () => {
+        setBoard({ top: [], me: null });
+        setUsingLocalData(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -221,6 +242,11 @@ export default function LeaderboardPage() {
 
   return (
     <PageLayout title="리더보드 확인하기">
+      {usingLocalData && (
+        <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          로컬 미리보기 모드예요. 그림 종류는 선택할 수 있지만, 순위와 작품 기록은 DB 서버가 연결되면 표시돼요.
+        </p>
+      )}
       {drawings && drawings.length > 0 && selected && <DrawingPicker drawings={drawings} selected={selected} />}
 
       <section className="overflow-hidden rounded-3xl border border-white/90 bg-white/80 shadow-card">
@@ -241,18 +267,20 @@ export default function LeaderboardPage() {
               </button>
             )}
             {scene && (
-              <button type="button" onClick={() => navigate(`/story/${scene.id}`)} className="rounded-full bg-sky-deep px-4 py-2 text-sm font-bold text-white hover:brightness-110">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(selected?.category === null ? `/story/${scene.id}` : `/creatures/${scene.id.replace(/^creature-/, "")}`)
+                }
+                className="rounded-full bg-sky-deep px-4 py-2 text-sm font-bold text-white hover:brightness-110"
+              >
                 ✏️ 이 장면 그리기
               </button>
             )}
           </div>
         </header>
 
-        {error ? (
-          <p role="alert" className="m-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
-            {error}
-          </p>
-        ) : drawings && drawings.length === 0 ? (
+        {drawings && drawings.length === 0 ? (
           <p className="p-10 text-center font-bold text-ink-muted">데이터베이스에 등록된 그림이 없어요.</p>
         ) : !board ? (
           <p className="p-10 text-center font-bold text-ink-muted">불러오는 중…</p>
@@ -291,7 +319,7 @@ export default function LeaderboardPage() {
 
       {viewing && <ArtworkViewer entry={viewing} scene={scene} guideUrl={guideUrl} onClose={closeViewer} />}
 
-      {board && !board.me && !error && (
+      {board && !board.me && (
         <p className="mt-3 text-center text-sm font-semibold text-ink-muted">아직 이 장면의 내 기록이 없어요.</p>
       )}
     </PageLayout>

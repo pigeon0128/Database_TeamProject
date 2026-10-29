@@ -116,6 +116,9 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
       <DrawingShell
         tools={tools}
         back={back}
+        coachMode="trace"
+        coachCharacter={aside ? "naty" : "rico"}
+        backgroundScene={aside ? "creature" : "story"}
         aspect={scene.width / scene.height}
         aside={aside}
         toolbarStart={

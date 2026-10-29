@@ -1,23 +1,15 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color"
-import { Vector3 } from "@babylonjs/core/Maths/math.vector"
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector"
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture"
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder"
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode"
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial"
 import type { Mesh } from "@babylonjs/core/Meshes/mesh"
 import type { Scene } from "@babylonjs/core/scene"
-import { roomArtworkImage, type RoomArtwork } from "../artwork"
-import { creatureGuide } from "../../../data/creatures"
+import type { RoomArtwork } from "../artwork"
+import { createArtworkTexture } from "./artworkTexture"
 import type { RoomObject } from "../types"
 import { material } from "../engine/room"
-
-const image = (url: string) =>
-  new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error("image unavailable"))
-    img.src = url
-  })
 
 export function createObject(
   scene: Scene,
@@ -72,63 +64,68 @@ export function createObject(
     paper.disableLighting = true
     paper.emissiveColor = Color3.White()
     surface.material = paper
-    pictureTexture = new DynamicTexture(
-      `${object.id}-artwork`,
-      { width: 768, height: 864 },
+    pictureTexture = createArtworkTexture(
       scene,
-      true,
+      root,
+      artwork,
+      object.artworkDrawingId,
+      preview,
     )
     paper.diffuseTexture = pictureTexture
-    const texture = pictureTexture,
-      ctx = texture.getContext() as CanvasRenderingContext2D
-    const placeholder = (text: string) => {
-      if (root.isDisposed()) return
-      ctx.fillStyle = "#faf9f5"
-      ctx.fillRect(0, 0, 768, 864)
-      ctx.fillStyle = "#77776d"
-      ctx.font = "26px sans-serif"
-      ctx.textAlign = "center"
-      ctx.fillText(text, 384, 445)
-      texture.update()
+  } else if (object.type === "easel") {
+    // Three timber legs form an A-frame; all geometry stays inside the shared footprint.
+    const beam = (name: string, from: number[], to: number[]) => {
+      const a = Vector3.FromArray(from),
+        b = Vector3.FromArray(to)
+      const piece = box(
+        name,
+        [0.09, Vector3.Distance(a, b), 0.09],
+        a.add(b).scale(0.5).asArray(),
+        wood,
+      )
+      piece.rotationQuaternion = Quaternion.FromUnitVectorsToRef(
+        Vector3.Up(),
+        b.subtract(a).normalize(),
+        new Quaternion(),
+      )
     }
-    placeholder(
-      artwork && (artwork.imageKey || artwork.previewImageUrl)
-        ? "그림을 불러오는 중…"
-        : object.artworkDrawingId
-          ? "작품을 불러올 수 없어요"
-          : "그림을 골라 주세요",
+    beam("front-left", [-0.56, 0.05, -0.34], [-0.045, 2.15, 0.12])
+    beam("front-right", [0.56, 0.05, -0.34], [0.045, 2.15, 0.12])
+    beam("rear-leg", [0, 0.05, 0.42], [0, 2.02, 0.1])
+    box("cross-brace", [0.86, 0.085, 0.1], [0, 0.55, -0.22], wood)
+    box("canvas-ledge", [1.22, 0.1, 0.24], [0, 0.76, -0.25], wood)
+    // Tilt the backing and painting together along the front legs, resting on the ledge.
+    const canvasMount = new TransformNode(`${object.id}-canvas-mount`, scene)
+    canvasMount.parent = root
+    canvasMount.position.set(0, 1.44, -0.12)
+    canvasMount.rotation.x = 0.21
+    const backing = box(
+      "canvas-backing",
+      [1.08, 1.28, 0.065],
+      [0, 0, 0],
+      mat("canvas-edge", "#dcc9a5"),
     )
-    if (artwork && (artwork.imageKey || artwork.previewImageUrl) && !preview) {
-      const guide = creatureGuide(artwork.slug)
-      Promise.all([
-        guide ? image(guide).catch(() => null) : null,
-        image(roomArtworkImage(artwork)),
-      ])
-        .then(([base, ink]) => {
-          if (root.isDisposed()) return
-          ctx.fillStyle = "#ffffff"
-          ctx.fillRect(0, 0, 768, 864)
-          const draw = (img: HTMLImageElement) => {
-            const ratio = Math.min(
-              728 / img.naturalWidth,
-              824 / img.naturalHeight,
-            )
-            const w = img.naturalWidth * ratio,
-              h = img.naturalHeight * ratio
-            ctx.drawImage(img, (768 - w) / 2, (864 - h) / 2, w, h)
-          }
-          if (base) {
-            ctx.globalAlpha = 0.3
-            draw(base)
-            ctx.globalAlpha = 1
-          }
-          draw(ink)
-          texture.update()
-        })
-        .catch(() => {
-          if (!root.isDisposed()) placeholder("그림을 불러오지 못했어요")
-        })
-    }
+    backing.parent = canvasMount
+    const surface = MeshBuilder.CreatePlane(
+      `${object.id}-picture`,
+      { width: 1.02, height: 1.2 },
+      scene,
+    )
+    surface.parent = canvasMount
+    surface.position.z = -0.037
+    pieces.push(surface)
+    const paper = mat("paper", "#ffffff")
+    paper.disableLighting = true
+    paper.emissiveColor = Color3.White()
+    surface.material = paper
+    pictureTexture = createArtworkTexture(
+      scene,
+      root,
+      artwork,
+      object.artworkDrawingId,
+      preview,
+    )
+    paper.diffuseTexture = pictureTexture
   } else if (object.type === "chair") {
     box("seat", [0.58, 0.1, 0.57], [0, 0.5, 0], dark)
     box("back", [0.58, 0.42, 0.07], [0, 0.84, 0.26], dark)

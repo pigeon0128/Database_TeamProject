@@ -189,3 +189,7 @@ Babylon 9.31은 허용 pointer 버튼과 실제 movement inputMap을 별도로 �
 플레이어 위치/방향/점프는 런타임 메모리다. RoomLayout, 실제 Express API, PostgreSQL schema, 인증 코드와 Preview 저장 구조는 변경하지 않았다. 기존 보관본은 역사적 결과로 남기고 이번 시각 비교/검증은 `DORO-MYROOM-SINGLE-20261028-01`에 별도 보관한다.
 
 최종 검증은 geometry 4 + Preview 5 + player/점프/실제 SDK 입력 9 + 로컬 PostgreSQL/API 7, 총 25건이다. 타입 검사와 production flag=true 빌드도 실행한다. 화면의 초록색 ROI 계측은 본체 높이가 레퍼런스 약 18.9–20.1%, 구현 약 19%임을 보여 주며 가로 폭도 이를 기준으로 보정했다. 원본 표면/목재 무늬, 그림자 방향, 몸통의 미세한 곡률과 신발 디테일은 다르다. 점프는 가구 위 착지/계단/중력을 이용한 가구 이동을 포함하지 않는다. 모바일 이동 패드, 실휴대폰/GPU 성능은 미검증이다.
+
+## 16. 바닥형 이젤
+
+2026-10-29에 easel 카탈로그와 frame/easel 공통 작품 텍스처를 추가했다. 바닥 배치와 플레이어 충돌은 기존 공통 footprint를 사용한다. 단일 조작과 저장 schemaVersion 1은 유지하며 신규 migration이 없다. 구조·호환성·실제 검증·제약은 [이젤 변경 기록](myroom-easel.md)을 따른다.

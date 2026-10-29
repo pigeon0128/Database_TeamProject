@@ -49,3 +49,11 @@ Research/DOROBUS_MyRoom_Inspection/experiments/DORO-MYROOM-IMPL-20261027-01/.
 
 Preview는 App의 DEV 전용 분기에서 AuthProvider 없이 마운트한다. localhost:8443 루트와 직접 해시 진입을 브라우저에서 확인했고, 사용하지 않는 API 대상 39991에 대해 요청 감사 로그의 API/업로드 요청은 0건이었다. Preview 홈/나가기만 숨기고 실제 인증 래퍼와 서비스 이탈은 유지했다. production flag=true 빌드에서 Mock 데이터/저장 키가 제거됨을 다시 확인했다.
 
+
+## 2026-10-29 바닥형 그림 이젤
+
+기존 단일 조작과 Preview를 유지하면서 `easel` 카탈로그/인벤토리 항목과 자체 MeshBuilder 목재 삼각 지지대·캔버스를 추가했다. 캔버스/그림 표면은 동일한 TransformNode에서 뒤로 0.21rad(약 12도) 기울이고 받침대 위에 놓았다. 공유 `supportsArtwork` 검증은 frame/easel만 작품 ID를 허용하고, 작품 로딩/밑그림 합성/placeholder/dispose는 공통 artworkTexture 모듈로 분리했다.
+
+기존 JSONB schemaVersion 1과 revision 및 작품 소유권 쿼리가 종류와 무관하게 작동하여 서버/DB/인증/Preview 저장 모듈 변경 및 신규 migration 없이 구현했다. 기존 4종 가구 레이아웃도 그대로 읽는다. geometry 6, Preview 6, player 10, 격리 PostgreSQL/API 8(부모 테스트 포함), 타입 검사와 production flag=true 빌드가 통과했다. 실제 브라우저에서 기존 액자 보존, 설치/교체/이동/90도 회전/겹침 차단/플레이어 충돌/점프/로컬 저장 복원/삭제, 기울기 측면 및 production 로그인 화면을 확인했다.
+
+실험 ID: DORO-MYROOM-EASEL-20261029-01. 근거와 한계는 docs/myroom-easel.md 및 별도 outputs/myroom-easel/README.md에 기록한다. 이전 수직 캔버스 스크린샷은 초기 실험 기록이며 최종 측면 근거는 12/13번이다. main merge는 수행하지 않는다.

@@ -1,4 +1,4 @@
-export type ObjectType = "frame" | "chair" | "table" | "plant"
+export type ObjectType = "frame" | "easel" | "chair" | "table" | "plant"
 
 export type Wall = "back" | "left" | "right" | "front"
 
@@ -33,6 +33,8 @@ export declare const ROOM: Readonly<{
 export declare const MAX_OBJECTS: number
 
 export declare const WALLS: Wall[]
+
+export declare function supportsArtwork(type: ObjectType | undefined): boolean
 
 export declare const CATALOG: Readonly<Record<ObjectType, {
   name: string

@@ -168,6 +168,64 @@ test(
       },
     )
     await t.test(
+      "floor easels share ownership checks, revision and durable JSONB storage with frames",
+      async () => {
+        const current = (await call("/api/myroom", "GET", undefined, cookie))
+          .body
+        const easel = {
+          id: "floor-art",
+          type: "easel",
+          position: { x: 2, y: 0, z: 1 },
+          rotation: Math.PI / 2,
+          scale: 1,
+          artworkDrawingId: 3,
+        }
+        for (const artworkDrawingId of [4, 99999, 900001])
+          assert.equal(
+            (
+              await save(
+                [easel].map((o) => ({ ...o, artworkDrawingId })),
+                current.revision,
+              )
+            ).status,
+            400,
+          )
+        assert.equal((await save([frame, easel], current.revision)).status, 200)
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame, easel],
+        )
+        assert.equal((await save([], current.revision)).status, 409)
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, b.cookie)).body.layout
+            .objects,
+          [],
+        )
+        const moved = {
+          ...easel,
+          position: { x: -3, y: 0, z: 2 },
+          rotation: Math.PI,
+          artworkDrawingId: 2,
+        }
+        assert.equal(
+          (await save([frame, moved], current.revision + 1)).status,
+          200,
+        )
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame, moved],
+        )
+        assert.equal((await save([frame], current.revision + 2)).status, 200)
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame],
+        )
+      },
+    )
+    await t.test(
       "existing collection, drawings, leaderboard, drafts and brushes still work",
       async () => {
         assert.ok((await call("/api/drawings")).body.drawings.length > 0)

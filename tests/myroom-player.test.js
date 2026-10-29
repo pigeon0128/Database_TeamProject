@@ -130,6 +130,18 @@ const table = (rotation = 0) => ({
   rotation,
   scale: 1,
 })
+
+test("floor easel blocks the player before and after quarter-turn and relocates an overlapping spawn", () => {
+  for (const rotation of [0, Math.PI / 2]) {
+    const easel = { ...table(rotation), type: "easel" }
+    const stopped = moveWithCollisions({ x: 0, z: -4 }, { x: 0, z: 10 }, [
+      easel,
+    ])
+    assert.ok(stopped.z < -(rotation ? 0.65 : 0.5) - PLAYER_RADIUS)
+    assert.ok(isWalkable(stopped, [easel]))
+    assert.ok(isWalkable(nearestOpenPosition({ x: 0, z: 0 }, [easel]), [easel]))
+  }
+})
 test("movement is camera-relative, diagonal-normalized, and opposite keys cancel", () => {
   const forward = cameraRelativeInput(0, 1, -Math.PI / 2)
   assert.ok(Math.abs(forward.x) < 1e-10 && Math.abs(forward.z - 1) < 1e-10)

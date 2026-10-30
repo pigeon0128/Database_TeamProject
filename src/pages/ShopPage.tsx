@@ -105,6 +105,8 @@ export default function ShopPage() {
   // 이젤에 올라간 붓과 이젤이 들어와 있는지. tryCount 는 체험할 때마다 캔버스를 새로 만들기 위한 key
   const [easelBrush, setEaselBrush] = useState<SpecialBrush | null>(null);
   const [trying, setTrying] = useState(false);
+  // 체험을 끝내고 돌아가는 중인지: 오른쪽 말풍선을 이젤이 다 나간 뒤에 띄우려고 쓴다
+  const [returning, setReturning] = useState(false);
   const [tryCount, setTryCount] = useState(0);
 
   const openBrushes = () => {
@@ -112,7 +114,10 @@ export default function ShopPage() {
     setBubble({ text: "마음에 드는 브러쉬를 골라 보세요!" });
   };
   /** 이젤을 오른쪽 화면 밖 대기 자리로 돌려보낸다 */
-  const closeEasel = () => setTrying(false);
+  const closeEasel = () => {
+    if (trying) setReturning(true);
+    setTrying(false);
+  };
   const startTry = () => {
     const b = bubble.brush;
     if (!b) return;
@@ -173,9 +178,13 @@ export default function ShopPage() {
         </div>
         {/* 몸만 오려 낸 그림이라 아래쪽이 중앙선에 딱 붙는다 */}
         <img src="/assets/shop/clerk.png" alt="기프트샵 점원" className="absolute bottom-0 left-1/2 h-[84%] w-auto -translate-x-1/2 object-contain drop-shadow-xl" />
-        {/* 말풍선: 평소에는 캐릭터 오른쪽, 체험하는 동안에는 캐릭터 왼쪽 */}
+        {/* 말풍선: 평소에는 캐릭터 오른쪽, 체험하는 동안에는 캐릭터 왼쪽.
+            옆으로 미끄러지지 않고, 자리가 바뀌면 key 로 새로 만들어 원래 자리에서 사라졌다가 새 자리에 톡 나타난다 */}
         <div
-          className={`absolute bottom-[42%] left-1/2 z-10 transition-transform duration-500 ease-out ${trying ? "-translate-x-[calc(100%+min(22vh,16rem)+3rem)]" : "translate-x-[min(22vh,16rem)]"}`}
+          key={trying ? "left" : "right"}
+          className={`bubble-pop absolute bottom-[42%] left-1/2 z-10 ${trying ? "-translate-x-[calc(100%+min(22vh,16rem)+3rem)]" : "translate-x-[min(22vh,16rem)]"}`}
+          // 왼쪽으로 갈 때는 잠깐 뒤에, 오른쪽으로 돌아올 때는 이젤이 나가기 시작하고 0.15초 뒤 나타난다
+          style={{ animationDelay: trying ? "0.2s" : returning ? "0.15s" : "0s" }}
         >
           <SpeechBubble bubble={bubble} side={trying ? "left" : "right"} cells={cells} busy={busy} onBuy={purchase} onTry={startTry} onCancel={() => setBubble({ text: "천천히 둘러보세요!" })} />
         </div>

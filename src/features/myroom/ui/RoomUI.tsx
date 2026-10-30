@@ -84,6 +84,25 @@ export function ObjectThumbnail({ type }: { type: ObjectType }) {
           <rect x="25" y="16" width="50" height="64" fill="#e1d8bb" />
           <rect x="29" y="20" width="42" height="56" fill="#f8f8f4" />
         </>
+      ) : type === "easel" ? (
+        <>
+          <path
+            d="M22 88 48 9h5l26 79M50 22l4 66M23 70h55"
+            stroke="#84613b"
+            strokeWidth="5"
+            fill="none"
+          />
+          <rect
+            x="29"
+            y="24"
+            width="43"
+            height="49"
+            fill="#f8f8f4"
+            stroke="#b38b58"
+            strokeWidth="3"
+          />
+          <path d="M24 75h53" stroke="#84613b" strokeWidth="6" />
+        </>
       ) : type === "chair" ? (
         <>
           <path

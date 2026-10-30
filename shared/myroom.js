@@ -9,6 +9,13 @@ export const CATALOG = Object.freeze({
     height: 1.9,
     depth: 0.16,
   },
+  easel: {
+    name: "목재 이젤",
+    category: "장식",
+    width: 1.3,
+    height: 2.2,
+    depth: 1,
+  },
   chair: {
     name: "접이식 의자",
     category: "의자",
@@ -57,6 +64,9 @@ export const validScale = (object) => {
 export const isRaised = (object) =>
   object.type === "colored" && object.position.y === TABLE_TOP
 export const WALLS = ["back", "left", "right", "front"]
+export function supportsArtwork(type) {
+  return type === "frame" || type === "easel"
+}
 export function wallRotation(wall) {
   return { back: 0, left: -Math.PI / 2, right: Math.PI / 2, front: Math.PI }[
     wall
@@ -207,7 +217,7 @@ export function validateLayout(value) {
       throw new Error("지원하지 않는 오브젝트 속성이에요.")
     if (
       o.artworkDrawingId !== undefined &&
-      (o.type !== "frame" ||
+      (!supportsArtwork(o.type) ||
         !Number.isSafeInteger(o.artworkDrawingId) ||
         o.artworkDrawingId <= 0)
     )

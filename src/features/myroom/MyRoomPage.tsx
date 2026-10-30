@@ -6,6 +6,7 @@ import {
   MIN_COLORED_SCALE,
   onTable,
   placementError,
+  supportsArtwork,
 } from "../../../shared/myroom.js"
 import { navigate } from "../../router"
 import { useAuth } from "../../auth"
@@ -94,7 +95,7 @@ function RoomPage({
   function select(id: string | null) {
     if (busy) return
     setSelected(id)
-    if (room.layout.objects.find((o) => o.id === id)?.type === "frame")
+    if (supportsArtwork(room.layout.objects.find((o) => o.id === id)?.type))
       setPanel("artwork")
   }
   function place(object: RoomObject) {
@@ -118,7 +119,9 @@ function RoomPage({
               y: o.position.y,
               z: object.position.z - dx * sin + dz * cos,
             },
-            rotation: (((o.rotation + turn) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2),
+            rotation:
+              (((o.rotation + turn) % (Math.PI * 2)) + Math.PI * 2) %
+              (Math.PI * 2),
           }
         })
       }
@@ -126,7 +129,8 @@ function RoomPage({
     })
     setPlacement(null)
     setSelected(object.id)
-    if (object.type === "frame" && !object.artworkDrawingId) setPanel("artwork")
+    if (supportsArtwork(object.type) && !object.artworkDrawingId)
+      setPanel("artwork")
   }
   function start(
     type: ObjectType,
@@ -357,7 +361,7 @@ function RoomPage({
               {resizeError && <p className="mr-size-error">{resizeError}</p>}
             </>
           )}
-          {selected.type === "frame" && (
+          {supportsArtwork(selected.type) && (
             <button disabled={busy} onClick={() => setPanel("artwork")}>
               <Icon name="frame" />
               그림 선택 / 교체
@@ -483,7 +487,7 @@ function RoomPage({
           onDeleteStored={room.removeStored}
         />
       )}
-      {panel === "artwork" && selected?.type === "frame" && (
+      {panel === "artwork" && selected && supportsArtwork(selected.type) && (
         <ArtworkPicker
           preview={isPreview}
           artworks={room.artworks}

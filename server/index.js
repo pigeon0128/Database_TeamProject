@@ -26,8 +26,12 @@ const app = express();
 // 요청 본문(JSON) 크기 제한. 그림이 들어가는 요청(그리던 그림, 완성 그림이 붙은 기록)만 크게 받는다.
 const smallJson = express.json({ limit: "100kb" });
 const largeJson = express.json({ limit: "5mb" });
+// 색칠 오브젝트(수납하기)는 부위별 색 샘플이 들어가 가장 크다.
+const hugeJson = express.json({ limit: "8mb" });
 const carriesImage = (path) => path.startsWith("/api/drafts/") || path === "/api/play-records";
-app.use((req, res, next) => (carriesImage(req.path) ? largeJson : smallJson)(req, res, next));
+app.use((req, res, next) =>
+  (req.path === "/api/myroom/storage" ? hugeJson : carriesImage(req.path) ? largeJson : smallJson)(req, res, next),
+);
 
 // 상태 확인 (DB 연결까지)
 app.get("/api/health", async (_req, res) => {

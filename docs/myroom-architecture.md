@@ -193,3 +193,15 @@ Babylon 9.31은 허용 pointer 버튼과 실제 movement inputMap을 별도로 �
 ## 16. 바닥형 이젤
 
 2026-10-29에 easel 카탈로그와 frame/easel 공통 작품 텍스처를 추가했다. 바닥 배치와 플레이어 충돌은 기존 공통 footprint를 사용한다. 단일 조작과 저장 schemaVersion 1은 유지하며 신규 migration이 없다. 구조·호환성·실제 검증·제약은 [이젤 변경 기록](myroom-easel.md)을 따른다.
+
+## 17. 수납함과 색칠 오브젝트 — 2026-10-29
+
+3D 색칠하기(`Test_3d_coloring`)에서 `저장 → 수납하기`를 누르면 칠한 캐릭터가 사용자의 수납함에 보관되고, 마이룸 인벤토리의 `수납함` 탭에서 꺼내 바닥이나 테이블 위에 놓는다.
+
+- **DB**: `020_stored_objects.sql`의 `user_stored_objects`(사용자당 최대 50개). 모양은 `spec` JSONB, 인벤토리 미리보기는 작은 JPEG data URL.
+- **API** (모두 로그인 필요): `GET /api/myroom/storage` 목록(spec 제외), `GET /api/myroom/storage/:id` 모양 포함 조회, `POST /api/myroom/storage` 수납(본문 최대 8MB). 다른 사용자의 오브젝트는 404, 방 저장 때 남의 번호는 400.
+- **spec** (`shared/colored.js`가 검증): 허용된 프리미티브(sphere/box/cone/cylinder/torus/roof)와 변환 행렬, 칠한 꼭짓점의 위치+색 샘플(9바이트, base64)만 받는다. 임의 모델·URL은 저장하지 않는다.
+- **레이아웃**: 새 종류 `colored` + `storedObjectId`. 바닥(y=0) 또는 테이블 상판(y=`TABLE_TOP`=0.95, 상판 안쪽·다른 물건과 겹치지 않을 때)에 놓는다. 서버는 `onTable` 규칙으로 허공에 뜬 배치를 거부한다. 테이블을 옮기거나 제거하면 그 위의 오브젝트도 함께 옮겨지거나 제거된다.
+- **렌더링**: `objects/coloredModel.ts`가 같은 프리미티브를 Babylon `MeshBuilder`로 만들고(박스·지붕만 직접 분할), 정점마다 가장 가까운 색 샘플을 입힌다. three.js(오른손)와 Babylon(왼손) 차이는 맨 바깥 노드의 `scaling.z = -1`로 맞춘다. 정점 색은 spec마다 한 번만 계산해 재사용한다.
+- **크기**: `CATALOG.colored`(0.6 × 0.9 × 0.6)에 맞춰 줄이고 바닥면을 y=0에 맞춘다.
+- **테스트**: `pnpm test:myroom:colored`.

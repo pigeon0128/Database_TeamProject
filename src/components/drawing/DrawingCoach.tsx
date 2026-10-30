@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export type CoachMode = "trace" | "free";
+export type CoachMode = "trace" | "free" | "paint3d";
 export type CoachCharacter = "codex" | "rico" | "naty";
 
 const coaches: Record<CoachCharacter, { name: string; image: string; alt: string }> = {
@@ -15,6 +15,11 @@ const messages: Record<CoachMode, Array<{ title: string; body: string }>> = {
     { title: "흰 선을 따라가요", body: "흰 선을 많이 채울수록 점수가 올라가요. 한 획은 길고 부드럽게 그려요!" },
     { title: "회색 영역은 조심!", body: "회색 부분과 같은 곳을 여러 번 칠하면 감점돼요. 완성 후 ✅ 버튼을 눌러요." },
   ],
+  paint3d: [
+    { title: "오브젝트를 돌려 봐요", body: "오른쪽 버튼으로 끌면 360도로 돌아가요. 휠로 가까이 볼 수 있고, 🎯 방향으로 정면이나 위에서도 볼 수 있어요." },
+    { title: "스프레이로 칠해요", body: "색을 고르고 문지르면 알갱이처럼 칠해져요. 오래 누를수록 진해지고, 부위마다 따로 칠해져요!" },
+    { title: "수납해서 마이룸으로 보내요", body: "완성하면 📦 수납하기를 눌러요. 마이룸에서 꺼내 방을 꾸밀 수 있어요. 💾 저장은 그림 파일로 내려받고 싶을 때 써요." },
+  ],
   free: [
     { title: "이름부터 지어 볼까요?", body: "위쪽 이름 칸에 내가 만들 캐릭터의 이름을 적어 보세요." },
     { title: "큰 모양부터 시작해요", body: "얼굴과 몸처럼 큰 모양을 먼저 그리고, 확대해서 표정을 더해요." },
@@ -25,22 +30,37 @@ const messages: Record<CoachMode, Array<{ title: string; body: string }>> = {
 export function DrawingCoach({ mode, character }: { mode: CoachMode; character: CoachCharacter }) {
   const [step, setStep] = useState(0);
   const [open, setOpen] = useState(true);
+  const [dismissed, setDismissed] = useState(false);
   const item = messages[mode][step];
   const coach = coaches[character];
 
+  // 접어 둔 도움말 버튼이 확대·축소 버튼을 가릴 수 있어서, ✕로 완전히 없앨 수 있다.
+  if (dismissed) return null;
+
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setStep(0);
-          setOpen(true);
-        }}
-        className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-black text-blue-600 shadow-lg"
-      >
-        <img src={coach.image} alt="" className="h-10 w-10 object-contain" />
-        {coach.name} 도움말
-      </button>
+      <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full border border-blue-100 bg-white text-xs font-black text-blue-600 shadow-lg">
+        <button
+          type="button"
+          onClick={() => {
+            setStep(0);
+            setOpen(true);
+          }}
+          className="flex items-center gap-2 rounded-full py-2 pl-4 pr-2"
+        >
+          <img src={coach.image} alt="" className="h-10 w-10 object-contain" />
+          {coach.name} 도움말
+        </button>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="mr-2 rounded-full px-2 py-1 text-base leading-none text-blue-300 hover:text-blue-600"
+          aria-label={`${coach.name} 도움말 완전히 닫기`}
+          title="완전히 닫기"
+        >
+          ✕
+        </button>
+      </div>
     );
   }
 

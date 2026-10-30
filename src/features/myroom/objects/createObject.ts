@@ -8,7 +8,8 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh"
 import type { Scene } from "@babylonjs/core/scene"
 import type { RoomArtwork } from "../artwork"
 import { createArtworkTexture } from "./artworkTexture"
-import type { RoomObject } from "../types"
+import type { ColoredSpec, RoomObject } from "../types"
+import { buildColoredObject } from "./coloredModel"
 import { material } from "../engine/room"
 
 export function createObject(
@@ -16,6 +17,7 @@ export function createObject(
   object: RoomObject,
   artwork?: RoomArtwork,
   preview = false,
+  stored?: ColoredSpec,
 ) {
   const root = new TransformNode(`object-${object.id}`, scene)
   const ownMaterials: StandardMaterial[] = []
@@ -126,6 +128,23 @@ export function createObject(
       preview,
     )
     paper.diffuseTexture = pictureTexture
+  } else if (object.type === "colored") {
+    if (stored) {
+      const built = buildColoredObject(scene, root, object.id, stored)
+      pieces.push(...built.pieces)
+      ownMaterials.push(...built.materials)
+    } else {
+      // 모양을 불러오는 동안 보이는 자리표시
+      const holder = MeshBuilder.CreateBox(
+        `${object.id}-loading`,
+        { width: 0.5, height: 0.5, depth: 0.5 },
+        scene,
+      )
+      holder.parent = root
+      holder.position.y = 0.25
+      holder.material = mat("loading", "#b9c4cc")
+      pieces.push(holder)
+    }
   } else if (object.type === "chair") {
     box("seat", [0.58, 0.1, 0.57], [0, 0.5, 0], dark)
     box("back", [0.58, 0.42, 0.07], [0, 0.84, 0.26], dark)
@@ -133,7 +152,8 @@ export function createObject(
       for (const z of [-0.23, 0.23])
         box("leg", [0.045, 0.5, 0.045], [x, 0.25, z], dark)
   } else if (object.type === "table") {
-    box("top", [1.8, 0.12, 1], [0, 0.89, 0], wood)
+    const top = box("top", [1.8, 0.12, 1], [0, 0.89, 0], wood)
+    top.metadata = { surface: "tabletop" }
     for (const x of [-0.76, 0.76])
       for (const z of [-0.36, 0.36])
         box("leg", [0.1, 0.85, 0.1], [x, 0.425, z], wood)
@@ -165,8 +185,9 @@ export function createObject(
     object.position.z,
   )
   root.rotation.y = object.rotation
+  root.scaling.setAll(object.scale ?? 1)
   pieces.forEach((m) => {
-    m.metadata = { objectId: object.id }
+    m.metadata = { ...m.metadata, objectId: object.id }
     m.isPickable = !preview
     m.receiveShadows = true
   })

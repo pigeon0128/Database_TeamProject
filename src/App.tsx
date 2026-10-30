@@ -13,8 +13,11 @@ import StorySelectPage from "./pages/StorySelectPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import SettingsPage from "./pages/SettingsPage";
 import StudioPage from "./pages/StudioPage";
+import { findModel } from "./features/paint3d/models";
 import { myRoomPreviewEnabled } from "./features/myroom/preview/enabled";
 
+const Paint3DPage = lazy(() => import("./pages/Paint3DPage"));
+const Paint3DSelectPage = lazy(() => import("./pages/Paint3DSelectPage"));
 const MyRoomPage = lazy(() => import("./features/myroom/MyRoomPage"));
 const PreviewMyRoomPage = lazy(() => import("./features/myroom/MyRoomPage").then((module) => ({ default: module.PreviewMyRoomPage })));
 
@@ -26,11 +29,13 @@ const routes: Record<string, ComponentType> = {
   "/creatures": CreatureListPage,
   "/settings": SettingsPage,
   "/studio": StudioPage,
+  "/paint3d": Paint3DSelectPage,
   "/myroom": MyRoomPage,
 };
 
 const STORY_PREFIX = "/story/";
 const CREATURE_PREFIX = "/creatures/";
+const PAINT3D_PREFIX = "/paint3d/";
 
 function Routes() {
   const { user, checking } = useAuth();
@@ -51,6 +56,15 @@ function Routes() {
   if (path.startsWith(CREATURE_PREFIX)) {
     const slug = decodeURIComponent(path.slice(CREATURE_PREFIX.length));
     return <CreatureDrawPage key={slug} slug={slug} />;
+  }
+  if (path.startsWith(PAINT3D_PREFIX)) {
+    const model = findModel(decodeURIComponent(path.slice(PAINT3D_PREFIX.length)));
+    // 모르는 오브젝트 주소는 오브젝트 고르기로 보낸다. key로 오브젝트가 바뀌면 색칠 상태를 새로 시작한다.
+    return (
+      <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-sky-soft text-sm text-ink-muted">불러오는 중…</main>}>
+        {model ? <Paint3DPage key={model.id} modelId={model.id} /> : <Paint3DSelectPage />}
+      </Suspense>
+    );
   }
   const Page = routes[path] ?? HomePage;
   return (

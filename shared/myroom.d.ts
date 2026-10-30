@@ -1,4 +1,4 @@
-export type ObjectType = "frame" | "easel" | "chair" | "table" | "plant"
+export type ObjectType = "frame" | "easel" | "chair" | "table" | "plant" | "colored"
 
 export type Wall = "back" | "left" | "right" | "front"
 
@@ -17,9 +17,10 @@ export type RoomObject = {
   type: ObjectType
   position: Position
   rotation: number
-  scale: 1
+  scale: number
   wall?: Wall
   artworkDrawingId?: number
+  storedObjectId?: number
 }
 
 export type RoomLayout = { objects: RoomObject[] }
@@ -35,6 +36,20 @@ export declare const MAX_OBJECTS: number
 export declare const WALLS: Wall[]
 
 export declare function supportsArtwork(type: ObjectType | undefined): boolean
+
+export declare const TABLE_TOP: number
+
+export declare const MIN_COLORED_SCALE: number
+
+export declare const MAX_COLORED_SCALE: number
+
+export declare function validScale(
+  object: Pick<RoomObject, "type" | "scale">,
+): boolean
+
+export declare function isRaised(object: RoomObject): boolean
+
+export declare function onTable(object: RoomObject, table: RoomObject): boolean
 
 export declare const CATALOG: Readonly<Record<ObjectType, {
   name: string

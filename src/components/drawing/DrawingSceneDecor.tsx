@@ -1,4 +1,4 @@
-export type DrawingSceneDecorMode = "free" | "story" | "creature";
+export type DrawingSceneDecorMode = "free" | "story" | "creature" | "paint3d";
 
 type SceneAsset = {
   src: string;
@@ -14,6 +14,10 @@ const scenes: Record<DrawingSceneDecorMode, SceneAsset[]> = {
   story: [
     { src: "/assets/dorobus/drawing/rico-pose.png", className: "-bottom-14 -left-8 w-64 opacity-[0.28] xl:w-[22rem] xl:opacity-[0.38]", glow: "bg-violet-200/45" },
     { src: "/assets/dorobus/drawing/xylo-pose.png", className: "-bottom-16 -right-8 w-52 opacity-[0.14] xl:w-64 xl:opacity-[0.22]", glow: "bg-amber-200/40" },
+  ],
+  paint3d: [
+    { src: "/assets/dorobus/drawing/codex-pose.png", className: "-bottom-14 -left-6 w-64 opacity-[0.30] xl:w-80 xl:opacity-[0.40]", glow: "bg-lime-200/45" },
+    { src: "/assets/dorobus/drawing/jero-pose.png", className: "-bottom-12 right-24 w-44 opacity-[0.12] xl:w-56 xl:opacity-[0.2]", glow: "bg-cyan-200/40" },
   ],
   creature: [
     { src: "/assets/dorobus/drawing/naty-pose.png", className: "bottom-10 left-10 w-48 opacity-[0.30] xl:left-14 xl:w-64 xl:opacity-[0.42]", glow: "bg-sky-200/55" },

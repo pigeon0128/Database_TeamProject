@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react"
 import {
   CATALOG,
+  MAX_COLORED_SCALE,
   MAX_OBJECTS,
+  MIN_COLORED_SCALE,
+  onTable,
+  placementError,
   supportsArtwork,
 } from "../../../shared/myroom.js"
 import { navigate } from "../../router"
 import { useAuth } from "../../auth"
 import MyRoomViewport from "./MyRoomViewport"
 import { useMyRoom } from "./hooks/useMyRoom"
+import { useStoredSpecs } from "./hooks/useStoredSpecs"
 import { myRoomPreviewEnabled } from "./preview/enabled"
 import type { ObjectType, Placement, RoomObject } from "./types"
 import InventoryPanel from "./ui/InventoryPanel"
@@ -23,6 +28,31 @@ export default function MyRoomPage() {
 
 export function PreviewMyRoomPage() {
   return <RoomPage preview nickname="Preview" />
+}
+
+/** 색칠 오브젝트 크기 조절 막대 (기본 크기의 0.5~2.5배) */
+function SizeSlider({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="mr-size">
+      <span>크기</span>
+      <input
+        type="range"
+        min={MIN_COLORED_SCALE}
+        max={MAX_COLORED_SCALE}
+        step={0.1}
+        value={value}
+        aria-label="오브젝트 크기"
+        onChange={(e) => onChange(Math.round(Number(e.target.value) * 10) / 10)}
+      />
+      <output>{value.toFixed(1)}배</output>
+    </label>
+  )
 }
 
 function RoomPage({
@@ -46,7 +76,21 @@ function RoomPage({
   const [hint, setHint] = useState<string | null>(null),
     [reset, setReset] = useState(0),
     [exit, setExit] = useState(false)
+  const specs = useStoredSpecs(room.layout, placement, !isPreview)
+  const storedName = (o: RoomObject) =>
+    room.stored.find((s) => s.id === o.storedObjectId)?.name
+  const [resizeError, setResizeError] = useState<string | null>(null)
   const selected = room.layout.objects.find((o) => o.id === selectedId)
+  useEffect(() => setResizeError(null), [selectedId])
+  function resize(object: RoomObject, scale: number) {
+    const next = { ...object, scale }
+    const error = placementError(next, room.layout.objects)
+    setResizeError(error)
+    if (error) return
+    room.setLayout((l) => ({
+      objects: l.objects.map((o) => (o.id === object.id ? next : o)),
+    }))
+  }
   const busy = room.loading || room.saving || !room.ready
   function select(id: string | null) {
     if (busy) return
@@ -56,18 +100,52 @@ function RoomPage({
   }
   function place(object: RoomObject) {
     if (busy) return
-    room.setLayout((current) => ({
-      objects: [...current.objects.filter((o) => o.id !== object.id), object],
-    }))
+    room.setLayout((current) => {
+      const before = current.objects.find((o) => o.id === object.id)
+      let rest = current.objects.filter((o) => o.id !== object.id)
+      // 테이블을 옮기면 그 위의 색칠 오브젝트도 함께 옮겨요.
+      if (before?.type === "table") {
+        const turn = object.rotation - before.rotation,
+          cos = Math.round(Math.cos(turn)),
+          sin = Math.round(Math.sin(turn))
+        rest = rest.map((o) => {
+          if (o.type !== "colored" || !onTable(o, before)) return o
+          const dx = o.position.x - before.position.x,
+            dz = o.position.z - before.position.z
+          return {
+            ...o,
+            position: {
+              x: object.position.x + dx * cos + dz * sin,
+              y: o.position.y,
+              z: object.position.z - dx * sin + dz * cos,
+            },
+            rotation:
+              (((o.rotation + turn) % (Math.PI * 2)) + Math.PI * 2) %
+              (Math.PI * 2),
+          }
+        })
+      }
+      return { objects: [...rest, object] }
+    })
     setPlacement(null)
     setSelected(object.id)
     if (supportsArtwork(object.type) && !object.artworkDrawingId)
       setPanel("artwork")
   }
-  function start(type: ObjectType, original?: RoomObject) {
+  function start(
+    type: ObjectType,
+    original?: RoomObject,
+    storedObjectId?: number,
+  ) {
     if (busy || (!original && room.layout.objects.length >= MAX_OBJECTS)) return
     setPanel(null)
-    setPlacement({ type, original, rotation: original?.rotation ?? 0 })
+    setPlacement({
+      type,
+      original,
+      rotation: original?.rotation ?? 0,
+      storedObjectId,
+      scale: original?.scale,
+    })
   }
   const goBack = () => (room.dirty ? setExit(true) : navigate("/"))
   useEffect(() => {
@@ -114,6 +192,7 @@ function RoomPage({
         artworks={room.artworks}
         selected={selectedId}
         placement={placement}
+        specs={specs}
         reset={reset}
         nickname={nickname}
         blocked={busy || !!panel || exit || room.conflict}
@@ -264,7 +343,7 @@ function RoomPage({
       {selected && !placement && !panel && (
         <aside className="mr-selection" aria-label="선택한 오브젝트">
           <div className="mr-selection-heading">
-            <h2>{CATALOG[selected.type].name}</h2>
+            <h2>{storedName(selected) ?? CATALOG[selected.type].name}</h2>
             <button
               className="mr-icon-button"
               aria-label="선택 해제"
@@ -273,6 +352,15 @@ function RoomPage({
               <Icon name="close" />
             </button>
           </div>
+          {selected.type === "colored" && (
+            <>
+              <SizeSlider
+                value={selected.scale ?? 1}
+                onChange={(v) => resize(selected, v)}
+              />
+              {resizeError && <p className="mr-size-error">{resizeError}</p>}
+            </>
+          )}
           {supportsArtwork(selected.type) && (
             <button disabled={busy} onClick={() => setPanel("artwork")}>
               <Icon name="frame" />
@@ -299,7 +387,15 @@ function RoomPage({
             disabled={busy}
             onClick={() => {
               room.setLayout((l) => ({
-                objects: l.objects.filter((o) => o.id !== selected.id),
+                objects: l.objects.filter(
+                  (o) =>
+                    o.id !== selected.id &&
+                    !(
+                      selected.type === "table" &&
+                      o.type === "colored" &&
+                      onTable(o, selected)
+                    ),
+                ),
               }))
               setSelected(null)
             }}
@@ -312,15 +408,42 @@ function RoomPage({
       {placement ? (
         <div className="mr-placement" role="status">
           <div className="mr-placement-heading">
-            <ObjectThumbnail type={placement.type} />
+            {placement.type === "colored" ? (
+              <img
+                className="mr-thumbnail"
+                alt=""
+                src={
+                  room.stored.find(
+                    (s) =>
+                      s.id ===
+                      (placement.storedObjectId ??
+                        placement.original?.storedObjectId),
+                  )?.thumbnail
+                }
+              />
+            ) : (
+              <ObjectThumbnail type={placement.type} />
+            )}
             <div>
               <small>
                 배치 모드 <i />
               </small>
-              <strong>{CATALOG[placement.type].name} 설치</strong>
+              <strong>
+                {(placement.original && storedName(placement.original)) ??
+                  room.stored.find((s) => s.id === placement.storedObjectId)
+                    ?.name ??
+                  CATALOG[placement.type].name}{" "}
+                설치
+              </strong>
             </div>
           </div>
           <p>{hint}</p>
+          {placement.type === "colored" && (
+            <SizeSlider
+              value={placement.scale ?? placement.original?.scale ?? 1}
+              onChange={(v) => setPlacement((p) => p && { ...p, scale: v })}
+            />
+          )}
           <div className="mr-placement-keys">
             <span>
               <kbd>클릭</kbd> 설치
@@ -359,6 +482,9 @@ function RoomPage({
         <InventoryPanel
           onClose={() => setPanel(null)}
           onPlace={(type) => start(type)}
+          stored={room.stored}
+          onPlaceStored={(id) => start("colored", undefined, id)}
+          onDeleteStored={room.removeStored}
         />
       )}
       {panel === "artwork" && selected && supportsArtwork(selected.type) && (

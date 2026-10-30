@@ -13,11 +13,12 @@ import {
   CATALOG,
   ROOM,
   placementError,
+  TABLE_TOP,
   wallRotation,
   type Wall,
 } from "../../../../shared/myroom.js"
 import type { RoomArtwork } from "../artwork"
-import type { Placement, RoomLayout, RoomObject } from "../types"
+import type { ColoredSpec, Placement, RoomLayout, RoomObject } from "../types"
 import { createObject } from "../objects/createObject"
 import { createRoom } from "./room"
 
@@ -85,6 +86,7 @@ export function createRoomScene(
     const player = createPlayerController(scene, camera, canvas, nickname)
 
     let layout: RoomLayout = { objects: [] },
+      specs: Record<number, ColoredSpec> = {},
       artworks: RoomArtwork[] = [],
       selected: string | null = null
     let placing: Placement | null = null,
@@ -99,7 +101,9 @@ export function createRoomScene(
       const hit = scene.pick(x, y, (mesh) =>
         placing!.type === "frame"
           ? mesh.metadata?.surface === "wall"
-          : mesh.metadata?.surface === "floor",
+          : mesh.metadata?.surface === "floor" ||
+            (placing!.type === "colored" &&
+              mesh.metadata?.surface === "tabletop"),
       )
       if (!hit?.hit || !hit.pickedPoint) {
         candidate = null
@@ -107,7 +111,9 @@ export function createRoomScene(
         callbacks.hint(
           placing.type === "frame"
             ? "액자를 걸 벽을 가리켜 주세요."
-            : "방 안쪽 바닥을 가리켜 주세요.",
+            : placing.type === "colored"
+              ? "바닥이나 테이블 위를 가리켜 주세요."
+              : "방 안쪽 바닥을 가리켜 주세요.",
         )
         return
       }
@@ -131,18 +137,28 @@ export function createRoomScene(
                     ? -ROOM.halfDepth + 0.12
                     : snap(p.z),
             }
-          : { x: snap(p.x), y: 0, z: snap(p.z) }
+          : {
+              x: snap(p.x),
+              y: hit.pickedMesh?.metadata?.surface === "tabletop" ? TABLE_TOP : 0,
+              z: snap(p.z),
+            }
+      const storedObjectId =
+        placing.original?.storedObjectId ?? placing.storedObjectId
       const object: RoomObject = {
         id: placing.original?.id ?? "preview",
         type: placing.type,
         position,
         rotation:
           placing.type === "frame" ? wallRotation(wall) : placing.rotation,
-        scale: 1,
+        scale:
+          placing.type === "colored"
+            ? (placing.scale ?? placing.original?.scale ?? 1)
+            : 1,
         ...(placing.type === "frame" ? { wall } : {}),
         ...(placing.original?.artworkDrawingId
           ? { artworkDrawingId: placing.original.artworkDrawingId }
           : {}),
+        ...(storedObjectId ? { storedObjectId } : {}),
       }
       const error = placementError(object, layout.objects)
       preview.root.setEnabled(true)
@@ -154,7 +170,9 @@ export function createRoomScene(
         error ??
           (placing.type === "frame"
             ? "클릭하면 이 벽에 액자를 설치해요."
-            : "클릭하면 가구를 설치해요."),
+            : placing.type === "colored"
+              ? "클릭하면 여기에 놓아요."
+              : "클릭하면 가구를 설치해요."),
       )
     }
     const pointer = scene.onPointerObservable.add((info) => {
@@ -208,6 +226,8 @@ export function createRoomScene(
           scene,
           o,
           artworks.find((a) => a.drawingId === o.artworkDrawingId),
+          false,
+          o.storedObjectId ? specs[o.storedObjectId] : undefined,
         )
         objects.set(o.id, instance)
         if (placing?.original?.id === o.id) instance.root.setEnabled(false)
@@ -228,14 +248,17 @@ export function createRoomScene(
         nextArtworks: RoomArtwork[],
         nextSelected: string | null,
         nextPlacement: Placement | null,
+        nextSpecs: Record<number, ColoredSpec> = {},
       ) {
         layout = next
+        const specsChanged = specs !== nextSpecs
+        specs = nextSpecs
 
         player.syncObjects(layout.objects)
 
         artworks = nextArtworks
         selected = nextSelected
-        const changed = placing !== nextPlacement
+        const changed = placing !== nextPlacement || (specsChanged && !!placing)
         placing = nextPlacement
         rebuild()
         if (changed) {
@@ -248,14 +271,31 @@ export function createRoomScene(
               type: placing.type,
               position: { x: 0, y: 0, z: 0 },
               rotation: placing.rotation,
-              scale: 1,
+              scale:
+                placing.type === "colored"
+                  ? (placing.scale ?? placing.original?.scale ?? 1)
+                  : 1,
+              ...(placing.type === "colored"
+                ? {
+                    storedObjectId:
+                      placing.original?.storedObjectId ?? placing.storedObjectId,
+                  }
+                : {}),
             }
-            preview = createObject(scene, o, undefined, true)
+            preview = createObject(
+              scene,
+              o,
+              undefined,
+              true,
+              o.storedObjectId ? specs[o.storedObjectId] : undefined,
+            )
             preview.root.setEnabled(false)
             callbacks.hint(
               placing.type === "frame"
                 ? "액자를 걸 벽을 가리켜 주세요."
-                : "가구를 놓을 바닥을 가리켜 주세요.",
+                : placing.type === "colored"
+                  ? "놓을 바닥이나 테이블 위를 가리켜 주세요."
+                  : "가구를 놓을 바닥을 가리켜 주세요.",
             )
           } else {
             callbacks.hint(null)

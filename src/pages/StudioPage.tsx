@@ -4,7 +4,7 @@ import DorobusMainCharacter, { type DorobusMainCharacterName } from "../componen
 import { navigate } from "../router";
 
 type Mode = {
-  id: "character" | "story" | "creature";
+  id: "character" | "story" | "creature" | "paint3d";
   title: string;
   description: string;
   detail: string;
@@ -22,6 +22,7 @@ const modes: Mode[] = [
   { id: "character", title: "캐릭터 그리기", description: "나만의 캐릭터를 자유롭게 만들어요.", detail: "이름을 짓고 자유롭게 그린 뒤 작품을 저장해 보세요. 정답이나 점수 없이 아이디어와 표현력을 키우는 모드입니다.", path: "/character", icon: "🐱", difficulty: "자유", time: "5~15분", color: "bg-blue-50", guide: "codex", illustration: "/assets/dorobus/studio/codex-drawing-hero.png", pose: "/assets/dorobus/drawing/codex-pose.png" },
   { id: "story", title: "스토리 장면 그리기", description: "이야기를 읽고 다음 장면을 상상해요.", detail: "제시된 이야기와 장면을 살펴본 뒤, 이어질 순간을 그림으로 완성합니다. 작품은 이야기 컬렉션에 기록됩니다.", path: "/story", icon: "📖", difficulty: "보통", time: "10~20분", color: "bg-amber-50", guide: "rico", illustration: "/assets/dorobus/studio/rico-drawing-hero.png", pose: "/assets/dorobus/drawing/rico-pose.png" },
   { id: "creature", title: "도감 생물 그리기", description: "생물의 특징을 관찰하며 도감을 채워요.", detail: "도감 속 생물을 골라 윤곽을 따라 그리고 정확도 점수를 얻습니다. 완성한 생물은 나만의 도감에 수집됩니다.", path: "/creatures", icon: "🌿", difficulty: "쉬움", time: "5~10분", color: "bg-emerald-50", guide: "naty", illustration: "/assets/dorobus/studio/naty-drawing-hero.png", pose: "/assets/dorobus/drawing/naty-pose.png" },
+  { id: "paint3d", title: "3D 색칠하기", description: "3D 오브젝트를 돌려 보며 스프레이로 칠해요.", detail: "먼저 칠할 3D 오브젝트(캐릭터, 탈것, 집 등)를 하나 고른 뒤, 360도로 돌려 가며 스프레이로 칠해 보세요. 완성하면 수납해서 마이룸에 배치할 수 있습니다.", path: "/paint3d", icon: "🧊", difficulty: "자유", time: "5~15분", color: "bg-violet-50", guide: "codex", illustration: "/assets/dorobus/studio/codex-drawing-hero.png", pose: "/assets/dorobus/drawing/codex-pose.png" },
 ];
 
 function StudioHeader() {
@@ -51,6 +52,9 @@ function StudioHeader() {
 export default function StudioPage() {
   const [selectedId, setSelectedId] = useState<Mode["id"]>("character");
   const selected = modes.find((mode) => mode.id === selectedId) ?? modes[0];
+  const guideDecorationClass = selected.guide === "naty"
+    ? "-bottom-4 -right-6 h-72 w-48"
+    : "-bottom-16 -right-7 h-52 w-44";
 
   return (
     <main className="min-h-screen bg-[#f4f8fc] text-[#151b2c]">
@@ -86,7 +90,7 @@ export default function StudioPage() {
           <section className="rounded-[1.7rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <h2 className="text-2xl font-black tracking-[-0.04em]">그리기 모드</h2>
             <p className="mt-1 text-sm font-semibold text-slate-400">오늘 만들고 싶은 작품을 선택해 보세요.</p>
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {modes.map((mode) => {
                 const active = mode.id === selected.id;
                 return (
@@ -111,8 +115,8 @@ export default function StudioPage() {
               <div className="flex justify-between px-4 py-3"><dt className="text-slate-400">◷ 추천 활동 시간</dt><dd>{selected.time}</dd></div>
               <div className="flex justify-between px-4 py-3"><dt className="text-slate-400">♕ 완성 기록</dt><dd>기록 없음</dd></div>
             </dl>
-            <button type="button" onClick={() => navigate(selected.path)} className="relative z-10 mt-5 w-full rounded-2xl bg-blue-500 px-5 py-4 font-black text-white transition hover:bg-blue-600">{selected.title} 시작하기 →</button>
-            <div className="pointer-events-none absolute -bottom-16 -right-7 h-52 w-44 opacity-35"><DorobusMainCharacter character={selected.guide} label={`Dorobus ${selected.title} 안내 캐릭터`} className="h-full w-full" /></div>
+            <button type="button" onClick={() => navigate(selected.path)} className="relative z-10 mt-5 w-full rounded-2xl bg-blue-500 px-5 py-4 font-black text-white transition hover:bg-blue-600">{selected.id === "paint3d" ? "오브젝트 고르러 가기" : `${selected.title} 시작하기`} →</button>
+            <div className={`pointer-events-none absolute opacity-35 ${guideDecorationClass}`}><DorobusMainCharacter character={selected.guide} label={`Dorobus ${selected.title} 안내 캐릭터`} className="h-full w-full" /></div>
           </section>
         </div>
       </div>

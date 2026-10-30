@@ -1,5 +1,5 @@
 // 메인 화면 (#/). 캐릭터 그리기, 스토리 장면 그리기, 리더보드, 도감 생물 그리기로 가는 메뉴 카드를 보여 주고,
-// 오른쪽 아래 모서리의 톱니바퀴 버튼으로 설정 및 방법 화면에 가고, 그 위에는 기념품 상점 그림이 놓인다(넓은 화면에서만).
+// 오른쪽 아래 모서리의 톱니바퀴 버튼으로 설정 및 방법 화면에 가고, 그 위의 기프트샵 그림(넓은 화면에서만)을 누르면 특수 브러쉬를 파는 상점(#/shop)에 간다.
 // 창 높이에 맞춰 한 화면에 모두 들어간다: 메뉴 카드 2×2가 남는 높이를 나눠 쓰고, 글자·아이콘 크기도 창 높이(vh)에 따라 줄어든다.
 import type { ReactNode } from "react";
 import { useAuth } from "../auth";
@@ -129,9 +129,9 @@ export default function HomePage() {
       <Cloud className="cloud-float-delayed absolute -right-16 top-40 w-56 text-white/80 sm:right-5 sm:top-24 sm:w-64" />
       <UserBar />
       <SettingsButton />
-      <div title="기념품 상점" className="group absolute bottom-[calc(clamp(0.75rem,3vh,2.5rem)+3.75rem)] right-5 z-10 hidden size-[clamp(6rem,17vh,9.5rem)] rounded-3xl border border-white/80 bg-white/76 p-[clamp(0.4rem,1.2vh,0.75rem)] shadow-sm backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-card-hover xl:block sm:right-8">
+      <button type="button" onClick={() => navigate("/shop")} title="기프트샵" aria-label="기프트샵" className="group absolute bottom-[calc(clamp(0.75rem,3vh,2.5rem)+3.75rem)] right-5 z-10 hidden size-[clamp(6rem,17vh,9.5rem)] rounded-3xl border border-white/80 bg-white/76 p-[clamp(0.4rem,1.2vh,0.75rem)] shadow-sm backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-card-hover focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep xl:block sm:right-8">
         <GiftShopIcon className="h-full w-full transition duration-300 group-hover:scale-[1.02]" />
-      </div>
+      </button>
       <div className="absolute left-[8%] top-[42%] h-3 w-3 rounded-full bg-white/70" />
       <div className="absolute right-[9%] top-[55%] h-2 w-2 rounded-full bg-white/70" />
 

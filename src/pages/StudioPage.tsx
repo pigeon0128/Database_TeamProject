@@ -52,6 +52,9 @@ function StudioHeader() {
 export default function StudioPage() {
   const [selectedId, setSelectedId] = useState<Mode["id"]>("character");
   const selected = modes.find((mode) => mode.id === selectedId) ?? modes[0];
+  const guideDecorationClass = selected.guide === "naty"
+    ? "-bottom-4 -right-6 h-72 w-48"
+    : "-bottom-16 -right-7 h-52 w-44";
 
   return (
     <main className="min-h-screen bg-[#f4f8fc] text-[#151b2c]">
@@ -113,7 +116,7 @@ export default function StudioPage() {
               <div className="flex justify-between px-4 py-3"><dt className="text-slate-400">♕ 완성 기록</dt><dd>기록 없음</dd></div>
             </dl>
             <button type="button" onClick={() => navigate(selected.path)} className="relative z-10 mt-5 w-full rounded-2xl bg-blue-500 px-5 py-4 font-black text-white transition hover:bg-blue-600">{selected.id === "paint3d" ? "오브젝트 고르러 가기" : `${selected.title} 시작하기`} →</button>
-            <div className="pointer-events-none absolute -bottom-16 -right-7 h-52 w-44 opacity-35"><DorobusMainCharacter character={selected.guide} label={`Dorobus ${selected.title} 안내 캐릭터`} className="h-full w-full" /></div>
+            <div className={`pointer-events-none absolute opacity-35 ${guideDecorationClass}`}><DorobusMainCharacter character={selected.guide} label={`Dorobus ${selected.title} 안내 캐릭터`} className="h-full w-full" /></div>
           </section>
         </div>
       </div>

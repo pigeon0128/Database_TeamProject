@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import type { RoomArtwork } from "./artwork"
-import type { Placement, RoomLayout, RoomObject } from "./types"
+import type { ColoredSpec, Placement, RoomLayout, RoomObject } from "./types"
 import { createRoomScene } from "./engine/createScene"
 
 export default function MyRoomViewport(props: {
@@ -8,6 +8,7 @@ export default function MyRoomViewport(props: {
   artworks: RoomArtwork[]
   selected: string | null
   placement: Placement | null
+  specs: Record<number, ColoredSpec>
   reset: number
 
   nickname: string
@@ -39,7 +40,7 @@ export default function MyRoomViewport(props: {
       )
       runtime.current = room
       const p = latest.current
-      room.sync(p.layout, p.artworks, p.selected, p.placement)
+      room.sync(p.layout, p.artworks, p.selected, p.placement, p.specs)
 
       room.setInteraction(p.blocked, !!p.placement)
     } catch {
@@ -58,8 +59,9 @@ export default function MyRoomViewport(props: {
       props.artworks,
       props.selected,
       props.placement,
+      props.specs,
     )
-  }, [props.layout, props.artworks, props.selected, props.placement])
+  }, [props.layout, props.artworks, props.selected, props.placement, props.specs])
   useEffect(() => runtime.current?.resetCamera(), [props.reset])
 
   useEffect(

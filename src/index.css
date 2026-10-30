@@ -63,3 +63,19 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 3D 색칠하기(#/paint3d): 작은 화면에서 도구 막대와 색 팔레트를 줄인다 */
+@media (max-width: 640px) {
+  .paint-page header { gap: 2px; padding: 4px; }
+  .paint-page header input { width: 100px; height: 30px; }
+  .tool-rail button { width: 44px; padding-top: 5px; padding-bottom: 5px; font-size: 10px; }
+  .color-palette { grid-template-columns: 1fr; gap: 5px; padding: 6px; }
+  .color-palette button, .color-palette label { width: 24px; height: 24px; }
+}
+@media (max-height: 650px) {
+  .paint-page { gap: 4px; padding: 4px; }
+  .tool-rail button { padding-top: 2px; padding-bottom: 2px; }
+  .tool-rail button > span { font-size: 16px; }
+  .color-palette { grid-template-columns: repeat(2, 1fr); gap: 5px; }
+  .color-palette button, .color-palette label { width: 24px; height: 24px; }
+}

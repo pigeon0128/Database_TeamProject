@@ -30,7 +30,32 @@ export const CATALOG = Object.freeze({
     height: 1.6,
     depth: 0.9,
   },
+  // 3D 색칠하기에서 수납한 오브젝트. 바닥 또는 테이블 위에 놓는다.
+  colored: {
+    name: "색칠 오브젝트",
+    category: "수납함",
+    width: 0.6,
+    height: 0.9,
+    depth: 0.6,
+  },
 })
+// 목재 책상 상판의 윗면 높이 (createObject의 table: 중심 0.89 + 두께의 절반 0.06)
+export const TABLE_TOP = 0.95
+// 색칠 오브젝트만 크기를 바꿀 수 있다 (기본 크기의 0.5~2.5배, 0.1 단위). 너무 커져서 방을 막지 않게 상한을 둔다.
+export const MIN_COLORED_SCALE = 0.5
+export const MAX_COLORED_SCALE = 2.5
+export const validScale = (object) => {
+  const s = object.scale ?? 1
+  if (object.type !== "colored") return s === 1
+  return (
+    Number.isFinite(s) &&
+    s >= MIN_COLORED_SCALE - 1e-9 &&
+    s <= MAX_COLORED_SCALE + 1e-9 &&
+    Math.abs(s * 10 - Math.round(s * 10)) < 1e-6
+  )
+}
+export const isRaised = (object) =>
+  object.type === "colored" && object.position.y === TABLE_TOP
 export const WALLS = ["back", "left", "right", "front"]
 export function wallRotation(wall) {
   return { back: 0, left: -Math.PI / 2, right: Math.PI / 2, front: Math.PI }[
@@ -39,14 +64,27 @@ export function wallRotation(wall) {
 }
 export function footprint(object) {
   const spec = CATALOG[object.type]
+  const k = validScale(object) ? (object.scale ?? 1) : 1
   return object.rotation % Math.PI > Math.PI / 4 &&
     object.rotation % Math.PI < (Math.PI * 3) / 4
-    ? { x: spec.depth / 2, z: spec.width / 2 }
-    : { x: spec.width / 2, z: spec.depth / 2 }
+    ? { x: (spec.depth * k) / 2, z: (spec.width * k) / 2 }
+    : { x: (spec.width * k) / 2, z: (spec.depth * k) / 2 }
 }
-export function placementError(object, others = []) {
+export function onTable(object, table) {
+  if (table.type !== "table" || table.position.y !== 0) return false
+  const a = footprint(object),
+    t = footprint(table)
+  return (
+    Math.abs(object.position.x - table.position.x) + a.x <= t.x + 1e-6 &&
+    Math.abs(object.position.z - table.position.z) + a.z <= t.z + 1e-6
+  )
+}
+export function placementError(object, others) {
+  const relational = others !== undefined
+  others = others ?? []
   const spec = CATALOG[object.type]
   if (!spec) return "지원하지 않는 오브젝트예요."
+  if (!validScale(object)) return "오브젝트 크기가 허용 범위를 벗어났어요."
   const p = object.position
   if (!p || ![p.x, p.y, p.z, object.rotation].every(Number.isFinite))
     return "좌표가 올바르지 않아요."
@@ -88,8 +126,9 @@ export function placementError(object, others = []) {
         return "다른 액자와 겹쳐요."
     }
   } else {
+    const raised = isRaised(object)
     if (
-      p.y !== 0 ||
+      (p.y !== 0 && !raised) ||
       object.wall !== undefined ||
       object.rotation < 0 ||
       object.rotation >= Math.PI * 2 ||
@@ -105,15 +144,29 @@ export function placementError(object, others = []) {
       Math.abs(p.z) + a.z > ROOM.halfDepth - 0.2
     )
       return "방 안쪽 바닥에 배치해 주세요."
-    for (const other of others) {
-      if (other.id === object.id || other.type === "frame") continue
-      const b = footprint(other)
-      if (
-        Math.abs(p.x - other.position.x) < a.x + b.x + 0.08 &&
-        Math.abs(p.z - other.position.z) < a.z + b.z + 0.08
-      )
-        return "다른 가구와 겹쳐요."
-    }
+    if (raised) {
+      if (relational && !others.some((t) => onTable(object, t)))
+        return "테이블 위 안쪽에 올려 주세요."
+      for (const other of others) {
+        if (other.id === object.id || !isRaised(other)) continue
+        const b = footprint(other)
+        if (
+          Math.abs(p.x - other.position.x) < a.x + b.x + 0.04 &&
+          Math.abs(p.z - other.position.z) < a.z + b.z + 0.04
+        )
+          return "테이블 위의 다른 오브젝트와 겹쳐요."
+      }
+    } else
+      for (const other of others) {
+        if (other.id === object.id || other.type === "frame" || isRaised(other))
+          continue
+        const b = footprint(other)
+        if (
+          Math.abs(p.x - other.position.x) < a.x + b.x + 0.08 &&
+          Math.abs(p.z - other.position.z) < a.z + b.z + 0.08
+        )
+          return "다른 가구와 겹쳐요."
+      }
   }
   return null
 }
@@ -134,7 +187,7 @@ export function validateLayout(value) {
     )
       throw new Error("오브젝트 ID가 올바르지 않거나 중복돼요.")
     ids.add(o.id)
-    if (!Object.hasOwn(CATALOG, o.type) || o.scale !== 1)
+    if (!Object.hasOwn(CATALOG, o.type) || !validScale(o))
       throw new Error("오브젝트 종류 또는 크기가 올바르지 않아요.")
     if (
       Object.keys(o).some(
@@ -147,6 +200,7 @@ export function validateLayout(value) {
             "scale",
             "wall",
             "artworkDrawingId",
+            "storedObjectId",
           ].includes(k),
       )
     )
@@ -158,6 +212,12 @@ export function validateLayout(value) {
         o.artworkDrawingId <= 0)
     )
       throw new Error("전시할 작품 번호가 올바르지 않아요.")
+    if (
+      (o.type === "colored") !== (o.storedObjectId !== undefined) ||
+      (o.storedObjectId !== undefined &&
+        (!Number.isSafeInteger(o.storedObjectId) || o.storedObjectId <= 0))
+    )
+      throw new Error("수납함 오브젝트 번호가 올바르지 않아요.")
     const error = placementError(o)
     if (error) throw new Error(error)
     return {
@@ -165,9 +225,10 @@ export function validateLayout(value) {
       type: o.type,
       position: { x: o.position.x, y: o.position.y, z: o.position.z },
       rotation: o.rotation,
-      scale: 1,
+      scale: o.scale ?? 1,
       ...(o.wall ? { wall: o.wall } : {}),
       ...(o.artworkDrawingId ? { artworkDrawingId: o.artworkDrawingId } : {}),
+      ...(o.storedObjectId ? { storedObjectId: o.storedObjectId } : {}),
     }
   })
   for (const o of objects) {

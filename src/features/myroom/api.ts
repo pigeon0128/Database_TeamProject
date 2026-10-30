@@ -1,10 +1,14 @@
 import { ApiError } from "../../lib/api"
-import type { RoomLayout, RoomState } from "./types"
+import type { ColoredSpec, RoomLayout, RoomState, StoredSummary } from "./types"
 
-async function request(method: string, body?: unknown): Promise<RoomState> {
+async function request<T = RoomState>(
+  method: string,
+  body?: unknown,
+  path = "/api/myroom",
+): Promise<T> {
   let res: Response
   try {
-    res = await fetch("/api/myroom", {
+    res = await fetch(path, {
       method,
       credentials: "same-origin",
       headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -25,4 +29,16 @@ export const myroomApi = {
   load: () => request("GET"),
   save: (layout: RoomLayout, expectedRevision: number) =>
     request("PUT", { schemaVersion: 1, expectedRevision, layout }),
+  storage: () =>
+    request<{ objects: StoredSummary[] }>("GET", undefined, "/api/myroom/storage").then(
+      (r) => r.objects,
+    ),
+  removeStored: (id: number) =>
+    request<{ ok: true }>("DELETE", undefined, `/api/myroom/storage/${id}`),
+  stored: (id: number) =>
+    request<StoredSummary & { spec: ColoredSpec }>(
+      "GET",
+      undefined,
+      `/api/myroom/storage/${id}`,
+    ),
 }

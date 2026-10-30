@@ -176,8 +176,8 @@ export default function ShopPage() {
         >
           {easelBrush && <EaselCanvas key={tryCount} slug={easelBrush.slug} name={easelBrush.name} onBack={stopTry} className="h-full" />}
         </div>
-        {/* 몸만 오려 낸 그림이라 아래쪽이 중앙선에 딱 붙는다 */}
-        <img src="/assets/shop/clerk.png" alt="기프트샵 점원" className="absolute bottom-0 left-1/2 h-[84%] w-auto -translate-x-1/2 object-contain drop-shadow-xl" />
+        {/* 몸만 오려 낸 그림이라 아래쪽이 중앙선에 딱 붙는다. 크기를 비율로 정해 반올림으로 틈이 생길 수 있어 1px 내려 둔다 (넘친 부분은 이 칸이 잘라 낸다) */}
+        <img src="/assets/shop/clerk.png" alt="기프트샵 점원" className="absolute -bottom-px left-1/2 h-[84%] w-auto -translate-x-1/2 object-contain drop-shadow-xl" />
         {/* 말풍선: 평소에는 캐릭터 오른쪽, 체험하는 동안에는 캐릭터 왼쪽.
             옆으로 미끄러지지 않고, 자리가 바뀌면 key 로 새로 만들어 원래 자리에서 사라졌다가 새 자리에 톡 나타난다 */}
         <div

@@ -13,6 +13,46 @@ function memoryStorage() {
     setItem: (key, value) => values.set(key, value),
   }
 }
+
+test("floor easel artwork, move, quarter-turn, replacement and removal round-trip without touching old frames", () => {
+  const source = createPreviewSource(memoryStorage())
+  const old = frame().objects[0]
+  const easel = {
+    id: "easel",
+    type: "easel",
+    position: { x: 2, y: 0, z: 1 },
+    rotation: 0,
+    scale: 1,
+    artworkDrawingId: previewArtworks[0].drawingId,
+  }
+  source.save({ objects: [old, easel] }, 0)
+  assert.deepEqual(source.load().layout.objects, [old, easel])
+  const moved = {
+    ...easel,
+    position: { x: -3, y: 0, z: 2 },
+    rotation: Math.PI / 2,
+    artworkDrawingId: previewArtworks[1].drawingId,
+  }
+  const updated = source.save({ objects: [old, moved] }, 1)
+  assert.deepEqual(source.load().layout, updated.layout)
+  assert.throws(
+    () => source.save({ objects: [old, { ...moved, artworkDrawingId: 2 }] }, 2),
+    /샘플 작품/,
+  )
+  assert.throws(() =>
+    source.save(
+      { objects: [old, { ...moved, position: { x: 99, y: 0, z: 0 } }] },
+      2,
+    ),
+  )
+  assert.throws(
+    () => source.save({ objects: [] }, 1),
+    (e) => e.status === 409,
+  )
+  assert.deepEqual(source.load(), updated)
+  source.save({ objects: [old] }, 2)
+  assert.deepEqual(source.load().layout.objects, [old])
+})
 const frame = (artworkDrawingId = previewArtworks[0].drawingId) => ({
   objects: [
     {

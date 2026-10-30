@@ -5,6 +5,8 @@ import {
   validateLayout,
   placementError,
   wallRotation,
+  footprint,
+  supportsArtwork,
 } from "../shared/myroom.js"
 
 const frame = (id = "frame-a", wall = "back") => ({
@@ -35,6 +37,53 @@ const chair = (id = "chair-a") => ({
   position: { x: 0, y: 0, z: 0 },
   rotation: 0,
   scale: 1,
+})
+
+test("easels accept artwork on the floor and preserve existing v1 layouts", () => {
+  const old = {
+    objects: [frame(), { ...chair(), position: { x: 3, y: 0, z: 0 } }],
+  }
+  assert.deepEqual(validateLayout(old), old)
+  const easel = { ...chair("easel-a"), type: "easel", artworkDrawingId: 2 }
+  assert.deepEqual(
+    validateLayout({ objects: [...old.objects, easel] }).objects.at(-1),
+    easel,
+  )
+  assert.equal(supportsArtwork("frame"), true)
+  assert.equal(supportsArtwork("easel"), true)
+  for (const type of ["chair", "table", "plant"])
+    assert.throws(
+      () => validateLayout({ objects: [{ ...easel, type }] }),
+      /작품/,
+    )
+  for (const artworkDrawingId of [0, -1, "2", 1.5, Number.MAX_SAFE_INTEGER + 1])
+    assert.throws(
+      () => validateLayout({ objects: [{ ...easel, artworkDrawingId }] }),
+      /작품/,
+    )
+  for (const invalid of [
+    { ...easel, wall: "back" },
+    { ...easel, position: { x: 0, y: 1, z: 0 } },
+    { ...easel, rotation: Math.PI / 4 },
+  ])
+    assert.throws(() => validateLayout({ objects: [invalid] }))
+})
+
+test("easel footprint rotates, bounds placement, and blocks every floor furniture type", () => {
+  const easel = { ...chair("easel-a"), type: "easel" }
+  assert.deepEqual(footprint(easel), { x: 0.65, z: 0.5 })
+  assert.deepEqual(footprint({ ...easel, rotation: Math.PI / 2 }), {
+    x: 0.5,
+    z: 0.65,
+  })
+  const edge = { ...easel, position: { x: 11.25, y: 0, z: 0 } }
+  assert.ok(placementError(edge))
+  assert.equal(placementError({ ...edge, rotation: Math.PI / 2 }), null)
+  for (const type of ["chair", "table", "plant", "easel"])
+    assert.throws(
+      () => validateLayout({ objects: [easel, { ...chair("other"), type }] }),
+      /겹쳐/,
+    )
 })
 
 test("all four wall bases face into the room and round-trip through the contract", () => {

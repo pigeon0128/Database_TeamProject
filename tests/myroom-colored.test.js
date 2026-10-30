@@ -30,6 +30,69 @@ const colored = (id, x, y, z, extra = {}) => ({
   ...extra,
 })
 
+test("easel artwork and resized colored objects coexist without mixing their saved contracts", () => {
+  const easel = {
+    id: "easel",
+    type: "easel",
+    position: { x: 3, y: 0, z: 3 },
+    rotation: Math.PI / 2,
+    scale: 1,
+    artworkDrawingId: 2,
+  }
+
+  const painted = colored("painted", -3, 0, 3, { scale: 2.5 })
+
+  const layout = {
+    objects: [
+      easel,
+      painted,
+      table,
+      colored("raised", 0, TABLE_TOP, 0, { scale: 0.8 }),
+    ],
+  }
+
+  assert.deepEqual(validateLayout(JSON.parse(JSON.stringify(layout))), layout)
+
+  for (const bad of [
+    { ...easel, scale: 1.5 },
+
+    { ...easel, storedObjectId: 1 },
+
+    { ...painted, artworkDrawingId: 2 },
+  ])
+    assert.throws(() => validateLayout({ objects: [bad] }))
+})
+
+test("easel and colored objects block each other using scaled, rotated floor footprints", () => {
+  const easel = {
+    id: "easel",
+    type: "easel",
+    position: { x: 0, y: 0, z: 0 },
+    rotation: 0,
+    scale: 1,
+  }
+
+  const near = colored("painted", 1.2, 0, 0)
+
+  assert.equal(placementError(near, [easel]), null)
+
+  assert.match(placementError({ ...near, scale: 2 }, [easel]), /겹쳐/)
+
+  assert.match(placementError(easel, [{ ...near, scale: 2 }]), /겹쳐/)
+
+  assert.throws(
+    () => validateLayout({ objects: [easel, { ...near, scale: 2 }] }),
+    /겹쳐/,
+  )
+
+  assert.equal(
+    placementError({ ...near, scale: 2 }, [
+      { ...easel, rotation: Math.PI / 2 },
+    ]),
+    null,
+  )
+})
+
 test("colored objects stand on the floor and keep clear of furniture", () => {
   assert.equal(CATALOG.colored.category, "수납함")
   assert.equal(placementError(colored("c", 4, 0, 4), [table]), null)

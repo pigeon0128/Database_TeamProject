@@ -168,6 +168,209 @@ test(
       },
     )
     await t.test(
+      "floor easels share ownership checks, revision and durable JSONB storage with frames",
+      async () => {
+        const current = (await call("/api/myroom", "GET", undefined, cookie))
+          .body
+        const easel = {
+          id: "floor-art",
+          type: "easel",
+          position: { x: 2, y: 0, z: 1 },
+          rotation: Math.PI / 2,
+          scale: 1,
+          artworkDrawingId: 3,
+        }
+        for (const artworkDrawingId of [4, 99999, 900001])
+          assert.equal(
+            (
+              await save(
+                [easel].map((o) => ({ ...o, artworkDrawingId })),
+                current.revision,
+              )
+            ).status,
+            400,
+          )
+        assert.equal((await save([frame, easel], current.revision)).status, 200)
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame, easel],
+        )
+        assert.equal((await save([], current.revision)).status, 409)
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, b.cookie)).body.layout
+            .objects,
+          [],
+        )
+        const moved = {
+          ...easel,
+          position: { x: -3, y: 0, z: 2 },
+          rotation: Math.PI,
+          artworkDrawingId: 2,
+        }
+        assert.equal(
+          (await save([frame, moved], current.revision + 1)).status,
+          200,
+        )
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame, moved],
+        )
+        assert.equal((await save([frame], current.revision + 2)).status, 200)
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame],
+        )
+      },
+    )
+    await t.test(
+      "easel artwork and colored storage ownership/resize/revisions round-trip together",
+      async () => {
+        const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+        const spec = {
+          v: 1,
+          bounds: { min: [-1, -1, -1], max: [1, 1, 1] },
+          group: identity,
+          parts: [
+            {
+              shape: { kind: "sphere", radius: 1 },
+              matrix: identity,
+              color: "#f25c54",
+            },
+          ],
+        }
+        const body = {
+          name: "integration-colored",
+          sourceModel: "sphere",
+          thumbnail: image,
+          spec,
+        }
+        assert.equal(
+          (await call("/api/myroom/storage", "POST", body)).status,
+          401,
+        )
+        const own = await call("/api/myroom/storage", "POST", body, cookie)
+        const foreign = await call(
+          "/api/myroom/storage",
+          "POST",
+          body,
+          b.cookie,
+        )
+        assert.equal(own.status, 201)
+        assert.equal(foreign.status, 201)
+        assert.deepEqual(
+          (
+            await call(
+              `/api/myroom/storage/${own.body.id}`,
+              "GET",
+              undefined,
+              cookie,
+            )
+          ).body.spec,
+          spec,
+        )
+        assert.equal(
+          (
+            await call(
+              `/api/myroom/storage/${foreign.body.id}`,
+              "GET",
+              undefined,
+              cookie,
+            )
+          ).status,
+          404,
+        )
+        const easel = {
+          id: "paired-easel",
+          type: "easel",
+          position: { x: 3, y: 0, z: 3 },
+          rotation: Math.PI / 2,
+          scale: 1,
+          artworkDrawingId: 2,
+        }
+        const painted = {
+          id: "paired-colored",
+          type: "colored",
+          position: { x: -3, y: 0, z: 3 },
+          rotation: 0,
+          scale: 1.4,
+          storedObjectId: own.body.id,
+        }
+        const current = (await call("/api/myroom", "GET", undefined, cookie))
+          .body
+        for (const bad of [
+          { ...painted, storedObjectId: foreign.body.id },
+          { ...painted, storedObjectId: 999999999 },
+          { ...painted, position: { ...easel.position } },
+          { ...painted, scale: 3 },
+          { ...painted, artworkDrawingId: 2 },
+          { ...easel, artworkDrawingId: 4 },
+        ])
+          assert.equal(
+            (
+              await save(
+                bad.id === easel.id
+                  ? [frame, bad, painted]
+                  : [frame, easel, bad],
+                current.revision,
+              )
+            ).status,
+            400,
+          )
+        assert.equal(
+          (await save([frame, easel, painted], current.revision)).status,
+          200,
+        )
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame, easel, painted],
+        )
+        assert.equal(
+          (
+            await call(
+              `/api/myroom/storage/${own.body.id}`,
+              "DELETE",
+              undefined,
+              cookie,
+            )
+          ).status,
+          409,
+        )
+        const changed = [
+          { ...easel, artworkDrawingId: 3 },
+          { ...painted, scale: 2.5, rotation: Math.PI / 2 },
+        ]
+        assert.equal(
+          (await save([frame, ...changed], current.revision + 1)).status,
+          200,
+        )
+        assert.deepEqual(
+          (await call("/api/myroom", "GET", undefined, cookie)).body.layout
+            .objects,
+          [frame, ...changed],
+        )
+        assert.equal((await save([], current.revision + 1)).status, 409)
+        assert.equal(
+          (await save([frame, changed[0]], current.revision + 2)).status,
+          200,
+        )
+        assert.equal(
+          (
+            await call(
+              `/api/myroom/storage/${own.body.id}`,
+              "DELETE",
+              undefined,
+              cookie,
+            )
+          ).status,
+          200,
+        )
+      },
+    )
+    await t.test(
       "existing collection, drawings, leaderboard, drafts and brushes still work",
       async () => {
         assert.ok((await call("/api/drawings")).body.drawings.length > 0)

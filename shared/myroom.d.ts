@@ -1,4 +1,4 @@
-export type ObjectType = "frame" | "chair" | "table" | "plant" | "colored"
+export type ObjectType = "frame" | "easel" | "chair" | "table" | "plant" | "colored"
 
 export type Wall = "back" | "left" | "right" | "front"
 
@@ -35,13 +35,17 @@ export declare const MAX_OBJECTS: number
 
 export declare const WALLS: Wall[]
 
+export declare function supportsArtwork(type: ObjectType | undefined): boolean
+
 export declare const TABLE_TOP: number
 
 export declare const MIN_COLORED_SCALE: number
 
 export declare const MAX_COLORED_SCALE: number
 
-export declare function validScale(object: Pick<RoomObject, "type" | "scale">): boolean
+export declare function validScale(
+  object: Pick<RoomObject, "type" | "scale">,
+): boolean
 
 export declare function isRaised(object: RoomObject): boolean
 

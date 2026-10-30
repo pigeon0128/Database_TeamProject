@@ -39,15 +39,18 @@ export function drawMarks(marks: HTMLCanvasElement, s: PaintStroke, r: Region, f
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
-/** 붓 자국(marks)을 구역 마스크로 잘라(clip 캔버스 사용) target 에 칠한다 */
-export function applyClipped(target: CanvasRenderingContext2D, marks: HTMLCanvasElement, clip: HTMLCanvasElement, r: Region) {
+/** 붓 자국(marks)을 구역 마스크로 잘라(clip 캔버스 사용) target 에 칠한다. erase 면 칠하는 대신 그 자리의 색을 지운다 */
+export function applyClipped(target: CanvasRenderingContext2D, marks: HTMLCanvasElement, clip: HTMLCanvasElement, r: Region, erase = false) {
   const c = clip.getContext("2d")!;
   c.globalCompositeOperation = "copy";
   c.drawImage(marks, 0, 0);
   c.globalCompositeOperation = "destination-in";
   c.drawImage(r.mask, 0, 0);
   c.globalCompositeOperation = "source-over";
+  const op = target.globalCompositeOperation;
+  if (erase) target.globalCompositeOperation = "destination-out";
   target.drawImage(clip, r.x, r.y);
+  target.globalCompositeOperation = op;
 }
 
 /** 색칠 획이 칠할 구역 (첫 점 자리). 근처에 구역이 없으면 null */
@@ -56,37 +59,18 @@ export function regionOf(regions: Regions, points: Point[]) {
   return id ? regions.region(id) : null;
 }
 
-/** 지우개 획으로 색을 지운다 (구역과 상관없이 지나간 곳 전부) */
-function erasePaint(ctx: CanvasRenderingContext2D, s: Stroke) {
-  ctx.save();
-  ctx.globalCompositeOperation = "destination-out";
-  ctx.lineWidth = s.size;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.arc(s.points[0][0], s.points[0][1], s.size / 2, 0, Math.PI * 2);
-  ctx.fill();
-  if (s.points.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(s.points[0][0], s.points[0][1]);
-    for (const [x, y] of s.points.slice(1)) ctx.lineTo(x, y);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
+/** 지우개 획이 색을 지울 때 쓰는 붓 자국 모양 (같은 points 배열을 써서 그리는 중에도 함께 늘어난다) */
+export const eraseMarks = (s: Stroke): PaintStroke => ({ type: "paint", pattern: null, color: "#000", size: s.size, points: s.points });
 
-/** 색칠 층 전체를 그린 순서대로 다시 그린다 (색칠 획은 칠하고, 펜 지우개 획은 색을 지운다) */
+/** 색칠 층 전체를 그린 순서대로 다시 그린다 (색칠 획은 칠하고, 펜 지우개 획은 처음 댄 구역 안의 색만 지운다) */
 export function renderPaint(ctx: CanvasRenderingContext2D, actions: (Stroke | PaintStroke)[], regions: Regions) {
   ctx.clearRect(0, 0, regions.width, regions.height);
   for (const a of actions) {
-    if (a.type === "stroke") {
-      if (a.erase) erasePaint(ctx, a);
-      continue;
-    }
+    if (a.type === "stroke" && !a.erase) continue;
     const r = regionOf(regions, a.points);
     if (!r) continue;
     const marks = makeCanvas(r.w, r.h);
-    drawMarks(marks, a, r, 0);
-    applyClipped(ctx, marks, makeCanvas(r.w, r.h), r);
+    drawMarks(marks, a.type === "stroke" ? eraseMarks(a) : a, r, 0);
+    applyClipped(ctx, marks, makeCanvas(r.w, r.h), r, a.type === "stroke");
   }
 }

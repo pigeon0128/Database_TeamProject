@@ -96,7 +96,7 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
     if (record.startedAt === null) return;
     const latest = scoring.scoreNow();
     draft.finish();
-    // 밑그림 없이 그린 선만 저장한다 (리더보드에서 밑그림 위에 겹쳐 볼 수 있게)
+    // 밑그림 없이 칠한 색과 그린 선만 저장한다 (리더보드에서 밑그림 위에 겹쳐 볼 수 있게)
     record.submit(latest.exactScore, canvasRef.current?.exportDrawing() ?? null);
   };
 

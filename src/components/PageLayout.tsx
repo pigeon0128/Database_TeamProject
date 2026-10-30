@@ -26,9 +26,25 @@ export default function PageLayout({ title, wide, back = { path: "/", label: "�
     <main className="relative min-h-screen overflow-hidden bg-[#eef7ff] px-5 py-5 text-ink sm:px-8">
       <DorobusBackdrop dense />
       {backgroundCharacter && (
-        <div className="pointer-events-none absolute right-[-2rem] top-20 z-0 h-64 w-48 opacity-20 lg:bottom-0 lg:top-auto lg:h-[min(52vh,540px)] lg:w-[min(34vw,420px)] lg:opacity-100" aria-hidden="true">
+        <div
+          className="pointer-events-none absolute bottom-0 right-4 z-0 hidden h-[min(44vh,460px)] w-[min(15vw,300px)] min-[1900px]:block"
+          aria-hidden="true"
+        >
           <span className={`absolute bottom-8 right-3 h-[72%] w-[85%] rounded-full blur-3xl ${backgroundCharacter.tone}`} />
           <img src={backgroundCharacter.image} alt={backgroundCharacter.label} className="relative h-full w-full object-contain drop-shadow-2xl" />
+        </div>
+      )}
+      {wide && title.includes("도감") && (
+        <div
+          className="pointer-events-none absolute bottom-[180px] left-4 z-0 hidden h-[min(50vh,460px)] w-[min(14vw,270px)] min-[1900px]:block"
+          aria-hidden="true"
+        >
+          <span className="absolute bottom-4 left-2 h-[72%] w-[90%] rounded-full bg-emerald-200/30 blur-3xl" />
+          <img
+            src="/assets/dorobus/decorations/codex-field-guide.png"
+            alt=""
+            className="relative h-full w-full object-contain object-bottom drop-shadow-2xl"
+          />
         </div>
       )}
       <div className={`relative mx-auto w-full ${wide ? "max-w-7xl" : "max-w-5xl"}`}>

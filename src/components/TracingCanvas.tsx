@@ -5,8 +5,9 @@
 // - 색칠(regions 가 있는 밑그림): 밑그림과 펜 선 사이의 색칠 층에 색·무늬를 칠한다. 붓을 댄 구역 안에만 칠해진다 (lib/drawing/paint.ts).
 //   색칠 층 위에 밑그림의 선만 다시 덮어서 칠해도 따라 그릴 흰 선이 보인다. 채점은 펜 선 캔버스만 읽으므로 색칠은 점수에 영향이 없다.
 //   층 순서: 밑그림 → 색칠 → 밑그림 선 → 펜 선
+// - 지우개는 펜 선은 구역과 상관없이 지우고, 색은 칠하기처럼 처음 댄 구역 안에서만 지운다.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { applyClipped, drawMarks, makeCanvas, regionOf, renderPaint } from "../lib/drawing/paint";
+import { applyClipped, drawMarks, eraseMarks, makeCanvas, regionOf, renderPaint } from "../lib/drawing/paint";
 import type { Region, Regions } from "../lib/drawing/regions";
 import { taper, visibleActions, visibleStrokes, type DrawAction, type PaintStroke, type Point, type Stroke } from "../lib/drawing/strokes";
 
@@ -16,7 +17,7 @@ export type PaintBrush = Pick<PaintStroke, "pattern" | "color" | "size">;
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */
   exportImage: (withGuide: boolean) => string | null;
-  /** 사용자가 그린 선만, 투명 배경 PNG data URL (리더보드에 올리는 완성 그림) */
+  /** 사용자가 칠한 색과 그린 선만, 투명 배경 PNG data URL (리더보드·마이룸에 올리는 완성 그림. 밑그림은 넣지 않는다) */
   exportDrawing: () => string | null;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -121,8 +122,8 @@ const ZOOM_STEP = 1.25;
 type View = { z: number; tx: number; ty: number };
 type Mode = "none" | "draw" | "paint" | "pan" | "pinch" | "blocked";
 
-/** 그리는 중인 색칠 획: 붓 자국(marks)과 구역으로 자른 결과(clip) 캔버스, 이미 그린 점 수 */
-type LivePaint = { stroke: PaintStroke; region: Region; marks: HTMLCanvasElement; clip: HTMLCanvasElement; drawn: number };
+/** 그리는 중인 색칠 획(또는 지우개가 색을 지우는 자국): 붓 자국(marks)과 구역으로 자른 결과(clip) 캔버스, 이미 그린 점 수 */
+type LivePaint = { stroke: PaintStroke; region: Region; marks: HTMLCanvasElement; clip: HTMLCanvasElement; drawn: number; erase: boolean };
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
@@ -230,7 +231,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     const ctx = paintDisplay();
     ctx.clearRect(r.x, r.y, r.w, r.h);
     ctx.drawImage(paintDone.current, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
-    applyClipped(ctx, marks, clip, r);
+    applyClipped(ctx, marks, clip, r, live.erase);
   };
   const schedulePaint = () => {
     if (!paintFrame.current) paintFrame.current = requestAnimationFrame(paintLive);
@@ -247,8 +248,19 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     ctx.clearRect(x, y, w, h);
     ctx.drawImage(paintDone.current!, x, y, w, h, x, y, w, h);
   };
-  /** 지우개는 펜 선과 함께 색도 지운다: 그리는 동안 색칠 층에도 같은 자국을 낼 캔버스 (색칠이 없으면 null) */
-  const paintEraseCtx = () => (regions && paintRef.current ? paintRef.current.getContext("2d")! : null);
+  /** 그리던 색칠 획이나 지우개 자국을 마저 그리고 끝낸다 */
+  const finishPaint = () => {
+    const live = livePaint.current;
+    if (!live) return null;
+    cancelAnimationFrame(paintFrame.current);
+    paintLive();
+    livePaint.current = null;
+    return live;
+  };
+  const startLive = (stroke: PaintStroke, region: Region, erase: boolean) => {
+    livePaint.current = { stroke, region, marks: makeCanvas(region.w, region.h), clip: makeCanvas(region.w, region.h), drawn: 0, erase };
+    schedulePaint();
+  };
 
   useImperativeHandle(ref, () => ({
     exportImage(withGuide) {
@@ -273,7 +285,15 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       return out.toDataURL("image/png");
     },
     exportDrawing() {
-      return canvasRef.current?.toDataURL("image/png") ?? null;
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      if (!regions || !paintDone.current) return canvas.toDataURL("image/png");
+      // 색칠 층 위에 펜 선을 겹친다. 밑그림 선은 리더보드가 밑에 깔아 보여 주므로 넣지 않는다 (겹쳐 두 번 보이지 않게)
+      const out = makeCanvas(width, height);
+      const ctx = out.getContext("2d")!;
+      ctx.drawImage(paintDone.current, 0, 0);
+      ctx.drawImage(canvas, 0, 0);
+      return out.toDataURL("image/png");
     },
     zoomIn: () => zoomAt(ZOOM_STEP),
     zoomOut: () => zoomAt(1 / ZOOM_STEP),
@@ -333,13 +353,8 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       if (current.current) {
         current.current = null;
         redraw();
-        // 지우개였으면 색칠 층에 낸 자국도 되돌린다
-        if (paintDone.current && paintRef.current) {
-          const ctx = paintDisplay();
-          ctx.clearRect(0, 0, width, height);
-          ctx.drawImage(paintDone.current, 0, 0);
-        }
       }
+      // 색칠 획이나 지우개가 색칠 층에 낸 자국도 되돌린다
       cancelPaint();
       mode.current = "pinch";
       gesture.current = { view: viewRef.current, ...pinchInfo() };
@@ -365,8 +380,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
       if (!region) return;
       mode.current = "paint";
       onStrokeStart?.();
-      livePaint.current = { stroke, region, marks: makeCanvas(region.w, region.h), clip: makeCanvas(region.w, region.h), drawn: 0 };
-      schedulePaint();
+      startLive(stroke, region, false);
       return;
     }
 
@@ -380,11 +394,9 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     rawLast.current = start;
     applyStyle(ctx, stroke);
     drawDot(ctx, start, size * taper(0, Infinity, fade));
-    const paintCtx = erase ? paintEraseCtx() : null;
-    if (paintCtx) {
-      applyStyle(paintCtx, stroke);
-      drawDot(paintCtx, start, size * taper(0, Infinity, fade));
-    }
+    // 지우개: 색은 처음 댄 구역 안에서만 지운다 (선 위에서 멀리 떨어진 곳에서 시작하면 펜 선만 지운다)
+    const region = erase && regions && paintRef.current && paintDone.current ? regionOf(regions, stroke.points) : null;
+    if (region) startLive(eraseMarks(stroke), region, true);
   };
 
   /** 보정된 점 p를 획에 붙이고 그 구간을 바로 그린다. 너무 가까운 점은 건너뛴다. */
@@ -399,11 +411,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     const i = pts.length - 1;
     const w = stroke.size * taper(dists.current[i - 1], Infinity, stroke.fade);
     drawSegment(ctx, pts, i, w);
-    const paintCtx = stroke.erase ? paintEraseCtx() : null;
-    if (paintCtx) {
-      applyStyle(paintCtx, stroke);
-      drawSegment(paintCtx, pts, i, w);
-    }
+    if (livePaint.current?.erase) schedulePaint();
   };
 
   const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -457,13 +465,10 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
 
   const handleUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     pointers.current.delete(e.pointerId);
-    const live = livePaint.current;
-    if (mode.current === "paint" && live) {
-      cancelAnimationFrame(paintFrame.current);
-      paintLive();
-      livePaint.current = null;
+    if (mode.current === "paint") {
+      const live = finishPaint();
       // 목록에 넣으면 색칠 층을 다시 그리는 효과가 다 그은 색에 이 획을 더한다
-      onStrokeEnd(live.stroke);
+      if (live) onStrokeEnd(live.stroke);
     }
     const stroke = current.current;
     if (mode.current === "draw" && stroke) {
@@ -476,6 +481,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
         if (Math.hypot(raw[0] - s[0], raw[1] - s[1]) < 1) break;
         addPoint(ctx, stroke, [s[0] + (raw[0] - s[0]) * 0.5, s[1] + (raw[1] - s[1]) * 0.5]);
       }
+      finishPaint();
       // 끝부분 페이드까지 반영된 모양은 onStrokeEnd → 다시 그리기에서 그려진다.
       onStrokeEnd(stroke);
     }

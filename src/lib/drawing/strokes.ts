@@ -16,7 +16,7 @@ export type Stroke = {
 /**
  * 색칠 획. 붓을 처음 댄 자리(points[0])의 구역 안에만 칠해진다 (lib/drawing/regions.ts).
  * 구역 번호는 저장하지 않고 그릴 때마다 첫 점으로 다시 찾는다 (밑그림이 바뀌어도 엉뚱한 구역에 칠해지지 않게).
- * 지우개는 따로 없고, 펜 지우개 획(Stroke.erase)이 펜 선과 색을 함께 지운다.
+ * 지우개는 따로 없고, 펜 지우개 획(Stroke.erase)이 펜 선과 색을 함께 지운다 (색은 지우개를 처음 댄 구역 안에서만).
  */
 export type PaintStroke = {
   type: "paint";

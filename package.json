@@ -17,7 +17,8 @@
     "test:myroom:player": "node --experimental-strip-types --test tests/myroom-player.test.js",
     "test:myroom:api": "node --test tests/myroom-api.test.js",
     "typecheck": "tsc --noEmit",
-    "test:myroom:colored": "node --test tests/myroom-colored.test.js"
+    "test:myroom:colored": "node --test tests/myroom-colored.test.js",
+    "test:myroom:story": "node --test tests/myroom-artwork-files.test.js tests/myroom-story-artworks-api.test.js"
   },
   "dependencies": {
     "@babylonjs/core": "9.31.0",

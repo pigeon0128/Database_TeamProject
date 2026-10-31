@@ -13,6 +13,7 @@ const svg = (shapes: string) =>
 export const previewArtworks: RoomArtwork[] = [
   {
     drawingId: 900001,
+    kind: "creature",
     name: "Preview 샘플 · 산",
     slug: "preview-mountain",
     imageKey: null,
@@ -22,6 +23,7 @@ export const previewArtworks: RoomArtwork[] = [
   },
   {
     drawingId: 900002,
+    kind: "creature",
     name: "Preview 샘플 · 꽃",
     slug: "preview-flower",
     imageKey: null,

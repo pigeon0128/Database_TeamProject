@@ -4,7 +4,7 @@ import type { ObjectType, StoredSummary } from "../types"
 import { Modal, ObjectThumbnail } from "./RoomUI"
 
 const descriptions: Record<ObjectType, string> = {
-  frame: "벽에 거는 액자. 내 도감의 완성 작품을 전시할 수 있어요.",
+  frame: "벽에 거는 액자. 내 도감·스토리 완성 작품을 전시할 수 있어요.",
   easel: "바닥에 세우는 목재 이젤. 완성 작품을 골라 캔버스에 전시해요.",
   chair: "접이식 의자를 바닥에 놓아 보세요.",
   table: "나무 책상. 의자와 함께 배치할 수 있어요.",

@@ -71,3 +71,13 @@ Preview는 App의 DEV 전용 분기에서 AuthProvider 없이 마운트한다. l
 검증: typecheck, geometry 6/Preview 6/player 11/colored 12/격리 PostgreSQL API 9(부모 포함), 총44건 pass/0 fail/0 skip 및 production flag=true build 성공. 새 테스트는 frame+easel+colored 동시 저장, 양쪽 ID/소유권/크기 규칙, 확대·회전 footprint 충돌과 플레이어 충돌, revision·불법 변경 거부·저장 복원·수납 삭제 방어를 검사한다. 테스트 DB의 기존 분리 cluster(55439)에 main의 020만 적용했으며 운영 DB는 사용하지 않았다.
 
 실제 브라우저에서 3D 색칠→수납→바닥 배치(2.5배)→선택 패널 크기 변경(2.3배)→완성 도감 작품을 이젤에 전시→혼합 저장/새로고침→colored 2.3배 및 이젤 작품 연결 복원을 확인했다. 기존 Mock Preview 이젤의 꽃→산 교체·로컬 저장/복원, WASD/Space, studio·캐릭터 입력/Undo/Redo·스토리 입력/채점·도감 완성 저장도 검증했다. 우클릭 카메라 파일은 원형 보존 및 Babylon SDK 회귀 통과를 근거로 하며 자동화에서 실제 우클릭 유지 드래그를 재검증했다고 주장하지 않는다. 실제 휴대폰/GPU·전 게임 완주 성능은 미검증이다. 증거는 DORO-MYROOM-COLORED-MERGE-20261030-01/outputs/myroom-colored-merge에 보관한다. 사용자 패치 백업 SHA256은 이전과 동일하고 별도 사본도 보존한다. 새 브랜치/PR/원격 main 변경/force push/reset/rebase를 수행하지 않는다. 기존 Git 작성자 설정과 커밋 Author를 변경하거나 Co-authored-by를 추가하지 않는다.
+
+## 2026-10-31 스토리 완성작의 마이룸 전시 (Issue #16, 2-1)
+
+최신 origin/main 37eb911에서 feature/myroom-story-artworks를 새로 생성하고 기존 feature/myroom aa33d59와 사용자 미추적 백업 패치를 보존했다. play_records→user_artworks→drawings를 기준으로 인증 사용자의 이미지 있는 완료 기록을 조회하고 creature_profiles는 LEFT JOIN 분류에만 사용한다. GET /api/myroom/artworks와 저장 검증이 같은 대표 작품/파일 존재 규칙을 사용한다. 점수·시간·완료 시각·ID 우선순위는 기존 도감 정책을 재사용한다.
+
+액자·이젤의 공통 선택창에 도감/스토리 종류를 표시하고, 공통 roomArtworkGuide로 스토리의 도감 밑그림 합성을 차단했다. artworkDrawingId/schemaVersion/revision, Preview Mock·로컬 저장, colored 수납품, 기존 배치/플레이어/인증/미니게임/스튜디오 소스와 DB 구조는 보존했다. 신규 migration 및 벽·바닥 격자 구현은 없다.
+
+타입 검사, geometry 6/Preview 6/player 11/colored 12/격리 PostgreSQL API 9/신규 story·파일 7, 총51건 pass/0 fail/0 skip(부모 포함), production flag=true 빌드를 확인했다. 테스트 DB/업로드 폴더만 사용했다. 실제 브라우저에서 스토리·도감 따라 그기 완료 기록 생성, 종류 표시와 story guide 0개/creature guide 1개, 스토리 액자·이젤 및 도감 액자 혼합 전시, 저장/새로고침/현재 선택 복원을 확인했다. 브라우저 warn/error는 0건이었다. 우클릭 유지 드래그/전체 미니게임 완주는 이번에 재검증하지 않았으며 관련 소스와 기존 SDK 회귀를 유지했다.
+
+대표 이미지 유실 시 하위 기록으로 대체하지 않고 목록·새 저장에서 제외하며 기존 레이아웃은 자동 삭제하지 않는다. 파일 시스템과 DB 사이의 삭제 경쟁, 모바일/GPU 성능, 전시 면 비율 개선은 남은 한계다. 실험 DORO-MYROOM-STORY-20261031-01의 별도 outputs/myroom-story-artworks/README.md와 docs/myroom-story-artworks.md에 정책/재현/근거를 남긴다. 원격 보관은 Research/DOROBUS_MyRoom_Inspection/experiments/DORO-MYROOM-STORY-20261031-01의 receipt로 검증한다. PR 생성/Merge/브랜치 삭제/main Push 및 Git 설정 변경은 수행하지 않는다.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { api, ApiError } from "../../../lib/api"
+import { ApiError } from "../../../lib/api"
 import { myroomApi } from "../api"
 import type { RoomArtwork } from "../artwork"
 import { myRoomPreviewEnabled } from "../preview/enabled"
@@ -43,11 +43,7 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
         ? [source.load(), source.artworks, [] as StoredSummary[]]
         : await Promise.all([
             myroomApi.load(),
-            api
-              .collection()
-              .then((c) =>
-                c.creatures.filter((a) => a.collected && a.imageKey),
-              ),
+            myroomApi.artworks(),
             myroomApi.storage(),
           ])
       if (requestId !== generation.current) return

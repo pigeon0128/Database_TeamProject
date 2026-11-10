@@ -6,13 +6,14 @@
 //   색칠 층 위에 밑그림의 선만 다시 덮어서 칠해도 따라 그릴 흰 선이 보인다. 채점은 펜 선 캔버스만 읽으므로 색칠은 점수에 영향이 없다.
 //   층 순서: 밑그림 → 색칠 → 밑그림 선 → 펜 선
 // - 지우개는 펜 선은 구역과 상관없이 지우고, 색은 칠하기처럼 처음 댄 구역 안에서만 지운다.
+// - 채우기(paintBrush.fill): 누른 자리의 구역 전체를 한 번에 칠한다. 스포이드(picking): 누른 자리에 칠해진 색을 onPick 으로 알려 준다.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { applyClipped, drawMarks, eraseMarks, makeCanvas, regionOf, renderPaint } from "../lib/drawing/paint";
 import type { Region, Regions } from "../lib/drawing/regions";
 import { taper, visibleActions, visibleStrokes, type DrawAction, type PaintStroke, type Point, type Stroke } from "../lib/drawing/strokes";
 
 /** 색칠 브러쉬 (null 이면 펜) */
-export type PaintBrush = Pick<PaintStroke, "pattern" | "color" | "size">;
+export type PaintBrush = Pick<PaintStroke, "pattern" | "color" | "size" | "fill">;
 
 export type TracingCanvasHandle = {
   /** 흰 배경 위에 사용자가 그린 선만 합쳐서 PNG data URL로 반환 */
@@ -45,6 +46,11 @@ type Props = {
   regions?: Regions | null;
   /** 고른 색칠 브러쉬. null 이면 펜으로 그린다 (지우개일 때는 무시) */
   paintBrush?: PaintBrush | null;
+  /** 스포이드: true 면 그리지 않고, 누른 자리의 색을 onPick 으로 알려 준다 */
+  picking?: boolean;
+  onPick?: (color: string) => void;
+  /** true 면 눌러도 아무것도 하지 않는다 (특수 브러쉬를 아직 고르지 않았을 때) */
+  idle?: boolean;
   /** 획을 긋기 시작할 때 (타이머용) */
   onStrokeStart?: () => void;
   /** 획 목록이 바뀌어 다시 그린 뒤 호출 (획을 다 그었을 때, 되돌리기·지우기 등) (채점용) */
@@ -128,7 +134,7 @@ type LivePaint = { stroke: PaintStroke; region: Region; marks: HTMLCanvasElement
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCanvas(
-  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onStrokeStart, onChange, onDrawing, regions, paintBrush },
+  { guideSrc, width, height, guideOpacity, showGuide, color, size, erase, smoothing, fade, actions, onStrokeEnd, onStrokeStart, onChange, onDrawing, regions, paintBrush, picking, onPick, idle },
   ref,
 ) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -334,6 +340,19 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     return [((e.clientX - rect.left) * width) / rect.width, ((e.clientY - rect.top) * height) / rect.height];
   };
 
+  /** 스포이드: (x, y)에 보이는 색. 펜 선이 위에 있으면 펜 색, 아니면 칠한 색. 아무것도 안 칠한 곳이면 null */
+  const colorAt = ([x, y]: Point) => {
+    const px = Math.floor(x);
+    const py = Math.floor(y);
+    if (px < 0 || py < 0 || px >= width || py >= height) return null;
+    for (const c of [canvasRef.current, paintDone.current]) {
+      if (!c) continue;
+      const d = getCtx(c).getImageData(px, py, 1, 1).data;
+      if (d[3] > 40) return `#${[d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+    }
+    return null;
+  };
+
   const pinchInfo = () => {
     const [a, b] = [...pointers.current.values()];
     const rect = viewportRef.current!.getBoundingClientRect();
@@ -373,6 +392,23 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     if (e.button !== 0) return;
 
     const start = toCanvasPoint(e);
+    if (idle) return;
+    // 스포이드: 그 자리의 색을 고른다. 손을 뗄 때까지 다른 동작은 하지 않는다
+    if (picking) {
+      const picked = colorAt(start);
+      if (picked) onPick?.(picked);
+      mode.current = "blocked";
+      return;
+    }
+    // 채우기: 누른 자리의 구역 전체를 한 번에 칠한다
+    if (regions && paintBrush?.fill && !erase) {
+      const stroke: PaintStroke = { type: "paint", ...paintBrush, points: [start] };
+      if (!regionOf(regions, stroke.points)) return;
+      onStrokeStart?.();
+      onStrokeEnd(stroke);
+      mode.current = "blocked";
+      return;
+    }
     // 색칠: 붓을 댄 자리의 구역을 정하고, 붓을 뗄 때까지 그 구역 안에만 칠한다. 선 위에서 멀리 떨어진 곳이면 칠하지 않는다.
     if (regions && paintBrush && !erase) {
       const stroke: PaintStroke = { type: "paint", ...paintBrush, points: [start] };
@@ -528,7 +564,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
           onPointerCancel={handleUp}
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 h-full w-full touch-none"
-          style={{ cursor: panning ? "grabbing" : "crosshair" }}
+          style={{ cursor: panning ? "grabbing" : idle ? "not-allowed" : picking || paintBrush?.fill ? "pointer" : "crosshair" }}
         />
       </div>
 

@@ -24,6 +24,12 @@ export function drawMarks(marks: HTMLCanvasElement, s: PaintStroke, r: Region, f
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   const pts = s.points;
+  // 채우기: 구역 사각형을 통째로 칠한다 (구역 마스크로 잘리므로 구역 안만 남는다)
+  if (s.fill) {
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    return;
+  }
   if (from === 0) {
     ctx.beginPath();
     ctx.arc(pts[0][0], pts[0][1], s.size / 2, 0, Math.PI * 2);

@@ -26,6 +26,8 @@ export type PaintStroke = {
   color: string;
   size: number;
   points: Point[];
+  /** 채우기: true 면 붓 자국 대신 points[0] 자리의 구역 전체를 칠한다 (size 는 쓰지 않는다) */
+  fill?: boolean;
 };
 
 /** 그림판에 쌓이는 동작: 펜 획, 색칠 획, 또는 "전체 지우기" */

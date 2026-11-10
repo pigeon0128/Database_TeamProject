@@ -4,6 +4,20 @@ import { useEffect, useState } from "react";
 
 const getPath = () => window.location.hash.replace(/^#/, "") || "/";
 
+/** 지금 주소의 경로 (# 뒷부분, ?쿼리 포함) */
+export const currentPath = getPath;
+
+/** 지금 주소 ?쿼리의 값 (예: #/shop?from=... 의 from). 없으면 null */
+export const queryParam = (name: string) => new URLSearchParams(getPath().split("?")[1] ?? "").get(name);
+
+/** 앱 안 경로인지 (다른 사이트 주소로 보내지 않게) */
+export const isAppPath = (path: string | null): path is string => !!path && path.startsWith("/") && !path.startsWith("//");
+
+/** 기록을 남기지 않고 주소만 바꾼다 (화면은 다시 그리지 않는다. 뒤로 가기에 쿼리 붙은 주소가 남지 않게) */
+export function replacePath(path: string) {
+  history.replaceState(history.state, "", `#${path}`);
+}
+
 export function navigate(path: string) {
   window.location.hash = path;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   CATALOG,
   MAX_COLORED_SCALE,
@@ -8,10 +8,12 @@ import {
   placementError,
   supportsArtwork,
 } from "../../../shared/myroom.js"
-import { navigate } from "../../router"
 import { useAuth } from "../../auth"
+import { guardHashChanges } from "../../router"
 import MyRoomViewport from "./MyRoomViewport"
 import { useMyRoom } from "./hooks/useMyRoom"
+import { placeLayoutObject } from "./hooks/layoutHistory"
+import { createHashExitGuard } from "./hooks/hashExitGuard"
 import { useStoredSpecs } from "./hooks/useStoredSpecs"
 import { myRoomPreviewEnabled } from "./preview/enabled"
 import type { ObjectType, Placement, RoomObject } from "./types"
@@ -34,9 +36,13 @@ export function PreviewMyRoomPage() {
 function SizeSlider({
   value,
   onChange,
+  onStart,
+  onEnd,
 }: {
   value: number
   onChange: (value: number) => void
+  onStart?: () => void
+  onEnd?: () => void
 }) {
   return (
     <label className="mr-size">
@@ -48,6 +54,28 @@ function SizeSlider({
         step={0.1}
         value={value}
         aria-label="오브젝트 크기"
+        onPointerDown={onStart}
+        onPointerUp={onEnd}
+        onPointerCancel={onEnd}
+        onBlur={onEnd}
+        onKeyDown={(e) => {
+          if (
+            !e.ctrlKey &&
+            !e.metaKey &&
+            [
+              "ArrowLeft",
+              "ArrowRight",
+              "ArrowUp",
+              "ArrowDown",
+              "Home",
+              "End",
+              "PageUp",
+              "PageDown",
+            ].includes(e.key)
+          )
+            onStart?.()
+        }}
+        onKeyUp={onEnd}
         onChange={(e) => onChange(Math.round(Number(e.target.value) * 10) / 10)}
       />
       <output>{value.toFixed(1)}배</output>
@@ -75,7 +103,20 @@ function RoomPage({
     [placement, setPlacement] = useState<Placement | null>(null)
   const [hint, setHint] = useState<string | null>(null),
     [reset, setReset] = useState(0),
-    [exit, setExit] = useState(false)
+    [exit, setExit] = useState<string | null>(null)
+  const dirtyRef = useRef(room.dirty)
+  dirtyRef.current = room.dirty
+  const exitGuard = useRef<ReturnType<typeof createHashExitGuard> | null>(null)
+  useEffect(() => {
+    const guard = createHashExitGuard(window, () => dirtyRef.current, setExit)
+    const unguardRouter = guardHashChanges(guard.check)
+    exitGuard.current = guard
+    return () => {
+      unguardRouter()
+      guard.dispose()
+      exitGuard.current = null
+    }
+  }, [])
   const specs = useStoredSpecs(room.layout, placement, !isPreview)
   const storedName = (o: RoomObject) =>
     room.stored.find((s) => s.id === o.storedObjectId)?.name
@@ -100,33 +141,8 @@ function RoomPage({
   }
   function place(object: RoomObject) {
     if (busy) return
-    room.setLayout((current) => {
-      const before = current.objects.find((o) => o.id === object.id)
-      let rest = current.objects.filter((o) => o.id !== object.id)
-      // 테이블을 옮기면 그 위의 색칠 오브젝트도 함께 옮겨요.
-      if (before?.type === "table") {
-        const turn = object.rotation - before.rotation,
-          cos = Math.round(Math.cos(turn)),
-          sin = Math.round(Math.sin(turn))
-        rest = rest.map((o) => {
-          if (o.type !== "colored" || !onTable(o, before)) return o
-          const dx = o.position.x - before.position.x,
-            dz = o.position.z - before.position.z
-          return {
-            ...o,
-            position: {
-              x: object.position.x + dx * cos + dz * sin,
-              y: o.position.y,
-              z: object.position.z - dx * sin + dz * cos,
-            },
-            rotation:
-              (((o.rotation + turn) % (Math.PI * 2)) + Math.PI * 2) %
-              (Math.PI * 2),
-          }
-        })
-      }
-      return { objects: [...rest, object] }
-    })
+    room.endEditGroup()
+    room.setLayout((current) => placeLayoutObject(current, object))
     setPlacement(null)
     setSelected(object.id)
     if (supportsArtwork(object.type) && !object.artworkDrawingId)
@@ -147,7 +163,18 @@ function RoomPage({
       scale: original?.scale,
     })
   }
-  const goBack = () => (room.dirty ? setExit(true) : navigate("/"))
+  const historyBlocked = busy || !!panel || !!placement || !!exit
+  function travel(direction: "undo" | "redo") {
+    if (historyBlocked) return
+    room[direction]()
+    setSelected(null)
+    setPlacement(null)
+    setPanel(null)
+    setResizeError(null)
+  }
+  const homeURL = () => new URL("#/", window.location.href).href
+  const goBack = () =>
+    room.dirty ? setExit(homeURL()) : exitGuard.current?.leave(homeURL())
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -156,6 +183,29 @@ function RoomPage({
           e.target.isContentEditable)
       )
         return
+      const command =
+        (e.ctrlKey || e.metaKey) && !e.altKey
+          ? e.key.toLowerCase() === "z"
+            ? e.shiftKey
+              ? "redo"
+              : "undo"
+            : e.key.toLowerCase() === "y"
+              ? "redo"
+              : null
+          : null
+      if (command) {
+        e.preventDefault()
+        if (
+          !historyBlocked &&
+          !(
+            e.target instanceof HTMLElement &&
+            e.target.closest('[role="dialog"]')
+          )
+        )
+          travel(command)
+        return
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key === "Escape") {
         setPlacement(null)
         setPanel(null)
@@ -171,7 +221,7 @@ function RoomPage({
     }
     window.addEventListener("keydown", key)
     return () => window.removeEventListener("keydown", key)
-  }, [panel, placement, exit, busy])
+  }, [panel, placement, exit, busy, historyBlocked, room.undo, room.redo])
   function downloadBackup() {
     const url = URL.createObjectURL(
       new Blob(
@@ -195,7 +245,7 @@ function RoomPage({
         specs={specs}
         reset={reset}
         nickname={nickname}
-        blocked={busy || !!panel || exit || room.conflict}
+        blocked={busy || !!panel || !!exit || room.conflict}
         onSelect={select}
         onPlace={place}
         onHint={setHint}
@@ -224,6 +274,22 @@ function RoomPage({
           }}
         >
           <Icon name="inventory" />
+        </button>
+        <button
+          aria-label="되돌리기"
+          title="되돌리기 (Ctrl+Z)"
+          disabled={historyBlocked || !room.canUndo}
+          onClick={() => travel("undo")}
+        >
+          <Icon name="undo" />
+        </button>
+        <button
+          aria-label="다시 실행"
+          title="다시 실행 (Ctrl+Shift+Z / Ctrl+Y)"
+          disabled={historyBlocked || !room.canRedo}
+          onClick={() => travel("redo")}
+        >
+          <Icon name="redo" />
         </button>
         <span className="mr-sidebar-spacer" />
         <button
@@ -336,7 +402,15 @@ function RoomPage({
         </section>
       )}
       {room.backup && (
-        <button className="mr-restore" onClick={room.restoreBackup}>
+        <button
+          className="mr-restore"
+          onClick={() => {
+            setSelected(null)
+            setPlacement(null)
+            setPanel(null)
+            room.restoreBackup()
+          }}
+        >
           이전 미저장 배치 복원
         </button>
       )}
@@ -357,6 +431,8 @@ function RoomPage({
               <SizeSlider
                 value={selected.scale ?? 1}
                 onChange={(v) => resize(selected, v)}
+                onStart={room.beginEditGroup}
+                onEnd={room.endEditGroup}
               />
               {resizeError && <p className="mr-size-error">{resizeError}</p>}
             </>
@@ -535,7 +611,15 @@ function RoomPage({
             <kbd>클릭</kbd> 오브젝트 선택
           </p>
           <hr />
+          <p>
+            <kbd>Ctrl+Z</kbd> 되돌리기 · <kbd>Ctrl+Shift+Z / Ctrl+Y</kbd> 다시
+            실행 (최대 50단계)
+          </p>
           <h3>배치 모드</h3>
+          <p className="mr-muted">
+            배치 중에만 1m 가이드 격자가 나타나요. 좌표는 기존처럼 0.1m 단위로
+            맞춰져요.
+          </p>
           <p>
             <kbd>클릭</kbd> 설치
           </p>
@@ -555,7 +639,7 @@ function RoomPage({
       {exit && (
         <Modal
           title="저장하지 않은 변경 사항"
-          onClose={() => setExit(false)}
+          onClose={() => setExit(null)}
           className="mr-confirm"
         >
           <p>
@@ -565,10 +649,15 @@ function RoomPage({
           <button className="mr-secondary" onClick={downloadBackup}>
             배치 파일로 보관
           </button>
-          <button className="mr-secondary" onClick={() => setExit(false)}>
+          <button className="mr-secondary" onClick={() => setExit(null)}>
             계속 꾸미기
           </button>
-          <button className="mr-danger" onClick={() => navigate("/")}>
+          <button
+            className="mr-danger"
+            onClick={() => {
+              if (exit) exitGuard.current?.leave(exit)
+            }}
+          >
             저장하지 않고 나가기
           </button>
         </Modal>

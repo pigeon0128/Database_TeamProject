@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 
 const getPath = () => window.location.hash.replace(/^#/, "") || "/";
 
+// The room owns its confirmation UI. Check before publishing a new route so
+// listener ordering cannot unmount it before its hashchange handler runs.
+let hashExitGuard: (() => boolean) | null = null;
+export function guardHashChanges(check: () => boolean) {
+  hashExitGuard = check;
+  return () => { if (hashExitGuard === check) hashExitGuard = null; };
+}
+
 /** 지금 주소의 경로 (# 뒷부분, ?쿼리 포함) */
 export const currentPath = getPath;
 
@@ -25,7 +33,9 @@ export function navigate(path: string) {
 export function usePath() {
   const [path, setPath] = useState(getPath);
   useEffect(() => {
-    const onChange = () => setPath(getPath());
+    const onChange = () => {
+      if (!hashExitGuard?.()) setPath(getPath());
+    };
     window.addEventListener("hashchange", onChange);
     return () => window.removeEventListener("hashchange", onChange);
   }, []);

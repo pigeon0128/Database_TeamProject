@@ -18,7 +18,8 @@
     "test:myroom:api": "node --test tests/myroom-api.test.js",
     "typecheck": "tsc --noEmit",
     "test:myroom:colored": "node --test tests/myroom-colored.test.js",
-    "test:myroom:story": "node --test tests/myroom-artwork-files.test.js tests/myroom-story-artworks-api.test.js"
+    "test:myroom:story": "node --test tests/myroom-artwork-files.test.js tests/myroom-story-artworks-api.test.js",
+    "test:myroom:history": "node --experimental-strip-types --test tests/myroom-history.test.js tests/myroom-grid.test.js tests/myroom-navigation.test.js"
   },
   "dependencies": {
     "@babylonjs/core": "9.31.0",

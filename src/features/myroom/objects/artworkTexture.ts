@@ -1,8 +1,11 @@
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture"
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode"
 import type { Scene } from "@babylonjs/core/scene"
-import { roomArtworkImage, type RoomArtwork } from "../artwork"
-import { creatureGuide } from "../../../data/creatures"
+import {
+  roomArtworkGuide,
+  roomArtworkImage,
+  type RoomArtwork,
+} from "../artwork"
 
 const image = (url: string) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
@@ -45,7 +48,7 @@ export function createArtworkTexture(
         : "그림을 골라 주세요",
   )
   if (artwork && (artwork.imageKey || artwork.previewImageUrl) && !preview) {
-    const guide = creatureGuide(artwork.slug)
+    const guide = roomArtworkGuide(artwork)
     Promise.all([
       guide ? image(guide).catch(() => null) : null,
       image(roomArtworkImage(artwork)),

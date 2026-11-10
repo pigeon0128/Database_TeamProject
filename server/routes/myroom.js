@@ -3,6 +3,7 @@ import { requireUser } from "../auth.js"
 import { pool } from "../db.js"
 import { BadRequest } from "../errors.js"
 import { validateLayout } from "../../shared/myroom.js"
+import { artworkFileExists } from "../storage.js"
 import {
   validateColoredSpec,
   validateSourceModel,
@@ -11,6 +12,41 @@ import {
 } from "../../shared/colored.js"
 
 const MAX_STORED_OBJECTS = 50
+
+// /api/collection과 같은 대표 작품 규칙: 이미지가 저장된 내 완료 기록 중 점수↓ 시간↑ 완료시각↑ ID↑.
+// creature_profiles는 분류에만 사용한다. 없는 장면은 기존 /api/drawings와 같이 story다.
+async function roomArtworks(client, userId, ids = null) {
+  const { rows } = await client.query(
+    `WITH ranked_artworks AS (
+       SELECT p.drawing_id, a.image_key,
+              ROW_NUMBER() OVER (
+                PARTITION BY p.drawing_id
+                ORDER BY p.similarity_score DESC, p.duration_ms ASC, p.played_at ASC, p.record_id ASC
+              ) AS rn
+         FROM play_records p JOIN user_artworks a ON a.record_id = p.record_id
+        WHERE p.user_id = $1 AND ($2::bigint[] IS NULL OR p.drawing_id = ANY($2::bigint[]))
+     )
+     SELECT d.drawing_id, d.title, c.slug, a.image_key,
+            CASE WHEN c.drawing_id IS NULL THEN 'story' ELSE 'creature' END AS kind
+       FROM ranked_artworks a JOIN drawings d ON d.drawing_id = a.drawing_id
+       LEFT JOIN creature_profiles c ON c.drawing_id = d.drawing_id
+      WHERE a.rn = 1 ORDER BY d.chapter_id, d.drawing_order, d.drawing_id`,
+    [userId, ids],
+  )
+  const available = await Promise.all(
+    rows.map((r) => artworkFileExists(r.image_key)),
+  )
+  return rows
+    .filter((_, i) => available[i])
+    .map((r) => ({
+      drawingId: Number(r.drawing_id),
+      name: r.title,
+      kind: r.kind,
+      slug: r.slug,
+      imageKey: r.image_key,
+    }))
+}
+
 const summary = (row) => ({
   id: Number(row.object_id),
   name: row.name,
@@ -42,6 +78,10 @@ myroomRoutes.get("/", async (req, res) => {
     [req.userId],
   )
   res.json(state(rows[0]))
+})
+
+myroomRoutes.get("/artworks", async (req, res) => {
+  res.json({ artworks: await roomArtworks(pool, req.userId) })
 })
 
 // 3D 색칠하기에서 '수납하기'로 보낸 오브젝트 (수납함)
@@ -179,15 +219,11 @@ myroomRoutes.put("/", async (req, res) => {
       req.userId,
     ])
     if (ids.length) {
-      const { rows } = await client.query(
-        `SELECT DISTINCT p.drawing_id FROM play_records p
-         JOIN user_artworks a ON a.record_id = p.record_id
-         JOIN creature_profiles c ON c.drawing_id = p.drawing_id
-         WHERE p.user_id = $1 AND p.drawing_id = ANY($2::bigint[])`,
-        [req.userId, ids],
-      )
-      if (rows.length !== ids.length)
-        throw new BadRequest("내 도감에서 완성한 작품만 전시할 수 있어요.")
+      const artworks = await roomArtworks(client, req.userId, ids)
+      if (artworks.length !== ids.length)
+        throw new BadRequest(
+          "이미지가 저장된 내 도감·스토리 완성 작품만 전시할 수 있어요.",
+        )
     }
     if (storedIds.length) {
       const { rows } = await client.query(

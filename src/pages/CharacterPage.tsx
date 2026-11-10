@@ -1,9 +1,9 @@
 // 캐릭터 그리기 화면 (#/character). 밑그림·채점 없이 흰 도화지에 자유롭게 그리고, 이름을 붙여 PNG로 저장한다.
-// 브러쉬 패널에서 색칠 붓·특수 브러쉬를 골라 도화지 어디든 칠할 수 있다 (펜 선 아래에 칠해진다).
+// 채우기·브러쉬·특수 브러쉬로 도화지 어디든 칠할 수 있다 (펜 선 아래에 칠해진다).
 import { useMemo, useRef, useState } from "react";
 import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
 import { DrawingShell } from "../components/drawing/DrawingShell";
-import { HistoryButtons, LineMenu, ShortcutList, SizeMenu } from "../components/drawing/menus";
+import { HistoryButtons, LineMenu, ShortcutList } from "../components/drawing/menus";
 import { ResumeDialog } from "../components/drawing/ResumeDialog";
 import { useDrawingTools } from "../components/drawing/useDrawingTools";
 import { ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
@@ -23,7 +23,7 @@ export default function CharacterPage() {
   const regions = useMemo(() => wholeCanvasRegions(CANVAS_SIZE, CANVAS_SIZE), []);
   const [name, setName] = useState("");
   // 이어서 그리기: 그리던 캐릭터와 이름을 저장해 둔다.
-  const draft = useDrawingDraft("character", { actions: tools.canvasProps.actions, replaceActions: tools.replaceActions }, name);
+  const draft = useDrawingDraft("character", { actions: tools.canvasProps.actions, replaceActions: tools.replaceActions }, name, (saved) => setName(saved ?? ""));
 
   const save = () => {
     const url = canvasRef.current?.exportImage(false);
@@ -52,7 +52,6 @@ export default function CharacterPage() {
               className="h-10 w-36 rounded-full bg-sky-soft px-4 text-sm font-bold text-ink outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-sky-deep sm:w-44"
             />
             <ToolbarDivider />
-            <SizeMenu tools={tools} />
             <LineMenu tools={tools} />
             <HistoryButtons tools={tools} />
           </>

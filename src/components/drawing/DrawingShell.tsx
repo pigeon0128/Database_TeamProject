@@ -1,59 +1,46 @@
-// 그리기 화면 틀: 위 툴바 / 왼쪽 도구 막대(브러쉬·지우개) + 가운데 그림판 (+ 오른쪽 정보 패널) / 아래 상태 막대.
-// 색칠할 수 있는 화면(tools.paintable)에서는 브러쉬 버튼을 누르면 브러쉬 패널(BrushPanel)이 옆으로 펼쳐진다.
-import { useCallback, useState, type ReactNode } from "react";
+// 그리기 화면 틀: 위 툴바 / 왼쪽 도구 막대 + 가운데 그림판 + 오른쪽 도구 패널(ToolPanel, 그 아래 정보 패널) / 아래 상태 막대.
+// 도구 막대: 펜 · 채우기 · 브러쉬 · 특수 브러쉬 · 지우개 · 스포이드 (색칠할 수 없는 화면에서는 펜·지우개만)
+import { useState, type ReactNode } from "react";
 import { comboText } from "../../lib/drawing/shortcuts";
 import { navigate } from "../../router";
 import DorobusBackdrop from "../DorobusBackdrop";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
-import { BrushPanel } from "./BrushPanel";
 import { DrawingCoach, type CoachCharacter, type CoachMode } from "./DrawingCoach";
 import DrawingSceneDecor, { type DrawingSceneDecorMode } from "./DrawingSceneDecor";
+import { ToolPanel } from "./ToolPanel";
 import type { DrawingTools } from "./useDrawingTools";
 
-/** 왼쪽에 떠 있는 도구 막대의 버튼 */
+/** 왼쪽에 떠 있는 도구 막대의 버튼. dot 이 있으면 아이콘 옆에 지금 색을 작은 점으로 보여 준다 */
 function RailButton({
   active,
   onClick,
   label,
   shortcut,
   children,
-  toggle,
-  more,
+  dot,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
-  shortcut: string;
+  shortcut?: string;
   children: ReactNode;
-  /** 브러쉬 패널을 여닫는 버튼 (패널의 "바깥 누르면 닫기"에서 뺀다) */
-  toggle?: boolean;
-  /** 옆으로 펼쳐지는 메뉴가 있으면 > 표시. true 면 펼쳐진 상태 (표시가 반대로 돈다) */
-  more?: { open: boolean };
+  dot?: string;
 }) {
   return (
     <button
       type="button"
-      data-brush-toggle={toggle || undefined}
-      aria-expanded={more ? more.open : undefined}
       onClick={onClick}
       aria-pressed={active}
-      title={`${label} (${shortcut})`}
-      className={`relative flex w-14 flex-col items-center gap-0.5 rounded-2xl py-2 text-[11px] font-bold transition ${
-        active ? "bg-sky-haze text-sky-deep" : "text-ink-muted hover:bg-sky-soft"
+      title={shortcut ? `${label} (${shortcut})` : label}
+      className={`relative flex w-16 flex-col items-center gap-0.5 rounded-2xl py-2 text-[11px] font-bold transition ${
+        active ? "bg-ink text-white shadow-card" : "text-ink-muted hover:bg-sky-soft"
       }`}
     >
-      <span className="text-xl leading-none">{children}</span>
-      {label}
-      {more && (
-        // 옆으로 브러쉬가 더 있다는 표시. 펼치면 반대로 돌아 "닫기"를 뜻한다
-        <svg
-          viewBox="0 0 12 12"
-          aria-hidden="true"
-          className={`absolute right-0.5 top-[38%] h-3 w-3 -translate-y-1/2 transition-transform duration-200 ${more.open ? "rotate-180" : ""}`}
-        >
-          <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
+      <span className="relative text-xl leading-none">
+        {children}
+        {dot && <span className="absolute -bottom-0.5 -right-1.5 h-2.5 w-2.5 rounded-full border border-white" style={{ background: dot }} aria-hidden="true" />}
+      </span>
+      <span className={`whitespace-nowrap ${label.length > 4 ? "text-[10px] tracking-tighter" : ""}`}>{label}</span>
     </button>
   );
 }
@@ -70,7 +57,7 @@ type DrawingShellProps = {
   aspect: number;
   /** 아래 상태 막대 내용 */
   footer?: ReactNode;
-  /** 그림판 오른쪽 정보 패널 (넓은 화면에서만 보인다, 도감 카드 등) */
+  /** 정보 패널 (도감 카드 등). 툴바 오른쪽 위 "도감 설명" 버튼을 누르면 오른쪽 도구 패널 자리에 보인다 */
   aside?: ReactNode;
   /** 그림판 (TracingCanvas) */
   children: ReactNode;
@@ -101,8 +88,10 @@ export function DrawingShell({
   coachCharacter = "codex",
   backgroundScene = "free",
 }: DrawingShellProps) {
-  const [brushPanel, setBrushPanel] = useState(false);
-  const closeBrushPanel = useCallback(() => setBrushPanel(false), []);
+  const { tool, setTool, paintable, paintColor } = tools;
+  /** 오른쪽에 도구 패널 대신 정보 패널(도감 설명)을 보이는지 */
+  const [showInfo, setShowInfo] = useState(false);
+  const infoOpen = !!aside && showInfo;
   return (
     // 흰 바탕에 옅은 회색 점무늬(화이트보드 느낌), 그 위에 반투명 흰 카드와 진한 글자
     <div
@@ -120,7 +109,14 @@ export function DrawingShell({
         </ToolbarButton>
         <ToolbarDivider />
         {toolbarStart}
-        <div className="ml-auto flex flex-wrap items-center gap-1">{toolbarEnd}</div>
+        <div className="ml-auto flex flex-wrap items-center gap-1">
+          {aside && (
+            <ToolbarButton title={infoOpen ? "그리기 도구 보기" : "도감 설명 보기"} onClick={() => setShowInfo((v) => !v)}>
+              {infoOpen ? "🎨 그리기 도구" : "📖 도감 설명"}
+            </ToolbarButton>
+          )}
+          {toolbarEnd}
+        </div>
       </header>
 
       <div className="relative z-10 flex min-h-0 flex-1 gap-3">
@@ -128,34 +124,48 @@ export function DrawingShell({
           aria-label="그리기 도구"
           className="relative z-20 flex flex-col gap-1 self-start rounded-3xl border border-white/90 bg-white/76 p-1.5 shadow-card backdrop-blur-sm"
         >
-          {/* 색칠할 수 있는 화면에서는 브러쉬 버튼을 누르면 옆으로 브러쉬 패널이 펼쳐진다 */}
-          <RailButton
-            label="브러쉬"
-            toggle
-            more={tools.paintable ? { open: brushPanel } : undefined}
-            shortcut={comboText(tools.keys.brush)}
-            active={!tools.erase}
-            onClick={() => {
-              tools.setErase(false);
-              if (tools.paintable) setBrushPanel((open) => !open);
-            }}
-          >
-            🖌️
+          <RailButton label="펜" shortcut={comboText(tools.keys.brush)} active={tool === "pen"} onClick={() => setTool("pen")}>
+            ✏️
           </RailButton>
-          {brushPanel && <BrushPanel tools={tools} onClose={closeBrushPanel} />}
-          <RailButton label="지우개" shortcut={comboText(tools.keys.eraser)} active={tools.erase} onClick={() => tools.setErase(true)}>
+          {paintable && (
+            <>
+              <RailButton label="채우기" active={tool === "fill"} onClick={() => setTool("fill")} dot={paintColor}>
+                🪣
+              </RailButton>
+              <RailButton label="브러쉬" active={tool === "brush"} onClick={() => setTool("brush")} dot={paintColor}>
+                🖌️
+              </RailButton>
+              <RailButton label="특수 브러쉬" active={tool === "special"} onClick={() => setTool("special")}>
+                ✨
+              </RailButton>
+            </>
+          )}
+          <RailButton label="지우개" shortcut={comboText(tools.keys.eraser)} active={tool === "eraser"} onClick={() => setTool("eraser")}>
             🧽
           </RailButton>
+          {paintable && (
+            <RailButton label="스포이드" active={tool === "picker"} onClick={() => setTool("picker")}>
+              💧
+            </RailButton>
+          )}
         </nav>
         {/* 남은 공간 안에서 비율을 지키며 그림판을 최대한 크게 */}
         <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center [container-type:size]">
           <div style={{ width: `min(100cqw, calc(100cqh * ${aspect}))` }}>{children}</div>
         </div>
-        {aside ? (
-          <aside className="hidden w-72 shrink-0 overflow-y-auto rounded-3xl border border-white/90 bg-white/76 p-4 shadow-card backdrop-blur-sm lg:block">{aside}</aside>
+        {/* 오른쪽: 고른 도구의 설정 (굵기, 색, 특수 브러쉬). "도감 설명"을 누르면 그 자리에 정보 패널(도감 카드)이 대신 보인다 */}
+        {infoOpen ? (
+          <aside aria-label="도감 설명" className="relative z-20 w-72 shrink-0 overflow-y-auto rounded-3xl border border-white/90 bg-white/90 p-4 shadow-card backdrop-blur-sm">
+            {aside}
+          </aside>
         ) : (
-          // 그림판이 가운데 오도록 도구 막대만큼 오른쪽도 비워 둔다
-          <div className="hidden w-[4.25rem] shrink-0 lg:block" aria-hidden="true" />
+          <aside
+            aria-label="도구 설정"
+            className="relative z-20 w-64 shrink-0 self-start overflow-y-auto rounded-3xl border border-white/90 bg-white/90 p-4 shadow-card backdrop-blur-sm"
+            style={{ maxHeight: "100%" }}
+          >
+            <ToolPanel tools={tools} />
+          </aside>
         )}
         {coachMode && <DrawingCoach mode={coachMode} character={coachCharacter} />}
       </div>

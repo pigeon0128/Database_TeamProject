@@ -12,6 +12,7 @@ import StoryPage from "./pages/story/StoryPage";
 import StorySelectPage from "./pages/StorySelectPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import SettingsPage from "./pages/SettingsPage";
+import ShopPage from "./pages/ShopPage";
 import StudioPage from "./pages/StudioPage";
 import { findModel } from "./features/paint3d/models";
 import { myRoomPreviewEnabled } from "./features/myroom/preview/enabled";
@@ -28,6 +29,7 @@ const routes: Record<string, ComponentType> = {
   "/leaderboard": LeaderboardPage,
   "/creatures": CreatureListPage,
   "/settings": SettingsPage,
+  "/shop": ShopPage,
   "/studio": StudioPage,
   "/paint3d": Paint3DSelectPage,
   "/myroom": MyRoomPage,

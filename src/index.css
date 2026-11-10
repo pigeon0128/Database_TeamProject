@@ -53,6 +53,22 @@ button {
   animation: cloud-drift 10s ease-in-out 1.5s infinite reverse;
 }
 
+/* 기프트샵 말풍선이 자리를 바꿀 때: 잠깐 비었다가 새 자리에서 톡 커지며 나타난다 (위치용 translate 와 겹치지 않게 scale 만 쓴다) */
+@keyframes bubble-pop {
+  from {
+    opacity: 0;
+    scale: 0.85;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.bubble-pop {
+  animation: bubble-pop 0.25s ease-out 0.2s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

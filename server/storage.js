@@ -1,7 +1,7 @@
 // 완성 그림 파일 저장소 (서버 폴더). DB에는 이 폴더 안의 경로(user_artworks.image_key)만 저장한다
 // (database/migrations/001_initial.sql 의 원래 설계). 폴더는 .env 의 UPLOAD_DIR, 없으면 프로젝트의 uploads/.
 // 서버(routes/records.js)와 pnpm db:migrate(예전에 DB에 넣었던 그림을 파일로 옮길 때)가 같이 쓴다.
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +24,16 @@ export async function saveFile(key, bytes) {
   const file = fileFor(key);
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, bytes);
+}
+
+/** DB 행만 남고 이미지가 사라진 작품은 새로 전시할 수 없다. 경로는 기존 저장소 범위로 제한한다. */
+export async function artworkFileExists(key) {
+  try {
+    const info = await stat(fileFor(key));
+    return info.isFile() && info.size > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** 파일이 없어도 오류로 보지 않는다 (이미 지워졌거나, 예시 데이터처럼 처음부터 파일이 없는 경로) */

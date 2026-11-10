@@ -1,4 +1,5 @@
 import { ApiError } from "../../lib/api"
+import type { RoomArtwork } from "./artwork"
 import type { ColoredSpec, RoomLayout, RoomState, StoredSummary } from "./types"
 
 async function request<T = RoomState>(
@@ -27,6 +28,10 @@ async function request<T = RoomState>(
 }
 export const myroomApi = {
   load: () => request("GET"),
+  artworks: () =>
+    request<{ artworks: RoomArtwork[] }>("GET", undefined, "/api/myroom/artworks").then(
+      (r) => r.artworks,
+    ),
   save: (layout: RoomLayout, expectedRevision: number) =>
     request("PUT", { schemaVersion: 1, expectedRevision, layout }),
   storage: () =>

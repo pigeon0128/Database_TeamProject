@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "../../auth";
 import { DrawingShell } from "../../components/drawing/DrawingShell";
-import { HistoryButtons, LineMenu, ShortcutList, SizeMenu } from "../../components/drawing/menus";
+import { HistoryButtons, LineMenu, ShortcutList } from "../../components/drawing/menus";
 import { ResumeDialog } from "../../components/drawing/ResumeDialog";
 import { useDrawingTools } from "../../components/drawing/useDrawingTools";
 import PageLayout from "../../components/PageLayout";
@@ -49,7 +49,7 @@ type SceneProps = {
   scene: Scene;
   /** 돌아갈 곳 (툴바 왼쪽 끝, 저장 결과 창) */
   back?: Back;
-  /** 그림판 오른쪽에 둘 정보 패널 (도감 카드). 좁은 화면에서는 툴바의 📖 메뉴로 연다 */
+  /** 정보 패널 (도감 카드). 툴바의 📖 도감 설명 버튼을 누르면 오른쪽 도구 패널 자리에 보인다 */
   aside?: ReactNode;
 };
 
@@ -125,7 +125,6 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
           <>
             <span className="mr-1 rounded-full bg-sun px-3 py-1 text-sm font-black text-ink">{scene.title}</span>
             <ToolbarDivider />
-            <SizeMenu tools={tools} />
             <LineMenu tools={tools} />
             <ToolbarMenu title="밑그림 설정" label="🖼️ 밑그림">
               {(close) => (
@@ -162,13 +161,6 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
             </ToolbarMenu>
             <ToolbarDivider />
             <HistoryButtons tools={tools} />
-            {aside && (
-              <span className="lg:hidden">
-                <ToolbarMenu title="도감 카드" label="📖 도감">
-                  {() => aside}
-                </ToolbarMenu>
-              </span>
-            )}
           </>
         }
         toolbarEnd={
@@ -183,7 +175,7 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
                   </p>
                   <h2 className="mb-2 text-sm font-extrabold text-ink-muted">🎨 색칠하기</h2>
                   <p className="mb-4 text-sm font-medium leading-relaxed">
-                    🖌️ 브러쉬를 눌러 <b>색칠 붓</b>이나 <b>특수 브러쉬</b>를 고르면, 붓을 댄 칸 안에만 색이 칠해져요. 색칠은 점수에 들어가지 않아요.
+                    🪣 <b>채우기</b>는 누른 칸 전체를, 🖌️ <b>브러쉬</b>와 ✨ <b>특수 브러쉬</b>는 붓을 댄 칸 안에만 색을 칠해요. 💧 <b>스포이드</b>로 그림 속 색을 가져올 수 있어요. 색칠은 점수에 들어가지 않아요.
                   </p>
                   <h2 className="mb-2 text-sm font-extrabold text-ink-muted">⌨️ 단축키</h2>
                   <ShortcutList keys={tools.keys} />

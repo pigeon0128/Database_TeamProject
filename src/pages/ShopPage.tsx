@@ -6,10 +6,12 @@
 //   말풍선의 "체험해보기"를 누르면 말풍선이 캐릭터 왼쪽으로 옮겨 가고, 이젤 캔버스가 오른쪽에서 말풍선 자리로 들어와 그 붓으로 그려 볼 수 있다.
 //   캔버스는 카운터 뒤 이젤에 얹혀 있어 아랫부분이 카운터에 가린다.
 //   캔버스의 "뒤로"나 다른 붓을 누르면 캔버스는 오른쪽 화면 밖으로 돌아가고, 말풍선은 다시 오른쪽으로 돌아온다.
-import { useState } from "react";
+//   그리기 화면의 특수 브러쉬에서 오면(#/shop?from=<그리던 화면>&brush=<붓>) 브러쉬 상자와 그 붓부터 보여 주고,
+//   "그리기로 돌아가기"를 누르면 그리던 화면으로 돌아가 그림을 이어 그린다. 고른 붓을 가지고 있으면 그 붓을 쥐여 보낸다.
+import { useEffect, useRef, useState } from "react";
 import type { SpecialBrush } from "../lib/api";
 import { useSpecialBrushes } from "../lib/specialBrushes";
-import { navigate } from "../router";
+import { isAppPath, navigate, queryParam } from "../router";
 import { BrushBox, CounterBackdrop } from "../components/shop/ShopArt";
 import { ShopWall } from "../components/shop/ShopWall";
 import EaselCanvas from "../components/shop/EaselCanvas";
@@ -98,8 +100,14 @@ function MenuPanel({ cells, onBrushes }: { cells: number | null; onBrushes: () =
 
 export default function ShopPage() {
   const { cells, brushes, error, buy } = useSpecialBrushes(true);
-  const [view, setView] = useState<"menu" | "brushes">("menu");
-  const [bubble, setBubble] = useState<Bubble>({ text: GREETING });
+  // 그리기 화면의 특수 브러쉬에서 왔으면(#/shop?from=<그리던 화면>&brush=<붓>) 브러쉬 상자부터 보여 주고, 나갈 때 그 화면으로 돌아간다
+  const [from] = useState(() => {
+    const path = queryParam("from");
+    return isAppPath(path) ? path : null;
+  });
+  const [wanted] = useState(() => queryParam("brush"));
+  const [view, setView] = useState<"menu" | "brushes">(from ? "brushes" : "menu");
+  const [bubble, setBubble] = useState<Bubble>({ text: from ? "마음에 드는 브러쉬를 골라 보세요!" : GREETING });
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // 이젤에 올라간 붓과 이젤이 들어와 있는지. tryCount 는 체험할 때마다 캔버스를 새로 만들기 위한 key
@@ -108,6 +116,19 @@ export default function ShopPage() {
   // 체험을 끝내고 돌아가는 중인지: 오른쪽 말풍선을 이젤이 다 나간 뒤에 띄우려고 쓴다
   const [returning, setReturning] = useState(false);
   const [tryCount, setTryCount] = useState(0);
+
+  /** 나가기: 그리기 화면에서 왔으면 그 화면으로 돌아가 그리던 그림을 바로 이어 그린다 (resume=1, lib/drawingDraft.ts) */
+  const leave = () => {
+    if (!from) return navigate("/");
+    const [path, query = ""] = from.split("?");
+    const params = new URLSearchParams(query);
+    params.set("resume", "1");
+    // 고른 붓을 가지고 있으면(방금 샀으면) 그리기 화면에서 바로 그 붓을 쥔다
+    const owned = brushes?.find((b) => b.slug === selected && b.owned);
+    if (owned) params.set("brush", owned.slug);
+    else params.delete("brush");
+    navigate(`${path}?${params}`);
+  };
 
   const openBrushes = () => {
     setView("brushes");
@@ -143,6 +164,18 @@ export default function ShopPage() {
     setSelected(b.slug);
     setBubble(brushBubble(b));
   };
+  // 그리기 화면에서 안 산 붓을 눌러 왔으면, 목록을 불러온 뒤 그 붓을 골라 가격을 보여 준다 (한 번만)
+  const pickedWanted = useRef(false);
+  useEffect(() => {
+    if (pickedWanted.current || !wanted || !brushes) return;
+    pickedWanted.current = true;
+    const b = brushes.find((x) => x.slug === wanted);
+    if (b) {
+      setSelected(b.slug);
+      setBubble(brushBubble(b));
+    }
+  }, [wanted, brushes]);
+
   const purchase = () => {
     const b = bubble.brush;
     if (!b) return;
@@ -162,8 +195,8 @@ export default function ShopPage() {
         <ShopWall className="absolute inset-0 h-full w-full" />
         {/* 화면 폭 전체에 걸친 줄이라 빈 곳은 클릭을 막지 않게 하고, 버튼과 셀 표시만 마우스를 받는다 */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-4 *:pointer-events-auto sm:px-8">
-          <button type="button" onClick={() => navigate("/")} className="rounded-full border border-white/80 bg-white/85 px-4 py-2 text-sm font-bold text-[#7A3E1F] shadow-sm transition hover:bg-white">
-            ← 메인으로
+          <button type="button" onClick={leave} className="rounded-full border border-white/80 bg-white/85 px-4 py-2 text-sm font-bold text-[#7A3E1F] shadow-sm transition hover:bg-white">
+            {from ? "← 그리기로 돌아가기" : "← 메인으로"}
           </button>
           <span className="rounded-full border-2 border-[#F2A91D] bg-[#FFF6C2] px-4 py-1.5 text-sm font-black text-[#7A4A00] shadow-sm">
             보유 셀 {cells === null ? "…" : cells.toLocaleString()}

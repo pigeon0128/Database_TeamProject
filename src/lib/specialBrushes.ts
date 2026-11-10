@@ -1,5 +1,5 @@
 // 특수 브러쉬 목록과 구매 (DB special_brushes·user_brushes·users.cells, API /api/brushes).
-// 그리기 화면의 브러쉬 패널(components/drawing/BrushPanel.tsx)이 쓴다.
+// 그리기 화면의 오른쪽 도구 패널(components/drawing/ToolPanel.tsx)이 쓴다.
 import { useCallback, useEffect, useState } from "react";
 import { api, type BrushState } from "./api";
 import { hasPattern } from "./drawing/brushPatterns";

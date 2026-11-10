@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { visibleActions, type DrawAction, type PaintStroke, type Stroke } from "./drawing/strokes";
 import { api } from "./api";
+import { currentPath, queryParam, replacePath } from "../router";
 
 export type Draft = {
   /** 펜 획과 색칠 획 (그린 순서대로) */
@@ -57,6 +58,7 @@ const KEEPALIVE_MAX_CHARS = 60000;
  *    불러오기에 실패하면 간격을 늘려 가며 다시 시도한다.
  *  - 그림이 바뀌면 1초 뒤에 저장하고, 화면을 나가거나 창을 닫을 때도 바로 저장한다. 다 지우면 저장된 그림도 지운다.
  *    바뀐 것이 없으면 다시 보내지 않는다.
+ *  - 상점에 다녀온 경우(주소에 ?resume=1): 묻지 않고 바로 이어 그린다.
  *  - finish(): 다 그린 그림(기록으로 저장함)은 저장된 그림을 지우고 더는 저장하지 않는다.
  * drawing: 지금 그림의 획 목록과, 저장된 그림으로 바꿀 때 쓰는 함수 (useDrawingTools 에서 받는다)
  * name: 캐릭터 이름처럼 그림과 같이 저장할 값
@@ -65,6 +67,8 @@ export function useDrawingDraft(
   key: string,
   drawing: { actions: DrawAction[]; replaceActions: (next: DrawAction[]) => void },
   name?: string,
+  /** 상점에 다녀와 바로 이어 그렸을 때, 같이 저장한 값(캐릭터 이름 등)을 받는다 */
+  onAutoResume?: (name: string | undefined) => void,
 ) {
   const [pending, setPending] = useState<Draft | null>(null);
   /** DB에서 불러오기를 마쳤는지 (마치기 전에는 저장하지 않는다) */
@@ -75,6 +79,8 @@ export function useDrawingDraft(
   const finished = useRef(false);
   /** 마지막으로 DB에 보낸 내용 ("": DB에 없음). 같으면 다시 보내지 않는다 */
   const lastSent = useRef("");
+  /** 상점에 다녀왔으면 묻지 않고 바로 이어 그린다 (ShopPage 가 돌아올 때 ?resume=1 을 붙인다) */
+  const [autoResume] = useState(() => queryParam("resume") === "1");
 
   useEffect(() => {
     let alive = true;
@@ -87,7 +93,10 @@ export function useDrawingDraft(
           if (!alive) return;
           if (draft) {
             lastSent.current = JSON.stringify({ strokes: draft.strokes, name: draft.name ?? null });
-            setPending(draft);
+            if (autoResume) {
+              replaceActions(draft.strokes);
+              onAutoResume?.(draft.name);
+            } else setPending(draft);
           }
           setLoaded(true);
           return;
@@ -99,7 +108,13 @@ export function useDrawingDraft(
     return () => {
       alive = false;
     };
+    // 처음 열 때 한 번만 불러온다 (autoResume 등은 처음 값 그대로 쓴다)
   }, [key]);
+
+  // 상점에서 돌아온 표시(?resume=1, ?brush=)는 읽었으니 주소에서 지운다 (새로 고침해도 다시 바로 이어 그리지 않게)
+  useEffect(() => {
+    if (autoResume) replacePath(currentPath().split("?")[0]);
+  }, [autoResume]);
 
   const flush = useCallback(
     ({ keepalive = false } = {}) => {

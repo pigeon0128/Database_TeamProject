@@ -21,6 +21,7 @@ import type { RoomArtwork } from "../artwork"
 import type { ColoredSpec, Placement, RoomLayout, RoomObject } from "../types"
 import { createObject } from "../objects/createObject"
 import { createRoom } from "./room"
+import { createPlacementGrid } from "./placementGrid"
 
 import { createPlayerController } from "../player/controller"
 
@@ -82,6 +83,7 @@ export function createRoomScene(
     shadows.blurKernel = 24
     shadows.setDarkness(0.3)
     const room = createRoom(scene)
+    const grid = createPlacementGrid(scene, room.walls)
 
     const player = createPlayerController(scene, camera, canvas, nickname)
 
@@ -260,6 +262,7 @@ export function createRoomScene(
         selected = nextSelected
         const changed = placing !== nextPlacement || (specsChanged && !!placing)
         placing = nextPlacement
+        grid.setPlacement(placing?.type ?? null)
         rebuild()
         if (changed) {
           preview?.root.dispose()

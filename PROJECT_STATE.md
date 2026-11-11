@@ -81,3 +81,21 @@ Preview는 App의 DEV 전용 분기에서 AuthProvider 없이 마운트한다. l
 타입 검사, geometry 6/Preview 6/player 11/colored 12/격리 PostgreSQL API 9/신규 story·파일 7, 총51건 pass/0 fail/0 skip(부모 포함), production flag=true 빌드를 확인했다. 테스트 DB/업로드 폴더만 사용했다. 실제 브라우저에서 스토리·도감 따라 그기 완료 기록 생성, 종류 표시와 story guide 0개/creature guide 1개, 스토리 액자·이젤 및 도감 액자 혼합 전시, 저장/새로고침/현재 선택 복원을 확인했다. 브라우저 warn/error는 0건이었다. 우클릭 유지 드래그/전체 미니게임 완주는 이번에 재검증하지 않았으며 관련 소스와 기존 SDK 회귀를 유지했다.
 
 대표 이미지 유실 시 하위 기록으로 대체하지 않고 목록·새 저장에서 제외하며 기존 레이아웃은 자동 삭제하지 않는다. 파일 시스템과 DB 사이의 삭제 경쟁, 모바일/GPU 성능, 전시 면 비율 개선은 남은 한계다. 실험 DORO-MYROOM-STORY-20261031-01의 별도 outputs/myroom-story-artworks/README.md와 docs/myroom-story-artworks.md에 정책/재현/근거를 남긴다. 원격 보관은 Research/DOROBUS_MyRoom_Inspection/experiments/DORO-MYROOM-STORY-20261031-01의 receipt로 검증한다. PR 생성/Merge/브랜치 삭제/main Push 및 Git 설정 변경은 수행하지 않는다.
+
+## 2026-11-11 마이룸 Undo/Redo·배치 격자
+
+feature/myroom aa33d59에서 최신 origin/main c55435a를 --no-commit --no-ff 일반 병합했다. 충돌은 없었고 main의 스토리 전시/기프트샵/그리기 패널을 보존한다. 사용자 승인 전 커밋 금지에 따라 현재 병합을 포함해 미커밋 상태로 유지한다. 사용자 패치 SHA256 90e41c960448f6c2d428440e154a646364d5c81f15415eafa3e30e201d2cc3fd와 별도 사본은 그대로다.
+
+useMyRoom의 기존 setLayout 경로에 순수 reducer 이력을 연결했다. 최대50개, no-op 제외, 새 편집 시 Redo 제거, 테이블+상판 오브젝트 단일 이동과 slider 제스처 묶음을 지원한다. Undo/Redo 때 선택/프리뷰를 비운다. 저장 snapshot만 baseline으로 갱신하며409는 이력을 보존한다. 원격 수락은 backup을 남기고 새 기준/빈 이력으로 전환하며 backup 복원은 Undo 가능한 한 편집이다.
+
+초기5개의 1m LinesMesh를 만들고 배치 종류별 표시만 바꾼다. alpha0.28/useVertexAlpha=true/isPickable=false로 기존 방/피킹/0.1m snap/충돌 계약을 유지한다. 실제 hashchange 리스너 순서로 경고 전에 언마운트되는 실패는 router의 경로 게시 전 guard 연결로 해결했다. 기존 beforeunload/JSON 백업/인증/API/DB schema/작품/플레이어는 보존했다.
+
+검증: typecheck 및 production flag=true build, geometry6/Preview6/player11/colored12/새 history-grid-navigation12/격리API9/story-file7, 총63 pass/0 fail/0 skip(부모 포함). 실제 Preview와 일반 사용자 브라우저에서 단축키/설치/작품/이동회전/삭제/slider 단일 Undo/테이블 묶음 복원/dirty/격자 숨김·피킹, hash·Back 경고, 실제409 이후 이력과 JSON 백업/원격 수락/backup 복원 Undo를 확인했다. Preview API 감사0건, 브라우저 warn/error0건이었다. 운영 DB 없이 분리 PostgreSQL을5545에 사용했다.
+
+근거는 docs/myroom-history-grid.md와 실험 DORO-MYROOM-HISTORY-GRID-20261111-01의 outputs/myroom-history-20261111에 있다. Native 새로고침 경고 표시/우클릭 유지 드래그/모바일·전체 게임 완주는 이번에 미검증이다. 취소한 hash 이동은 URL replace로 복원하므로 같은 URL의 history 항목이 남을 수 있고, 레이아웃 외 수납품 영구 삭제는 Undo 대상이 아니다. 히스토리 인덱스 정밀 복원 및 리소스 수명과 이력의 연계는 후속 개선이다. 커밋/Push/PR 생성/승인 없는 Merge commit/main 변경은 하지 않는다.
+
+## 2026-11-11 커밋 승인 및 최종 시연 자료
+
+사용자가 구현/스크린샷을 확인하고 커밋을 승인했다. 기존 main→feature 병합은 dc68c44로 별도 완료했고 Undo/Redo·격자 기능은 지정 메시지 feat(myroom): add undo redo and placement grid로 분리해 기록한다. 위의 미커밋 상태 설명은 개발·검증 당시 기록이다. main 브랜치 변경/Push/PR 생성은 승인 범위에 포함하지 않는다.
+
+최종1920×1080 PNG 두 장을 docs/assets/myroom에 복사해 기존 Git LFS 규칙으로 관리하고 docs/myroom-history-grid.md에서 참조한다. outputs의 원본/검증 자료와 Google Drive의 두 실험 아카이브는 보존하며 전체 재다운로드 체크섬 확인을 마쳤다. 테스트 로그/DB/업로드/환경설정/백업 패치는 소스 커밋에서 제외한다. 커밋 준비 시 코드·package·신규 테스트12개 파일의 SHA256이63개 테스트를 통과한 검증 산출물과 동일함을 확인했다.

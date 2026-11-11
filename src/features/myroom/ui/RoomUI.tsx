@@ -3,6 +3,8 @@ import type { ObjectType } from "../types"
 
 export function Icon({ name }: { name: string }) {
   const paths: Record<string, ReactNode> = {
+    undo: <path d="M4 5v6h6M4 11l5-5a8 8 0 1 1-1 13" />,
+    redo: <path d="M20 5v6h-6m6 0-5-5a8 8 0 1 0 1 13" />,
     home: (
       <>
         <path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z" />

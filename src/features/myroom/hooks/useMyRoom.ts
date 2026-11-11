@@ -1,16 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useReducer, useRef, useState } from "react"
 import { ApiError } from "../../../lib/api"
 import { myroomApi } from "../api"
 import type { RoomArtwork } from "../artwork"
 import { myRoomPreviewEnabled } from "../preview/enabled"
-import type { ColoredSpec, RoomLayout, RoomState, StoredSummary } from "../types"
+import type {
+  ColoredSpec,
+  RoomLayout,
+  RoomState,
+  StoredSummary,
+} from "../types"
+import {
+  createLayoutHistory,
+  historyDirty,
+  layoutHistoryReducer,
+  type LayoutUpdate,
+} from "./layoutHistory"
 
 const ignoreUnauthorized = () => {}
 
 export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
   const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
-  const [layout, setLayout] = useState<RoomLayout>({ objects: [] })
-  const [baseline, setBaseline] = useState(JSON.stringify({ objects: [] }))
+  const [history, dispatch] = useReducer(
+    layoutHistoryReducer,
+    { objects: [] },
+    createLayoutHistory,
+  )
+  const layout = history.present
+  const editGroup = useRef<string | null>(null),
+    groupSequence = useRef(0)
+  const setLayout = useCallback((update: LayoutUpdate) => {
+    dispatch({ type: "edit", update, group: editGroup.current })
+  }, [])
+  const endEditGroup = useCallback(() => {
+    editGroup.current = null
+    dispatch({ type: "endGroup" })
+  }, [])
+  const beginEditGroup = useCallback(() => {
+    if (!editGroup.current)
+      editGroup.current = `resize-${++groupSequence.current}`
+  }, [])
   const [revision, setRevision] = useState(0),
     [artworks, setArtworks] = useState<RoomArtwork[]>([]),
     [stored, setStored] = useState<StoredSummary[]>([])
@@ -23,7 +51,7 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
     [conflict, setConflict] = useState(false)
   const [remote, setRemote] = useState<RoomState | null>(null),
     [backup, setBackup] = useState<RoomLayout | null>(null)
-  const dirty = baseline !== JSON.stringify(layout)
+  const dirty = historyDirty(history)
   const fail = useCallback(
     (e: unknown) => {
       if (e instanceof ApiError && e.status === 401) expire()
@@ -49,8 +77,8 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
       if (requestId !== generation.current) return
       if (room.schemaVersion !== 1)
         throw new Error("새 버전의 방이에요. 앱을 업데이트해 주세요.")
-      setLayout(room.layout)
-      setBaseline(JSON.stringify(room.layout))
+      editGroup.current = null
+      dispatch({ type: "reset", layout: room.layout })
       setRevision(room.revision)
       setArtworks(collection)
       setStored(storage)
@@ -83,6 +111,7 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
     setError("")
     setSaved(false)
     const snapshot = layout
+    endEditGroup()
     try {
       const result = isPreview
         ? (await import("../preview/data"))
@@ -90,7 +119,7 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
             .save(snapshot, revision)
         : await myroomApi.save(snapshot, revision)
       setRevision(result.revision)
-      setBaseline(JSON.stringify(snapshot))
+      dispatch({ type: "saved", snapshot })
       setSaved(true)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setConflict(true)
@@ -128,8 +157,8 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
   function acceptRemote() {
     if (!remote) return
     setBackup(layout)
-    setLayout(remote.layout)
-    setBaseline(JSON.stringify(remote.layout))
+    editGroup.current = null
+    dispatch({ type: "reset", layout: remote.layout })
     setRevision(remote.revision)
     setConflict(false)
     setRemote(null)
@@ -139,6 +168,18 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
   return {
     layout,
     setLayout,
+    canUndo: history.past.length > 0,
+    canRedo: history.future.length > 0,
+    undo: () => {
+      editGroup.current = null
+      dispatch({ type: "undo" })
+    },
+    redo: () => {
+      editGroup.current = null
+      dispatch({ type: "redo" })
+    },
+    beginEditGroup,
+    endEditGroup,
     artworks,
     stored,
     removeStored,
@@ -158,6 +199,7 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
     acceptRemote,
     restoreBackup: () => {
       if (backup) {
+        endEditGroup()
         setLayout(backup)
         setBackup(null)
       }

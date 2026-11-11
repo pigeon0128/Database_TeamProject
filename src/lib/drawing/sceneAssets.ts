@@ -52,6 +52,8 @@ const loadGuide = (scene: Scene) =>
 
 export const loadScenePreview = (scene: Scene) =>
   cached(previews, scene, async () => {
+    // 새 챕터 장면은 선화와 색칠용 이미지가 모두 준비되어 있으므로 목록에서 무거운 캔버스 변환을 하지 않는다.
+    if (scene.example) return { guideUrl: scene.guide, exampleUrl: scene.example };
     const guide = await loadGuide(scene);
     const [guideUrl, exampleUrl] = await Promise.all([toUrl(guide), toUrl(makeTracedExample(guide, scene.scoreExclude))]);
     return { guideUrl, exampleUrl };

@@ -2,7 +2,7 @@
 // 누르면 그 장면의 그리기 화면(#/story/<id>)으로 이동한다. 그리던 그림이 저장된 장면은 "이어 그리기"로 표시한다.
 import { useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
-import { scenes, type Scene } from "../data/scenes";
+import { scenes, storyChapters, type Scene } from "../data/scenes";
 import { draftKeys } from "../lib/drawingDraft";
 import { loadScenePreview } from "../lib/drawing/sceneAssets";
 import { navigate } from "../router";
@@ -58,16 +58,28 @@ export default function StorySelectPage() {
     draftKeys().then(setDrafts, () => {});
   }, []);
 
+  const chapterGroups = storyChapters
+    .map((chapter) => ({ ...chapter, scenes: scenes.filter((scene) => scene.chapter === chapter.id) }))
+    .filter((chapter) => chapter.scenes.length > 0);
+
   return (
     <PageLayout title="스토리 장면 그리기" wide>
       <p className="mb-5 text-sm font-medium text-ink-muted">따라 그릴 장면을 골라 보세요. 그림을 누르면 바로 그리기를 시작해요!</p>
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {scenes.map((scene, i) => (
-          <SceneCard key={scene.id} scene={scene} index={i} inProgress={drafts.has(`story:${scene.id}`)} />
+      <div className="space-y-10">
+        {chapterGroups.map((chapter) => (
+          <section key={chapter.id} aria-labelledby={`chapter-${chapter.id}`}>
+            <div className="mb-4 flex flex-wrap items-end gap-3">
+              <span className="rounded-full bg-sky-haze px-3 py-1 text-xs font-black text-sky-deep">{chapter.label}</span>
+              <h2 id={`chapter-${chapter.id}`} className="text-2xl font-black tracking-[-0.04em]">{chapter.title}</h2>
+              <span className="text-sm font-bold text-ink-muted">{chapter.scenes.length}장면</span>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {chapter.scenes.map((scene, index) => (
+                <SceneCard key={scene.id} scene={scene} index={index} inProgress={drafts.has(`story:${scene.id}`)} />
+              ))}
+            </div>
+          </section>
         ))}
-        <div className="flex min-h-48 items-center justify-center rounded-4xl border-2 border-dashed border-sky-haze p-6 text-center text-sm font-bold text-ink-muted">
-          새로운 장면이 곧 추가돼요 ✏️
-        </div>
       </div>
     </PageLayout>
   );

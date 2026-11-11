@@ -3,15 +3,20 @@
 // 장면마다 밑그림, 크기, 채점에서 뺄 영역, 따라 그리기 대상에서 뺄 영역을 정한다.
 import forestGuide from "../assets/story/forest-guide.webp";
 import type { Rect } from "../lib/drawing/strokes";
+import { chapterScenes, storyChapters } from "./chapterScenes";
 
 export type Scene = {
   /** 주소에 쓰이는 이름 (#/story/<id>) */
   id: string;
   /** DB drawings.drawing_id (기록 저장·리더보드용). 아직 DB에 없는 장면이면 비워 둔다. */
   drawingId?: number;
+  /** 장면 선택 화면에서 묶어 보여 줄 챕터 id */
+  chapter?: string;
   title: string;
   line: string;
   guide: string;
+  /** 제공된 색칠용 완성 예시. 없으면 밑그림에서 자동으로 만든다. */
+  example?: string;
   width: number;
   height: number;
   /** 채점에서 뺄 영역 (밑그림 안의 안내 문구 상자 등) */
@@ -34,6 +39,7 @@ export const scenes: Scene[] = [
   {
     id: "forest-music",
     drawingId: 1,
+    chapter: "special",
     title: "숲속의 노래",
     line: "소리에도 생명이 있구나!!",
     guide: forestGuide,
@@ -43,6 +49,8 @@ export const scenes: Scene[] = [
     // 위쪽 음표 (캐릭터 손은 y 400부터 시작)
     backgroundRegions: [{ x: 300, y: 0, w: 960, h: 370 }],
   },
+  ...chapterScenes,
 ];
 
 export const findScene = (id: string) => scenes.find((s) => s.id === id);
+export { storyChapters };

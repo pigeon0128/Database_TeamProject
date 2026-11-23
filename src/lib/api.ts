@@ -10,7 +10,7 @@ export type Drawing = {
   order: number;
   chapter: { id: number; title: string; order: number };
   /** 도감 생물이면 분류(DB creature_profiles.category), 스토리 장면이면 null */
-  category: "animal" | "plant" | "object" | null;
+  category: "animal" | "plant" | "dinosaur" | "object" | null;
 };
 
 /** 색칠하기 특수 브러쉬 (DB special_brushes). 무늬는 앱이 slug 로 그린다 (lib/drawing/brushPatterns.ts) */
@@ -50,7 +50,7 @@ export type CreatureEntry = {
   name: string;
   /** 앱 주소·밑그림 파일 이름 (src/data/creatures.ts) */
   slug: string;
-  category: "animal" | "plant" | "object";
+  category: "animal" | "plant" | "dinosaur" | "object";
   summary: string;
   facts: { label: string; content: string }[];
   tips: string[];

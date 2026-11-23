@@ -7,6 +7,16 @@ import { draftKeys } from "../lib/drawingDraft";
 import { loadScenePreview } from "../lib/drawing/sceneAssets";
 import { navigate } from "../router";
 
+const chapterTabs = [
+  { id: "special", label: "기존 장면" },
+  { id: "ch1", label: "CH1" },
+  { id: "ch2", label: "CH2" },
+  { id: "ch3", label: "CH3" },
+  { id: "ch4", label: "CH4" },
+] as const;
+
+type ChapterTabId = (typeof chapterTabs)[number]["id"];
+
 function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; inProgress: boolean }) {
   const [preview, setPreview] = useState<string | null>(null);
 
@@ -52,6 +62,7 @@ function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; 
 }
 
 export default function StorySelectPage() {
+  const [selectedChapter, setSelectedChapter] = useState<ChapterTabId>("ch1");
   // 그리던 그림이 DB에 있는 장면들 (한 번에 불러온다. 못 불러오면 표시만 안 할 뿐 그리기에는 지장 없다)
   const [drafts, setDrafts] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -60,11 +71,62 @@ export default function StorySelectPage() {
 
   const chapterGroups = storyChapters
     .map((chapter) => ({ ...chapter, scenes: scenes.filter((scene) => scene.chapter === chapter.id) }))
-    .filter((chapter) => chapter.scenes.length > 0);
+    .filter(
+      (chapter) =>
+        chapter.scenes.length > 0 &&
+        (selectedChapter === "special" ? chapter.id === "special" : chapter.id.startsWith(`${selectedChapter}-`)),
+    );
+
+  const chapterAvailability = new Map<ChapterTabId, boolean>(
+    chapterTabs.map((tab) => [
+      tab.id,
+      tab.id === "special"
+        ? scenes.some((scene) => scene.chapter === "special")
+        : scenes.some((scene) => scene.chapter?.startsWith(`${tab.id}-`)),
+    ]),
+  );
 
   return (
     <PageLayout title="스토리 장면 그리기" wide>
       <p className="mb-5 text-sm font-medium text-ink-muted">따라 그릴 장면을 골라 보세요. 그림을 누르면 바로 그리기를 시작해요!</p>
+      <nav aria-label="스토리 챕터 선택" className="mb-8 rounded-3xl border border-white/90 bg-white/80 p-3 shadow-card backdrop-blur-sm">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {chapterTabs.map((tab) => {
+            const available = chapterAvailability.get(tab.id) ?? false;
+            const selected = tab.id === selectedChapter;
+
+            return (
+              <span key={tab.id} className="group relative block">
+                <button
+                  type="button"
+                  aria-pressed={available ? selected : undefined}
+                  aria-disabled={!available}
+                  aria-describedby={!available ? `chapter-${tab.id}-status` : undefined}
+                  onClick={() => available && setSelectedChapter(tab.id)}
+                  className={`w-full rounded-2xl px-4 py-3 text-sm font-black transition focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-sky-deep ${
+                    selected
+                      ? "bg-sky-deep text-white shadow-sm"
+                      : available
+                        ? "bg-sky-haze text-sky-deep hover:-translate-y-0.5 hover:bg-sky-100"
+                        : "cursor-not-allowed bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+                {!available && (
+                  <span
+                    id={`chapter-${tab.id}-status`}
+                    role="tooltip"
+                    className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-800 px-3 py-1.5 text-xs font-bold text-white opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-within:opacity-100"
+                  >
+                    준비중
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      </nav>
       <div className="space-y-10">
         {chapterGroups.map((chapter) => (
           <section key={chapter.id} aria-labelledby={`chapter-${chapter.id}`}>

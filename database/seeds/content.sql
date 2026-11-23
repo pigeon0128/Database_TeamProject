@@ -31,7 +31,10 @@ VALUES
     (13, 2, '스포츠카', 'creatures/sportscar.png', 12),
     (14, 2, '축구공', 'creatures/soccerball.png', 13),
     (15, 2, '로봇', 'creatures/robot.png', 14),
-    (17, 2, '놀이터', 'creatures/playground.png', 15)
+    (17, 2, '놀이터', 'creatures/playground.png', 15),
+    (18, 2, '이구아노돈', 'creatures/dinosaurs/iguanodon-guide.webp', 16),
+    (19, 2, '스테고사우루스', 'creatures/dinosaurs/stegosaurus-guide.webp', 17),
+    (20, 2, '트리케라톱스', 'creatures/dinosaurs/triceratops-guide.webp', 18)
 ON CONFLICT DO NOTHING;
 
 -- 도감 정보는 번호와 이름이 둘 다 맞는 그림에만 붙인다 (다른 내용의 그림이 같은 번호를 쓰고 있으면 건너뜀).
@@ -52,7 +55,10 @@ FROM (VALUES
     (13, '스포츠카', 'sportscar', 'object', '엔진의 힘으로 바퀴를 돌려 도로를 달리는 자동차예요.'),
     (14, '축구공', 'soccerball', 'object', '발로 차서 상대 골문에 넣는 축구 경기에 쓰는 둥근 공이에요.'),
     (15, '로봇', 'robot', 'object', '사람과 비슷한 모습과 기능을 가진 자동 기계예요.'),
-    (17, '놀이터', 'playground', 'object', '그네·시소·미끄럼틀 같은 시설을 갖추고 안전하게 놀 수 있도록 따로 만든 곳이에요.')
+    (17, '놀이터', 'playground', 'object', '그네·시소·미끄럼틀 같은 시설을 갖추고 안전하게 놀 수 있도록 따로 만든 곳이에요.'),
+    (18, '이구아노돈', 'iguanodon', 'dinosaur', '엄지손가락에 뾰족한 가시가 있는 초식 공룡이에요.'),
+    (19, '스테고사우루스', 'stegosaurus', 'dinosaur', '등에는 커다란 골판이 줄지어 있고 꼬리 끝에는 가시가 있는 초식 공룡이에요.'),
+    (20, '트리케라톱스', 'triceratops', 'dinosaur', '얼굴에 세 개의 뿔과 커다란 목 방패가 있는 초식 공룡이에요.')
 ) AS v (drawing_id, name, slug, category, summary)
 JOIN drawings d ON d.drawing_id = v.drawing_id AND d.title = v.name
 ON CONFLICT DO NOTHING;
@@ -100,6 +106,15 @@ FROM (VALUES
     ('dandelion', 1, '분류', '국화과 · 여러해살이풀'),
     ('dandelion', 2, '사는 곳', '우리나라 곳곳'),
     ('dandelion', 3, '특징', '줄기 없이 잎이 뿌리에서 바로 나오고, 잎은 깊게 갈라지며 톱니가 있어요. 열매에 난 흰 털이 씨앗을 멀리 옮겨요'),
+    ('iguanodon', 1, '분류', '조반목 · 초식 공룡'),
+    ('iguanodon', 2, '특징', '앞발의 엄지손가락이 뾰족한 가시처럼 생겼어요'),
+    ('iguanodon', 3, '움직임', '두 발로 걷기도 하고 네 발로 걷기도 했어요'),
+    ('stegosaurus', 1, '분류', '검룡류 · 초식 공룡'),
+    ('stegosaurus', 2, '특징', '등을 따라 커다란 골판이 두 줄로 늘어서 있어요'),
+    ('stegosaurus', 3, '꼬리', '꼬리 끝에 긴 가시 네 개가 있어요'),
+    ('triceratops', 1, '분류', '각룡류 · 초식 공룡'),
+    ('triceratops', 2, '특징', '눈 위에 긴 뿔 두 개, 코 위에 짧은 뿔 한 개가 있어요'),
+    ('triceratops', 3, '목 방패', '머리 뒤쪽에 넓고 단단한 프릴이 펼쳐져 있어요'),
     ('airplane', 1, '분류', '탈것'),
     ('airplane', 2, '나는 원리', '날개 위쪽은 공기 압력이 낮고 아래쪽은 높아서 날개를 위로 밀어 올리는 힘(양력)이 생겨요'),
     ('airplane', 3, '생김새', '앞날개가 하늘에 뜨는 힘을 만들고, 꼬리날개가 균형을 잡아요'),
@@ -145,6 +160,12 @@ FROM (VALUES
     ('tree', 2, '줄기는 아래로 갈수록 넓게 퍼져요.'),
     ('dandelion', 1, '가운데에서 솜털 씨앗이 동그랗게 사방으로 퍼져요.'),
     ('dandelion', 2, '날아가는 씨앗은 작은 우산처럼 생겼어요.'),
+    ('iguanodon', 1, '길게 뻗은 꼬리와 목의 흐름을 먼저 살펴보세요.'),
+    ('iguanodon', 2, '앞발 엄지의 뾰족한 가시를 빠뜨리지 않도록 그려요.'),
+    ('stegosaurus', 1, '등 위의 커다란 골판을 앞뒤 크기 변화에 맞춰 그려요.'),
+    ('stegosaurus', 2, '꼬리 끝의 긴 가시와 짧고 둥근 머리를 살펴보세요.'),
+    ('triceratops', 1, '얼굴의 세 뿔과 머리 뒤의 넓은 목 방패를 먼저 그려요.'),
+    ('triceratops', 2, '몸을 받치는 네 다리를 굵고 튼튼하게 표현해 보세요.'),
     ('airplane', 1, '날개 아래에 둥근 엔진이 하나씩 달려 있어요.'),
     ('airplane', 2, '꼬리 날개는 위로 곧게 서 있어요.'),
     ('sportscar', 1, '바퀴는 동그랗게, 차체는 낮고 길게 그려요.'),

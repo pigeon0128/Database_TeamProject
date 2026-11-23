@@ -7,6 +7,15 @@ import cactus from "../assets/creatures/cactus.png";
 import cat from "../assets/creatures/cat.png";
 import dandelion from "../assets/creatures/dandelion.png";
 import dog from "../assets/creatures/dog.png";
+import iguanodonColoring from "../assets/creatures/dinosaurs/iguanodon-coloring.webp";
+import iguanodonGuide from "../assets/creatures/dinosaurs/iguanodon-guide-no-bg.png";
+import iguanodonOriginal from "../assets/creatures/dinosaurs/iguanodon-original.webp";
+import stegosaurusColoring from "../assets/creatures/dinosaurs/stegosaurus-coloring.webp";
+import stegosaurusGuide from "../assets/creatures/dinosaurs/stegosaurus-guide.webp";
+import stegosaurusOriginal from "../assets/creatures/dinosaurs/stegosaurus-original.webp";
+import triceratopsColoring from "../assets/creatures/dinosaurs/triceratops-coloring.webp";
+import triceratopsGuide from "../assets/creatures/dinosaurs/triceratops-guide.webp";
+import triceratopsOriginal from "../assets/creatures/dinosaurs/triceratops-original.webp";
 import lion from "../assets/creatures/lion.png";
 import playground from "../assets/creatures/playground.png";
 import robot from "../assets/creatures/robot.png";
@@ -19,7 +28,7 @@ import tree from "../assets/creatures/tree.png";
 import zebra from "../assets/creatures/zebra.png";
 import type { Scene } from "./scenes";
 
-export const CATEGORY_LABELS = { animal: "동물", plant: "식물", object: "무생물" } as const;
+export const CATEGORY_LABELS = { animal: "동물", plant: "식물", dinosaur: "공룡", object: "무생물" } as const;
 export type CreatureCategory = keyof typeof CATEGORY_LABELS;
 
 type CreatureGuide = {
@@ -33,6 +42,10 @@ type CreatureGuide = {
   category: CreatureCategory;
   /** 밑그림 이미지 */
   guide: string;
+  /** 예시 보기에서 사용하는 색칠용 선화 */
+  example?: string;
+  /** 도감 목록 카드에서 사용하는 컬러 원본 */
+  thumbnail?: string;
   /** 밑그림 크기 (px). 도감 밑그림은 모두 1500x1500 정사각형 */
   width: number;
   height: number;
@@ -51,6 +64,42 @@ const CREATURE_GUIDES: CreatureGuide[] = [
   { slug: "cactus", drawingId: 9, name: "사와로 선인장", category: "plant", guide: cactus, width: 1500, height: 1500, lineWidth: 6 },
   { slug: "tree", drawingId: 10, name: "느티나무", category: "plant", guide: tree, width: 1500, height: 1500, lineWidth: 6 },
   { slug: "dandelion", drawingId: 11, name: "민들레", category: "plant", guide: dandelion, width: 1500, height: 1500, lineWidth: 6 },
+  {
+    slug: "iguanodon",
+    drawingId: 18,
+    name: "이구아노돈",
+    category: "dinosaur",
+    guide: iguanodonGuide,
+    example: iguanodonColoring,
+    thumbnail: iguanodonOriginal,
+    width: 1536,
+    height: 1024,
+    lineWidth: 6,
+  },
+  {
+    slug: "stegosaurus",
+    drawingId: 19,
+    name: "스테고사우루스",
+    category: "dinosaur",
+    guide: stegosaurusGuide,
+    example: stegosaurusColoring,
+    thumbnail: stegosaurusOriginal,
+    width: 1677,
+    height: 938,
+    lineWidth: 6,
+  },
+  {
+    slug: "triceratops",
+    drawingId: 20,
+    name: "트리케라톱스",
+    category: "dinosaur",
+    guide: triceratopsGuide,
+    example: triceratopsColoring,
+    thumbnail: triceratopsOriginal,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
   { slug: "airplane", drawingId: 12, name: "비행기", category: "object", guide: airplane, width: 1500, height: 1500, lineWidth: 6 },
   { slug: "sportscar", drawingId: 13, name: "스포츠카", category: "object", guide: sportscar, width: 1500, height: 1500, lineWidth: 6 },
   { slug: "soccerball", drawingId: 14, name: "축구공", category: "object", guide: soccerball, width: 1500, height: 1500, lineWidth: 6 },
@@ -68,6 +117,7 @@ const toScene = (c: CreatureGuide): Scene => ({
   title: c.name,
   line: "",
   guide: c.guide,
+  example: c.example,
   width: c.width,
   height: c.height,
   scoreExclude: [],
@@ -80,4 +130,7 @@ export const creatureScenes: Scene[] = CREATURE_GUIDES.map(toScene);
 export const findCreatureScene = (slug: string) => creatureScenes.find((s) => s.id === `creature-${slug}`);
 
 /** 밑그림 이미지 (도감 목록 카드) */
-export const creatureGuide = (slug: string) => CREATURE_GUIDES.find((g) => g.slug === slug)?.guide ?? null;
+export const creatureGuide = (slug: string) => {
+  const creature = CREATURE_GUIDES.find((g) => g.slug === slug);
+  return creature?.guide ?? null;
+};

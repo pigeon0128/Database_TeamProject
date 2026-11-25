@@ -2,7 +2,7 @@
 // 나무 이젤에 하얀 캔버스가 얹혀 있고, 고른 브러쉬의 무늬(lib/drawing/brushPatterns.ts)로 그려진다.
 // 캔버스 오른쪽의 "뒤로" 버튼으로 닫는다. 놓을 자리와 들어오고 나가는 움직임은 부모(pages/ShopPage.tsx)가 정한다.
 import { useEffect, useRef, type PointerEvent } from "react";
-import { patternFor } from "../../lib/drawing/brushPatterns";
+import { patternFor, preloadBrushTexture } from "../../lib/drawing/brushPatterns";
 
 /** 무늬에 섞이는 붓 색 */
 const TRIAL_COLOR = "#e9474e";
@@ -39,6 +39,8 @@ function Easel() {
 export default function EaselCanvas({ slug, name, onBack, className }: { slug: string; name: string; onBack: () => void; className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const last = useRef<{ x: number; y: number } | null>(null);
+  // 그림 브러쉬는 체험 캔버스가 들어오는 동안 그림을 미리 불러 둔다
+  useEffect(() => preloadBrushTexture(slug), [slug]);
 
   // 화면 크기에 맞춰 캔버스 해상도를 맞춘다 (크기가 바뀌면 그림도 비운다)
   useEffect(() => {

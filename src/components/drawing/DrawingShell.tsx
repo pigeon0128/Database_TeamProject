@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { comboText } from "../../lib/drawing/shortcuts";
 import { navigate } from "../../router";
 import DorobusBackdrop from "../DorobusBackdrop";
+import HomeLogo from "../HomeLogo";
 import { ToolbarButton, ToolbarDivider } from "../toolbar";
 import { DrawingCoach, type CoachCharacter, type CoachMode } from "./DrawingCoach";
 import DrawingSceneDecor, { type DrawingSceneDecorMode } from "./DrawingSceneDecor";
@@ -100,13 +101,15 @@ export function DrawingShell({
       <DorobusBackdrop />
       <DrawingSceneDecor mode={backgroundScene} />
       <header className="relative z-30 flex flex-wrap items-center gap-1 rounded-3xl border border-white/90 bg-white/76 px-2 py-1.5 shadow-card backdrop-blur-sm">
-        <button type="button" onClick={() => navigate("/studio")} aria-label="AI 화실" className="mr-1 flex items-center gap-1 px-1 text-lg font-black tracking-[-0.04em] text-[#64a5ff] sm:px-2">
-          <span className="text-xl">💨</span><span className="hidden xl:inline">DOROBUS</span>
-        </button>
-        <ToolbarDivider />
-        <ToolbarButton title={back.label} onClick={() => navigate(back.path)}>
-          ← <span className="hidden sm:inline">{back.label}</span>
-        </ToolbarButton>
+        <HomeLogo textClassName="hidden xl:inline" />
+        {back.path !== "/" && (
+          <>
+            <ToolbarDivider />
+            <ToolbarButton title={back.label} onClick={() => navigate(back.path)}>
+              ← <span className="hidden sm:inline">{back.label}</span>
+            </ToolbarButton>
+          </>
+        )}
         <ToolbarDivider />
         {toolbarStart}
         <div className="ml-auto flex flex-wrap items-center gap-1">

@@ -1,7 +1,7 @@
 // 기프트샵 화면(pages/ShopPage.tsx)의 그림들. (중앙선 위 배경은 ShopWall.tsx)
 //   CounterBackdrop: 중앙선 아래 카운터. 나뭇결과 이음 홈이 있는 나무 수납장 앞면.
 //   BrushBox: 중앙선 아래의 브러쉬 상자. 붓들이 가운데를 중심으로 부채꼴로 퍼져 놓이고, 붓 머리는 아래를 향한다.
-//     붓 머리는 브러쉬마다 무늬 그림(public/assets/shop/brushes/<slug>.png)으로 채운다.
+//     붓 머리는 브러쉬마다 무늬 그림(public/assets/shop/brushes/<slug>.png)으로 채운다. 상자 하나에 10개씩 담는다 (ShopPage).
 import type { KeyboardEvent } from "react";
 import type { SpecialBrush } from "../../lib/api";
 
@@ -108,15 +108,75 @@ function Brush({ brush, selected, onPick }: { brush: SpecialBrush; selected: boo
   );
 }
 
-/** 브러쉬 상자: 사다리꼴 상자 안에 붓이 부채꼴로 놓이고, 앞판 아래에 이름·가격표가 붙는다 */
-export function BrushBox({ brushes, selected, onPick, className }: { brushes: SpecialBrush[]; selected: string | null; onPick: (b: SpecialBrush) => void; className?: string }) {
+/** 이름표에 들어가게 이름을 줄로 나눈다 (가운데점·띄어쓰기에서 끊고, 한 줄은 6글자까지) */
+function nameLines(name: string) {
+  if (name.length <= 5) return [name];
+  const parts = name.split(/(?<=·)|\s+/).filter(Boolean);
+  const lines: string[] = [];
+  for (const part of parts) {
+    const last = lines[lines.length - 1];
+    if (last !== undefined && (last + part).length <= 6) lines[lines.length - 1] = last + part;
+    else lines.push(part);
+  }
+  return lines.slice(0, 3);
+}
+
+type PageTurn = { label: string; onClick: () => void };
+
+/** 상자 옆 넘기기 버튼: 상자 오른쪽 위 종류 표시("무늬 2 / 3")와 같은 모양의 알약 버튼에 "이전" / "다음" */
+function PageButton({ dir, turn }: { dir: "prev" | "next"; turn: PageTurn }) {
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      turn.onClick();
+    }
+  };
+  // 상자 옆면에서 40쯤 떨어진 곳, 상자 높이 가운데쯤 (오른쪽 옆면은 그 높이에서 x≈953, 왼쪽은 x≈47)
+  const w = 84;
+  const h = 38;
+  const x = dir === "next" ? 995 : 5 - w;
+  const y = 179;
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      aria-label={turn.label}
+      onClick={turn.onClick}
+      onKeyDown={onKey}
+      className="group cursor-pointer outline-none"
+    >
+      <title>{turn.label}</title>
+      <rect x={x} y={y} width={w} height={h} rx={h / 2} fill="#2A1C17" fillOpacity="0.85" stroke="#F3E2C4" strokeWidth="2.5" className="transition-colors group-hover:stroke-[#FFD23F] group-focus-visible:stroke-[#FFD23F]" />
+      <text x={x + w / 2} y={y + h / 2 + 6} textAnchor="middle" fontSize="17" fontWeight="900" fill="#FFF8EC" className="pointer-events-none">
+        {dir === "next" ? "다음 ›" : "‹ 이전"}
+      </text>
+    </g>
+  );
+}
+
+/** 브러쉬 상자: 사다리꼴 상자 안에 붓이 부채꼴로 놓이고, 앞판 아래에 이름·가격표가 붙는다.
+ *  slots 를 주면 붓이 그보다 적어도 같은 간격으로 가운데에 모아 놓는다 (상자마다 붓 간격이 같게).
+ *  prev·next 를 주면 상자 옆에 조금 떨어뜨려 "이전" / "다음" 버튼을 그린다 */
+export function BrushBox({ brushes, slots, selected, onPick, prev, next, className }: {
+  brushes: SpecialBrush[];
+  slots?: number;
+  selected: string | null;
+  onPick: (b: SpecialBrush) => void;
+  prev?: PageTurn;
+  next?: PageTurn;
+  className?: string;
+}) {
   const n = brushes.length;
-  const xs = brushes.map((_, i) => (n === 1 ? 500 : 110 + (780 * i) / (n - 1)));
+  const gap = 780 / Math.max(1, (slots ?? n) - 1);
+  const xs = brushes.map((_, i) => 500 + (i - (n - 1) / 2) * gap);
   // 모든 붓 손잡이가 상자 위쪽 먼 한 점을 향하게 해서 부채꼴로 퍼지게 한다
   const pivot = { x: 500, y: -520 };
   const headY = 300;
   return (
-    <svg viewBox="0 0 1000 470" className={className} role="group" aria-label="특수 브러쉬 상자">
+    // 양옆에 이전·다음 버튼 자리(90)를 늘 비워 두어, 상자를 넘겨도 상자 크기와 자리가 그대로다
+    <svg viewBox="-90 0 1180 470" className={className} role="group" aria-label="특수 브러쉬 상자">
+      {prev && <PageButton dir="prev" turn={prev} />}
+      {next && <PageButton dir="next" turn={next} />}
       {/* 상자 */}
       <path d="M80 26H920L986 366H14Z" fill={WOOD_DARK} stroke={LINE} strokeWidth="6" strokeLinejoin="round" />
       <path d="M98 42H902L960 352H40Z" fill="#9E2433" />
@@ -142,10 +202,16 @@ export function BrushBox({ brushes, selected, onPick, className }: { brushes: Sp
         <g key={b.slug} className="cursor-pointer" onClick={() => onPick(b)}>
           <path d={`M${xs[i]} 396v8`} stroke={LINE} strokeWidth="3" />
           <rect x={xs[i] - 40} y="404" width="80" height="54" rx="8" fill={b.owned ? "#EAF6DA" : "#FFF8EC"} stroke={selected === b.slug ? "#FFD23F" : LINE} strokeWidth={selected === b.slug ? 5 : 3} />
-          <text x={xs[i]} y="428" textAnchor="middle" fontSize="18" fontWeight="900" fill={LINE}>
-            {b.name}
-          </text>
-          <text x={xs[i]} y="450" textAnchor="middle" fontSize="15" fontWeight="800" fill={b.owned ? "#3B6D11" : "#B8262B"}>
+          {nameLines(b.name).map((line, k, lines) => {
+            const size = lines.length === 1 ? 17 : lines.length === 2 ? 13 : 11;
+            const top = lines.length === 1 ? 428 : lines.length === 2 ? 419 : 415;
+            return (
+              <text key={k} x={xs[i]} y={top + k * (size + 1)} textAnchor="middle" fontSize={size} fontWeight="900" fill={LINE}>
+                {line}
+              </text>
+            );
+          })}
+          <text x={xs[i]} y="452" textAnchor="middle" fontSize="15" fontWeight="800" fill={b.owned ? "#3B6D11" : "#B8262B"}>
             {b.owned ? "보유" : `${b.price}셀`}
           </text>
         </g>

@@ -13,6 +13,17 @@ export type Drawing = {
   category: "animal" | "plant" | "dinosaur" | "object" | null;
 };
 
+/** 특수 브러쉬 종류: 무늬 / 반짝이 / 사이버틱 / 삼색반짝이 */
+export type BrushCategory = "pattern" | "glitter" | "cyber" | "tricolor";
+
+/** 상점에 보이는 순서와 이름 */
+export const BRUSH_CATEGORIES: { id: BrushCategory; label: string }[] = [
+  { id: "pattern", label: "무늬" },
+  { id: "glitter", label: "반짝이" },
+  { id: "cyber", label: "사이버틱" },
+  { id: "tricolor", label: "삼색반짝이" },
+];
+
 /** 색칠하기 특수 브러쉬 (DB special_brushes). 무늬는 앱이 slug 로 그린다 (lib/drawing/brushPatterns.ts) */
 export type SpecialBrush = {
   id: number;
@@ -20,6 +31,8 @@ export type SpecialBrush = {
   name: string;
   /** 가격 (셀) */
   price: number;
+  /** 기프트샵에서 나눠 파는 종류 (DB special_brushes.category, migrations/022) */
+  category: BrushCategory;
   /** 내가 산 브러쉬인지 (DB user_brushes 에 행이 있음). 산 브러쉬만 쓸 수 있다 */
   owned: boolean;
 };
@@ -56,7 +69,7 @@ export type CreatureEntry = {
   tips: string[];
   /** 도감 정보의 출처 (DB creature_sources) */
   sources: { citation: string; url: string }[];
-  /** 완성 그림이 저장된 기록이 있으면 수집 완료 */
+  /** 완성 그림이 저장된 대표 작품의 일치율이 80% 이상이면 수집 완료 (server/completion.js) */
   collected: boolean;
   /** 대표 작품의 기록 ID */
   recordId: number | null;
@@ -77,6 +90,25 @@ export type LeaderboardEntry = {
   score: number;
   durationMs: number;
   playedAt: string;
+};
+
+/** 메인 화면의 내 그림 요약 (GET /api/summary) */
+export type UserSummary = {
+  /** 가진 셀 (기프트샵 화폐) */
+  cells: number;
+  /** 모든 기록 중 가장 높은 일치율 (0~100). 기록이 없으면 null */
+  bestScore: number | null;
+  /** 완성 작품으로 치는 최소 일치율 (%) */
+  completeScore: number;
+  /** 일치율 completeScore 이상으로 완성 그림이 저장된 그림 수 (스토리 + 도감) */
+  completedArtworks: number;
+  /** 그중 스토리 장면 수 */
+  storyCompleted: number;
+  /** 그중 도감 생물 수 (도감 화면의 "수집 완료"와 같은 기준) */
+  creatureCollected: number;
+  creatureTotal: number;
+  /** 3D 색칠하기에서 수납한 오브젝트 수 */
+  storedObjects: number;
 };
 
 /** 완성 그림 주소: DB의 경로(image_key)를 API 서버의 /uploads 폴더 주소로 (<img src> 에 그대로 쓴다) */
@@ -145,5 +177,6 @@ export const api = {
     request<{ savedAt: string }>("PUT", `/drafts/${encodeURIComponent(key)}`, { strokes, name: name ?? null }, opts),
   /** 생물 도감 목록과 내 수집 현황 */
   collection: () => request<{ creatures: CreatureEntry[] }>("GET", "/collection"),
+  summary: () => request<UserSummary>("GET", "/summary"),
   deleteDraft: (key: string) => request<{ ok: true }>("DELETE", `/drafts/${encodeURIComponent(key)}`),
 };

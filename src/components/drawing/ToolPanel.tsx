@@ -5,8 +5,9 @@
 //     안 산 붓은 🔒 가격이 붙고, 누르면 상점(#/shop)으로 간다. 상점에서 나오면 이 그리기 화면으로 돌아온다
 //   스포이드: 굵기·색 대신 "원하는 색깔에 찍어 보세요" 안내만 보여 준다 (색을 가져오면 바로 브러쉬로 바뀐다)
 // 특수 브러쉬 목록·구매: lib/specialBrushes.ts → GET/POST /api/brushes
-import { useEffect, useRef } from "react";
-import { patternFor } from "../../lib/drawing/brushPatterns";
+import { Fragment, useEffect, useRef } from "react";
+import { BRUSH_CATEGORIES } from "../../lib/api";
+import { patternFor, useBrushTextures } from "../../lib/drawing/brushPatterns";
 import { comboText } from "../../lib/drawing/shortcuts";
 import { useSpecialBrushes } from "../../lib/specialBrushes";
 import { currentPath, navigate } from "../../router";
@@ -90,12 +91,13 @@ function drawBrush(ctx: CanvasRenderingContext2D, slug: string, color: string) {
 
 function BrushArt({ slug, color }: { slug: string; color: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const texturesLoaded = useBrushTextures();
   useEffect(() => {
     const ctx = ref.current!.getContext("2d")!;
     // 좌우를 뒤집어 그린다: 손잡이가 오른쪽, 붓털 머리가 왼쪽을 본다
     ctx.setTransform(-2, 0, 0, 2, BRUSH_W * 2, 0);
     drawBrush(ctx, slug, color);
-  }, [slug, color]);
+  }, [slug, color, texturesLoaded]);
   return <canvas ref={ref} width={BRUSH_W * 2} height={BRUSH_H * 2} style={{ width: BRUSH_W, height: BRUSH_H }} aria-hidden="true" />;
 }
 
@@ -162,6 +164,7 @@ function ColorSections({ tools }: { tools: DrawingTools }) {
 /** 굵기 미리보기 점을 특수 브러쉬 무늬로 칠한 것 */
 function PatternDot({ slug, color, size }: { slug: string; color: string; size: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const texturesLoaded = useBrushTextures();
   useEffect(() => {
     const canvas = ref.current!;
     const ctx = canvas.getContext("2d")!;
@@ -174,7 +177,7 @@ function PatternDot({ slug, color, size }: { slug: string; color: string; size: 
     ctx.fill();
     ctx.fillStyle = patternFor(ctx, slug, color, 0.5);
     ctx.fill();
-  }, [slug, color, size]);
+  }, [slug, color, size, texturesLoaded]);
   return (
     <canvas
       ref={ref}
@@ -242,15 +245,17 @@ function SpecialBrushes({ tools }: { tools: DrawingTools }) {
     <Section title="특수 브러쉬">
       {specials.error && <p className="text-xs font-bold text-red-600">{specials.error}</p>}
       {!specials.brushes && !specials.error && <p className="text-xs font-medium text-ink-muted">불러오는 중…</p>}
-      {specials.brushes && !special && <p className="mb-1 text-xs font-bold text-sky-deep">쓸 붓을 골라 주세요.</p>}
       {/* 붓은 패널 오른쪽 모서리에서 시작해 머리가 왼쪽을 본다. 고른 붓은 왼쪽으로 쏙 나오고, 나머지는 오른쪽 모서리 밖으로 조금 들어가 있다.
           안 산 붓을 누르면 상점으로 가서 그 붓을 보여 준다 */}
       <div className="-mr-4 flex flex-col overflow-x-hidden">
-        {specials.brushes?.map((b) => {
+        {specials.brushes?.map((b, i, list) => {
           const active = special === b.slug;
+          // 목록은 종류(무늬·반짝이·사이버틱·삼색반짝이) 순서라, 종류가 바뀌는 자리에 이름을 붙인다
+          const heading = list[i - 1]?.category !== b.category ? BRUSH_CATEGORIES.find((c) => c.id === b.category)?.label : null;
           return (
+            <Fragment key={b.slug}>
+            {heading && <p className="mb-0.5 mt-2 pr-4 text-[11px] font-black text-sky-deep first:mt-0">{heading}</p>}
             <button
-              key={b.slug}
               type="button"
               onClick={() => (b.owned ? pickSpecial(b.slug) : goToShop(b.slug))}
               title={b.owned ? b.name : `${b.name} — 상점에서 ${b.price}셀로 사기`}
@@ -266,6 +271,7 @@ function SpecialBrushes({ tools }: { tools: DrawingTools }) {
                 <span className="absolute right-9 top-1/2 -translate-y-1/2 rounded-full bg-white/95 px-1.5 text-[10px] font-black text-ink shadow-sm">🔒 {b.price}</span>
               )}
             </button>
+            </Fragment>
           );
         })}
       </div>

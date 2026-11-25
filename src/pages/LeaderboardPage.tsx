@@ -2,7 +2,9 @@
 // 일치율이 높은 순, 같으면 빨리 그린 순. 내 기록이 10위 밖이면 표 아래에 따로 보여 준다. 데이터는 API 서버(server/)에서 받는다.
 // 기록마다 그린 그림이 있으면(user_artworks.image_key 경로의 파일) 썸네일로 보여 주고, 누르면 밑그림과 겹쳐 크게 본다.
 // 위쪽에서 "스토리 장면 그리기 / 도감 생물 그리기"를 고르고, 도감은 동물·식물·무생물별 이름 목록에서 그림을 고른다.
-import { useCallback, useEffect, useState } from "react";
+// 순위표 오른쪽 위의 학년 버튼(전체 / 초등 1~6학년)으로 학년별 순위를 고른다.
+// 아직 사용자 학년 데이터가 없어 임시 화면이다: "전체"만 실제 순위를 보여 주고, 학년을 고르면 준비 중 안내를 보여 준다.
+import { useCallback, useEffect, useRef, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../auth";
 import { CATEGORY_LABELS, localCreatureCatalog, type CreatureCategory } from "../data/creatures";
@@ -15,6 +17,64 @@ import { navigate, usePath } from "../router";
 
 const LIMIT = 10;
 const MEDALS = ["🥇", "🥈", "🥉"];
+
+/** 학년 고르기 목록. 0 = 전체 */
+const GRADES = [0, 1, 2, 3, 4, 5, 6] as const;
+type Grade = (typeof GRADES)[number];
+const gradeLabel = (grade: Grade) => (grade === 0 ? "전체" : `초등 ${grade}학년`);
+/** 사용자 학년 데이터가 생기면 true로 바꾸고, api.leaderboard에 학년을 넘겨 거른 순위를 받는다 */
+const GRADE_DATA_READY = false;
+
+/** 학년 고르기 버튼: 누르면 전체·1~6학년 목록이 펼쳐진다. 바깥을 누르거나 Esc를 누르면 닫힌다 */
+function GradePicker({ grade, onChange }: { grade: Grade; onChange: (grade: Grade) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKeyDown = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition ${grade === 0 ? "bg-sky-soft hover:bg-sky-haze" : "bg-sun/50 hover:bg-sun/70"}`}
+      >
+        🎓 {gradeLabel(grade)}
+        <span aria-hidden="true" className={`text-xs transition ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <ul role="listbox" aria-label="학년별 순위" className="absolute right-0 top-full z-20 mt-2 w-36 overflow-hidden rounded-2xl border border-sky-haze bg-white py-1 shadow-card-hover">
+          {GRADES.map((g) => (
+            <li key={g} role="option" aria-selected={g === grade}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(g);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm font-bold transition hover:bg-sky-soft ${g === grade ? "text-sky-deep" : "text-ink"}`}
+              >
+                {gradeLabel(g)}
+                {g === grade && <span aria-hidden="true">✓</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /** 앱의 장면 제목이 있으면 그것을, 없으면 DB 제목을 쓴다. */
 const drawingTitle = (d: Drawing) => findDrawingScene(d.id)?.title ?? d.title;
@@ -193,6 +253,9 @@ export default function LeaderboardPage() {
   const [board, setBoard] = useState<Board | null>(null);
   const [loading, setLoading] = useState(false);
   const [usingLocalData, setUsingLocalData] = useState(false);
+  const [grade, setGrade] = useState<Grade>(0);
+  // 학년 데이터가 없는 동안은 학년을 고르면 순위 대신 준비 중 안내를 보여 준다
+  const gradePending = grade !== 0 && !GRADE_DATA_READY;
 
   useEffect(() => {
     api.drawings().then(
@@ -249,13 +312,13 @@ export default function LeaderboardPage() {
       )}
       {drawings && drawings.length > 0 && selected && <DrawingPicker drawings={drawings} selected={selected} />}
 
-      <section className="overflow-hidden rounded-3xl border border-white/90 bg-white/80 shadow-card">
+      <section className="rounded-3xl border border-white/90 bg-white/80 shadow-card">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-haze px-5 py-4">
           <div>
             <h2 className="text-lg font-black">{selected ? drawingTitle(selected) : "리더보드"}</h2>
-            <p className="text-xs font-semibold text-ink-muted">사람마다 최고 기록 1개 · 일치율이 높은 순, 같으면 빨리 그린 순</p>
+            <p className="text-xs font-semibold text-ink-muted">{grade !== 0 && `${gradeLabel(grade)} · `}사람마다 최고 기록 1개 · 일치율이 높은 순, 같으면 빨리 그린 순</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {selected && (
               <button
                 type="button"
@@ -266,6 +329,7 @@ export default function LeaderboardPage() {
                 ↻ 새로고침
               </button>
             )}
+            {selected && <GradePicker grade={grade} onChange={setGrade} />}
             {scene && (
               <button
                 type="button"
@@ -280,8 +344,19 @@ export default function LeaderboardPage() {
           </div>
         </header>
 
+        {/* 표 모서리는 여기서 둥글게 자른다 (section 전체를 자르면 학년 목록이 잘린다) */}
+        <div className="overflow-hidden rounded-b-3xl">
         {drawings && drawings.length === 0 ? (
           <p className="p-10 text-center font-bold text-ink-muted">데이터베이스에 등록된 그림이 없어요.</p>
+        ) : gradePending ? (
+          <div className="p-10 text-center">
+            <p className="text-3xl" aria-hidden="true">🎓</p>
+            <p className="mt-3 font-black text-ink">{gradeLabel(grade)} 순위는 준비 중이에요</p>
+            <p className="mt-1 text-sm font-semibold text-ink-muted">학년 정보가 등록되면 같은 학년 친구들끼리의 순위를 볼 수 있어요.</p>
+            <button type="button" onClick={() => setGrade(0)} className="mt-4 rounded-full bg-sky-deep px-4 py-2 text-sm font-bold text-white hover:brightness-110">
+              전체 순위 보기
+            </button>
+          </div>
         ) : !board ? (
           <p className="p-10 text-center font-bold text-ink-muted">불러오는 중…</p>
         ) : board.top.length === 0 ? (
@@ -315,11 +390,12 @@ export default function LeaderboardPage() {
             </tbody>
           </table>
         )}
+        </div>
       </section>
 
       {viewing && <ArtworkViewer entry={viewing} scene={scene} guideUrl={guideUrl} onClose={closeViewer} />}
 
-      {board && !board.me && (
+      {board && !board.me && !gradePending && (
         <p className="mt-3 text-center text-sm font-semibold text-ink-muted">아직 이 장면의 내 기록이 없어요.</p>
       )}
     </PageLayout>

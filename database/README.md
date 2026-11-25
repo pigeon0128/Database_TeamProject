@@ -112,8 +112,11 @@ DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서�
 색칠하기의 특수 브러쉬는 재화 '셀'로 사서 쓰므로, 누가 어떤 브러쉬를 샀는지를 DB에 둡니다 (`migrations/018_special_brushes.sql`).
 
 - **셀** (`users.cells`): 사용자당 값 하나라 표를 따로 두지 않고 `users` 의 칸으로 둡니다. 처음 가진 셀은 10000(기본값)이고, `CHECK (cells >= 0)` 로 음수가 되지 않습니다.
-- **브러쉬와 가격** (`special_brushes`): slug, 이름, 가격, 순서. 목록은 `seeds/content.sql` 이 넣습니다 (가격은 지금 모두 100셀, 임시 값).
-  무늬를 그리는 방법은 앱 코드(`src/lib/drawing/brushPatterns.ts`)가 slug 로 찾습니다.
+- **브러쉬와 가격** (`special_brushes`): slug, 이름, 가격, 순서, 종류(`category`, `migrations/022_brush_categories.sql`). 목록은 `seeds/content.sql` 이 넣습니다.
+  종류는 기프트샵에서 나눠 파는 묶음입니다: 무늬 `pattern`(21개) / 반짝이 `glitter`(15개) / 사이버틱 `cyber`(3개) / 삼색반짝이 `tricolor`(10개).
+  가격은 종류와 상관없이 모두 100셀입니다 (`migrations/023_brush_price_100.sql`).
+  무늬를 그리는 방법은 앱 코드(`src/lib/drawing/brushPatterns.ts`)가 slug 로 찾습니다. 처음 10개(물결·하트 …)는 코드로 그리고,
+  나머지는 디자인 시안 그림(`public/assets/brushes/<slug>.webp`, 목록 `src/lib/drawing/textureBrushes.ts`)을 깔아 그립니다.
 - **산 브러쉬** (`user_brushes`): 기본 키 `(user_id, brush_id)` 로 같은 브러쉬를 두 번 살 수 없습니다.
   사용자를 지우면 함께 지워지고(CASCADE), 누군가 산 브러쉬는 지울 수 없습니다(RESTRICT).
 - **구매** (`POST /api/brushes/<slug>/purchase`, `server/routes/brushes.js`): 한 트랜잭션 안에서 사용자 행을 잠그고(`FOR UPDATE`)

@@ -1,9 +1,11 @@
 // 도감 API (/api/collection): 생물 도감 목록과 내 수집 현황.
 // database/queries/collection.sql 의 3번 쿼리와 같다 (대표 작품 규칙은 리더보드와 같다: 일치율↓ 시간↑ 완료시각↑ 기록ID↑).
+// 수집 완료(collected)는 완성 그림이 저장된 대표 작품의 일치율이 80% 이상일 때만이다 (../completion.js). SQL은 그대로 두고 여기서 거른다.
 // 표: creature_profiles·creature_facts·creature_tips (migrations/007), creature_sources (migrations/011), drawings, play_records, user_artworks
 import { Router } from "express";
 import { requireUser } from "../auth.js";
 import { pool } from "../db.js";
+import { isComplete } from "../completion.js";
 
 export const collectionRoutes = Router();
 
@@ -48,7 +50,7 @@ collectionRoutes.get("/", requireUser, async (req, res) => {
       facts: r.facts,
       tips: r.tips,
       sources: r.sources,
-      collected: r.is_collected,
+      collected: r.is_collected && isComplete(r.best_score),
       recordId: r.representative_record_id === null ? null : Number(r.representative_record_id),
       imageKey: r.representative_image_key,
       bestScore: r.best_score === null ? null : Number(r.best_score),

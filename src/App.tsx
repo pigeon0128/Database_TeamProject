@@ -1,9 +1,9 @@
 // 최상위 컴포넌트. 현재 주소(#/...)를 보고 어떤 페이지를 보여 줄지 고른다.
+// 메인 화면(#/)은 AI 화실이다. 예전 주소 #/studio도 같은 화면을 보여 준다.
 // #/story/<장면 id>는 장면 그리기, #/creatures/<생물>은 도감 생물 그리기 화면, 나머지는 routes 표대로 연결하고 모르는 주소는 메인으로 보낸다.
 import { lazy, Suspense, type ComponentType } from "react";
 import { usePath } from "./router";
 import { AuthProvider, useAuth } from "./auth";
-import HomePage from "./pages/HomePage";
 import CharacterPage from "./pages/CharacterPage";
 import CreatureDrawPage from "./pages/creatures/CreatureDrawPage";
 import CreatureListPage from "./pages/creatures/CreatureListPage";
@@ -23,7 +23,7 @@ const MyRoomPage = lazy(() => import("./features/myroom/MyRoomPage"));
 const PreviewMyRoomPage = lazy(() => import("./features/myroom/MyRoomPage").then((module) => ({ default: module.PreviewMyRoomPage })));
 
 const routes: Record<string, ComponentType> = {
-  "/": HomePage,
+  "/": StudioPage,
   "/character": CharacterPage,
   "/story": StorySelectPage,
   "/leaderboard": LeaderboardPage,
@@ -68,7 +68,7 @@ function Routes() {
       </Suspense>
     );
   }
-  const Page = routes[path] ?? HomePage;
+  const Page = routes[path] ?? StudioPage;
   return (
     <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-sky-soft text-sm text-ink-muted">마이룸을 준비하고 있어요…</main>}>
       <Page />

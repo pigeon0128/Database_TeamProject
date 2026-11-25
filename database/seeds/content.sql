@@ -210,19 +210,62 @@ JOIN creature_profiles p ON p.slug = v.slug
 ON CONFLICT DO NOTHING;
 
 -- 색칠하기의 특수 브러쉬와 가격(셀) (migrations/018). slug 는 앱의 무늬 이름(src/lib/drawing/brushPatterns.ts)과 맞춘다.
--- 가격은 임시 값이다. 이미 있는 브러쉬는 건너뛰므로, 가격을 바꾸려면 UPDATE 를 따로 쓴다.
-INSERT INTO special_brushes (slug, name, price, brush_order)
+-- 가격은 모두 100셀이다 (migrations/023). 이미 있는 브러쉬는 건너뛰므로, 가격을 바꾸려면 UPDATE 를 따로 쓴다.
+INSERT INTO special_brushes (slug, name, price, brush_order, category)
 VALUES
-    ('wave', '물결', 100, 1),
-    ('hearts', '하트', 100, 2),
-    ('stars', '별', 100, 3),
-    ('rainbow', '무지개', 100, 4),
-    ('leaf', '나뭇잎', 100, 5),
-    ('flower', '꽃', 100, 6),
-    ('clouds', '구름', 100, 7),
-    ('strawberries', '딸기', 100, 8),
-    ('butterflies', '나비', 100, 9),
-    ('rose', '장미', 100, 10)
+    ('wave', '물결', 100, 1, 'pattern'),
+    ('hearts', '하트', 100, 2, 'pattern'),
+    ('stars', '별', 100, 3, 'pattern'),
+    ('rainbow', '무지개', 100, 4, 'pattern'),
+    ('leaf', '나뭇잎', 100, 5, 'pattern'),
+    ('flower', '꽃', 100, 6, 'pattern'),
+    ('clouds', '구름', 100, 7, 'pattern'),
+    ('strawberries', '딸기', 100, 8, 'pattern'),
+    ('butterflies', '나비', 100, 9, 'pattern'),
+    ('rose', '장미', 100, 10, 'pattern'),
+    -- 무늬 (특수붓 디자인 시안: 그림은 public/assets/brushes/<slug>.webp)
+    ('cloud-outline', '구름 윤곽선', 100, 11, 'pattern'),
+    ('melon', '메론', 100, 12, 'pattern'),
+    ('banana', '바나나', 100, 13, 'pattern'),
+    ('honeycomb', '벌집', 100, 14, 'pattern'),
+    ('bubbles', '비눗방울', 100, 15, 'pattern'),
+    ('pebbles', '알록달록 조약돌', 100, 16, 'pattern'),
+    ('ice-crystal', '얼음 결정', 100, 17, 'pattern'),
+    ('space-trip', '우주여행', 100, 18, 'pattern'),
+    ('cherry', '체리', 100, 19, 'pattern'),
+    ('candy-ribbon', '캔디 리본', 100, 20, 'pattern'),
+    ('grapes', '포도', 100, 21, 'pattern'),
+    -- 반짝이 (특수붓 디자인 시안: 그림은 public/assets/brushes/<slug>.webp)
+    ('gl-black-orange', '검정·주황', 100, 22, 'glitter'),
+    ('gl-gold-white', '금색·하양', 100, 23, 'glitter'),
+    ('gl-navy-blush', '남색·연분홍', 100, 24, 'glitter'),
+    ('gl-lavender-mint', '라벤더·민트', 100, 25, 'glitter'),
+    ('gl-mocha-cream', '모카·크림', 100, 26, 'glitter'),
+    ('gl-purple-orange', '보라·주황', 100, 27, 'glitter'),
+    ('gl-pink-butter', '분홍·크림노랑', 100, 28, 'glitter'),
+    ('gl-red-pink', '빨강·분홍', 100, 29, 'glitter'),
+    ('gl-silver-white', '은색·하양', 100, 30, 'glitter'),
+    ('gl-teal-champagne', '청록·샴페인', 100, 31, 'glitter'),
+    ('gl-green-yellow', '초록·노랑', 100, 32, 'glitter'),
+    ('gl-blue-lilac', '파랑·연보라', 100, 33, 'glitter'),
+    ('gl-blue-lilac-soft', '파랑·연보라 은은', 100, 34, 'glitter'),
+    ('gl-blue-sky', '파랑·하늘색', 100, 35, 'glitter'),
+    ('gl-sky-peach', '하늘색·복숭아색', 100, 36, 'glitter'),
+    -- 사이버틱 (특수붓 디자인 시안: 그림은 public/assets/brushes/<slug>.webp)
+    ('neon-multi', '네온 다색', 100, 37, 'cyber'),
+    ('neon-red', '네온 빨강', 100, 38, 'cyber'),
+    ('neon-green', '네온 초록', 100, 39, 'cyber'),
+    -- 삼색반짝이 (특수붓 디자인 시안: 그림은 public/assets/brushes/<slug>.webp)
+    ('tri-navy-purple-pink', '남색·보라·분홍', 100, 40, 'tricolor'),
+    ('tri-rose-mint-lilac', '로즈핑크·민트·라일락', 100, 41, 'tricolor'),
+    ('tri-mint-butt-peac', '민트·크림노랑·복숭아색', 100, 42, 'tricolor'),
+    ('tri-berr-lave-vani', '베리핑크·라벤더·바닐라', 100, 43, 'tricolor'),
+    ('tri-peac-crea-moch', '복숭아색·크림·모카', 100, 44, 'tricolor'),
+    ('tri-pink-lave-sky', '분홍·라벤더·하늘색', 100, 45, 'tricolor'),
+    ('tri-teal-navy-silver', '청록·남색·은색', 100, 46, 'tricolor'),
+    ('tri-teal-sky-lave', '청록·하늘색·라벤더', 100, 47, 'tricolor'),
+    ('tri-cora-apri-butt', '코랄·살구·크림노랑', 100, 48, 'tricolor'),
+    ('tri-sky-lemon-cream', '하늘색·레몬노랑·크림', 100, 49, 'tricolor')
 ON CONFLICT DO NOTHING;
 
 -- 번호를 직접 넣었으므로, 다음에 자동으로 붙일 번호를 가장 큰 번호 뒤로 맞춘다.

@@ -1,6 +1,10 @@
 // 색칠하기 특수 브러쉬의 무늬. 붓 자국 안에 이 무늬가 드러난다 (special-brushes.html 의 무늬를 옮겨 옴).
 // 어떤 브러쉬를 보여 줄지(이름·순서)는 DB special_brushes 가 정하고, 여기서는 slug 로 무늬를 그린다.
 // 무늬 일부는 지금 고른 색(color)을 섞어 쓴다.
+// 디자인 시안으로 만든 브러쉬(textureBrushes.ts)는 그림(webp)을 불러와 깐다. 불러오기 전에는 평균색으로 칠하고,
+// 다 불러오면 useBrushTextures() 를 쓰는 화면이 다시 그린다.
+import { useSyncExternalStore } from "react";
+import { TEXTURE_BRUSHES } from "./textureBrushes";
 
 const TAU = Math.PI * 2;
 /** 무늬 한 칸 크기 (캔버스 픽셀) */
@@ -28,7 +32,60 @@ const backgrounds: Record<string, string> = {
 };
 
 /** 앱이 그릴 줄 아는 무늬인지 (DB에 앱이 모르는 slug 가 있으면 목록에서 뺀다) */
-export const hasPattern = (slug: string) => slug in backgrounds;
+export const hasPattern = (slug: string) => slug in backgrounds || slug in TEXTURE_BRUSHES;
+
+/** 그림으로 까는 브러쉬인지 */
+export const isTextureBrush = (slug: string) => slug in TEXTURE_BRUSHES;
+
+/** 그림 브러쉬의 그림 주소 */
+export const textureUrl = (slug: string) => `/assets/brushes/${slug}.webp`;
+
+const images = new Map<string, HTMLImageElement>();
+const listeners = new Set<() => void>();
+/** 그림을 하나 다 불러올 때마다 1씩 는다 (다시 그리기 신호) */
+let loadedVersion = 0;
+
+/** 그림 브러쉬의 그림. 처음 부르면 불러오기 시작하고, 다 불러오기 전에는 null */
+function textureImage(slug: string) {
+  let img = images.get(slug);
+  if (!img) {
+    img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      loadedVersion++;
+      listeners.forEach((f) => f());
+    };
+    img.src = textureUrl(slug);
+    images.set(slug, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+/** 그림 브러쉬의 그림을 미리 불러온다 (무늬 브러쉬면 아무것도 안 한다) */
+export function preloadBrushTexture(slug: string) {
+  if (isTextureBrush(slug)) textureImage(slug);
+}
+
+/** 그림 브러쉬 그림들을 다 불러올 때까지 기다린다 (한 번 그리고 끝나는 미리보기용. 못 불러온 그림은 평균색으로 칠해진다) */
+export async function loadBrushTextures(slugs: Iterable<string>) {
+  await Promise.all(
+    [...new Set(slugs)].filter(isTextureBrush).map((slug) => {
+      textureImage(slug);
+      return images.get(slug)!.decode().catch(() => {});
+    }),
+  );
+}
+
+/** 그림 브러쉬 그림을 새로 불러올 때마다 바뀌는 값. 그림을 쓰는 캔버스는 이 값이 바뀌면 다시 그린다 */
+export function useBrushTextures() {
+  return useSyncExternalStore(
+    (onChange) => {
+      listeners.add(onChange);
+      return () => listeners.delete(onChange);
+    },
+    () => loadedVersion,
+  );
+}
 
 const tiles = new Map<string, HTMLCanvasElement>();
 
@@ -420,8 +477,17 @@ function patternTile(slug: string, color: string) {
   return tile;
 }
 
-/** ctx 에서 붓 색으로 쓸 무늬. 캔버스 원점에 고정되어 획을 여러 번 나눠 그려도 무늬가 이어진다. */
-export function patternFor(ctx: CanvasRenderingContext2D, slug: string, color: string, scale = PATTERN_SCALE) {
+/** ctx 에서 붓 색으로 쓸 무늬. 캔버스 원점에 고정되어 획을 여러 번 나눠 그려도 무늬가 이어진다.
+ *  그림 브러쉬는 기본 크기(scale = PATTERN_SCALE)에서 그림을 1:1 로 깔고, 아직 못 불러왔으면 평균색을 돌려준다. */
+export function patternFor(ctx: CanvasRenderingContext2D, slug: string, color: string, scale = PATTERN_SCALE): CanvasPattern | string {
+  const texture = TEXTURE_BRUSHES[slug];
+  if (texture) {
+    const img = textureImage(slug);
+    if (!img) return texture.fallback;
+    const pattern = ctx.createPattern(img, "repeat")!;
+    pattern.setTransform(new DOMMatrix().scale(scale / PATTERN_SCALE));
+    return pattern;
+  }
   const pattern = ctx.createPattern(patternTile(slug, color), "repeat")!;
   pattern.setTransform(new DOMMatrix().scale(scale).rotate(PATTERN_ROTATE));
   return pattern;

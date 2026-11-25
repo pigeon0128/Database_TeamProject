@@ -49,7 +49,7 @@ export function CreatureInfo({ creature }: { creature: CreatureEntry }) {
       <p className="mt-4 text-xs font-bold text-ink-muted">
         {creature.collected && creature.bestScore !== null
           ? `📗 수집 완료 · 최고 ${formatScore(creature.bestScore)}점${creature.bestDurationMs !== null ? ` · ${formatDuration(creature.bestDurationMs)}` : ""}`
-          : "아직 수집하지 않았어요. 다 그리고 완료하면 도감에 등록돼요!"}
+          : "아직 수집하지 않았어요. 일치율 80% 이상으로 완료하면 도감에 등록돼요!"}
       </p>
     </div>
   );

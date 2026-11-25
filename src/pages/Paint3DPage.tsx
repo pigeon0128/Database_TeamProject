@@ -2,6 +2,7 @@
 // 서버 없이 브라우저에서만 동작한다. three.js 처리는 paintScene.ts 에 있다.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import DorobusBackdrop from "../components/DorobusBackdrop";
+import HomeLogo from "../components/HomeLogo";
 import { DrawingCoach } from "../components/drawing/DrawingCoach";
 import DrawingSceneDecor from "../components/drawing/DrawingSceneDecor";
 import { ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
@@ -132,9 +133,7 @@ export default function Paint3DPage({ modelId }: { modelId: ModelId }) {
       <DorobusBackdrop />
       <DrawingSceneDecor mode="paint3d" />
       <header className="relative z-30 flex flex-wrap items-center gap-1 rounded-3xl border border-white/90 bg-white/76 px-2 py-1.5 shadow-card backdrop-blur-sm">
-        <button type="button" onClick={() => navigate("/studio")} aria-label="AI 화실" className="mr-1 flex items-center gap-1 px-1 text-lg font-black tracking-[-0.04em] text-[#64a5ff] sm:px-2">
-          <span className="text-xl">💨</span><span className="hidden xl:inline">DOROBUS</span>
-        </button>
+        <HomeLogo textClassName="hidden xl:inline" />
         <ToolbarDivider />
         <ToolbarButton title="다른 오브젝트 고르기" onClick={() => navigate("/paint3d")}>
           ← <span className="hidden sm:inline">오브젝트 고르기</span>

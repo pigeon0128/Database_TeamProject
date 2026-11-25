@@ -5,7 +5,7 @@ import { navigate } from "../router";
 
 export default function Paint3DSelectPage() {
   return (
-    <PageLayout title="3D 오브젝트 고르기" wide back={{ path: "/studio", label: "AI 화실" }}>
+    <PageLayout title="3D 오브젝트 고르기" wide back={{ path: "/", label: "메인으로" }}>
       <p className="mb-5 text-sm font-medium text-ink-muted">색칠할 오브젝트를 하나 골라 보세요. 칠한 뒤에는 수납해서 마이룸에 놓을 수 있어요!</p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {MODELS.map((model) => (

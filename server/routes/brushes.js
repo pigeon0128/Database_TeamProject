@@ -1,5 +1,5 @@
 // 특수 브러쉬 API (/api/brushes): 그리기 화면 브러쉬 패널의 무늬 브러쉬 목록과 구매 (migrations/018).
-// 표: special_brushes (브러쉬·가격), user_brushes (산 브러쉬), users.cells (가진 셀)
+// 표: special_brushes (브러쉬·가격·종류 category, migrations/022), user_brushes (산 브러쉬), users.cells (가진 셀)
 import { Router } from "express";
 import { requireUser } from "../auth.js";
 import { pool } from "../db.js";
@@ -11,7 +11,7 @@ export const brushRoutes = Router();
 async function brushState(db, userId) {
   const [brushes, user] = await Promise.all([
     db.query(
-      `SELECT b.brush_id, b.slug, b.name, b.price, (ub.user_id IS NOT NULL) AS owned
+      `SELECT b.brush_id, b.slug, b.name, b.price, b.category, (ub.user_id IS NOT NULL) AS owned
          FROM special_brushes b
          LEFT JOIN user_brushes ub ON ub.brush_id = b.brush_id AND ub.user_id = $1
         ORDER BY b.brush_order`,
@@ -21,7 +21,7 @@ async function brushState(db, userId) {
   ]);
   return {
     cells: user.rows[0]?.cells ?? 0,
-    brushes: brushes.rows.map((r) => ({ id: r.brush_id, slug: r.slug, name: r.name, price: r.price, owned: r.owned })),
+    brushes: brushes.rows.map((r) => ({ id: r.brush_id, slug: r.slug, name: r.name, price: r.price, category: r.category, owned: r.owned })),
   };
 }
 

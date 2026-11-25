@@ -1,6 +1,11 @@
-import { useState, type ReactNode } from "react";
+// 메인 화면 (#/, 예전 주소 #/studio). AI 화실: 그리기 모드(캐릭터·스토리·도감·3D 색칠)를 고르고,
+// "내 그림 요약"·레벨·셀·모드별 완성 기록은 /api/summary 의 실제 기록으로 채운다.
+// 위쪽 메뉴와 아래 "더 둘러보기" 카드로 리더보드·마이룸·기프트샵·설정에 간다. 다른 화면의 DOROBUS 로고와 "메인으로"는 모두 여기로 돌아온다.
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "../auth";
 import DorobusMainCharacter, { type DorobusMainCharacterName } from "../components/DorobusMainCharacter";
+import GiftShopIcon from "../components/GiftShopIcon";
+import { api, type UserSummary } from "../lib/api";
 import { navigate } from "../router";
 
 type Mode = {
@@ -25,25 +30,118 @@ const modes: Mode[] = [
   { id: "paint3d", title: "3D 색칠하기", description: "3D 오브젝트를 돌려 보며 스프레이로 칠해요.", detail: "먼저 칠할 3D 오브젝트(캐릭터, 탈것, 집 등)를 하나 고른 뒤, 360도로 돌려 가며 스프레이로 칠해 보세요. 완성하면 수납해서 마이룸에 배치할 수 있습니다.", path: "/paint3d", icon: "🧊", difficulty: "자유", time: "5~15분", color: "bg-violet-50", guide: "codex", illustration: "/assets/dorobus/studio/codex-drawing-hero.png", pose: "/assets/dorobus/drawing/codex-pose.png" },
 ];
 
-function StudioHeader() {
+const extras: { title: string; description: string; path: string; icon: ReactNode; tone: string }[] = [
+  { title: "리더보드", description: "점수와 다른 친구들의 작품을 확인해요.", path: "/leaderboard", icon: "🏆", tone: "bg-amber-50" },
+  { title: "마이룸", description: "완성한 작품과 3D 오브젝트로 방을 꾸며요.", path: "/myroom", icon: "🏠", tone: "bg-violet-50" },
+  { title: "기프트샵", description: "특수 브러쉬를 구경하고 구매해요.", path: "/shop", icon: <GiftShopIcon className="h-full w-full p-1" />, tone: "bg-rose-50" },
+  { title: "설정 및 방법", description: "단축키와 그리기 방법을 확인해요.", path: "/settings", icon: "⚙️", tone: "bg-slate-100" },
+];
+
+/** 화실 레벨 규칙: 완성 작품(일치율 80% 이상) 1개 = 1 EXP, 레벨마다 EXP_PER_LEVEL 이 필요하다 (Lv. 1에서 시작) */
+const EXP_PER_LEVEL = 5;
+function levelOf(summary: UserSummary | null) {
+  const exp = summary?.completedArtworks ?? 0;
+  return { level: Math.floor(exp / EXP_PER_LEVEL) + 1, progress: exp % EXP_PER_LEVEL, toNext: EXP_PER_LEVEL - (exp % EXP_PER_LEVEL) };
+}
+
+/** 내 그림 요약 (GET /api/summary). 불러오는 동안·실패하면 null */
+function useSummary() {
+  const [summary, setSummary] = useState<UserSummary | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api.summary().then((s) => { if (alive) setSummary(s); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  return summary;
+}
+
+const formatScore = (score: number) => `${Number.isInteger(score) ? score : score.toFixed(1)}%`;
+
+/** 모드별 "완성 기록" 칸 글자 */
+function modeRecord(id: Mode["id"], summary: UserSummary | null) {
+  if (!summary) return "…";
+  switch (id) {
+    case "character": return "점수 없는 자유 모드";
+    case "story": return summary.storyCompleted ? `장면 ${summary.storyCompleted}개 완성` : "기록 없음";
+    case "creature": return `${summary.creatureCollected} / ${summary.creatureTotal} 수집`;
+    case "paint3d": return summary.storedObjects ? `오브젝트 ${summary.storedObjects}개 수납` : "기록 없음";
+  }
+}
+
+/** 아이디 버튼을 누르면 보유 젬·레벨·로그아웃이 담긴 메뉴를 펼친다. 바깥을 누르거나 Esc를 누르면 닫힌다. */
+function UserMenu({ loginId, onLogout, summary }: { loginId: string; onLogout: () => void; summary: UserSummary | null }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0 text-sm font-bold">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`flex items-center gap-2 rounded-full border px-3 py-2 transition ${open ? "border-blue-300 bg-blue-50 text-blue-600" : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-200"}`}
+      >
+        <span aria-hidden="true">🐇</span>
+        <span className="max-w-32 truncate">{loginId}</span>
+        <span aria-hidden="true" className={`text-xs transition ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-200/70">
+          <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+            <span className="grid size-10 place-items-center rounded-full bg-blue-50 text-xl" aria-hidden="true">🐇</span>
+            <div className="min-w-0">
+              <p className="truncate font-black text-slate-900">{loginId}</p>
+              <p className="text-xs font-semibold text-slate-400">AI 화실 회원</p>
+            </div>
+          </div>
+          <dl className="space-y-2 px-4 py-3">
+            <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2"><dt className="text-emerald-700">💠 보유 셀</dt><dd className="font-black text-emerald-700">{summary ? summary.cells.toLocaleString("ko-KR") : "…"}</dd></div>
+            <div className="flex items-center justify-between rounded-xl bg-blue-50 px-3 py-2"><dt className="text-blue-500">⭐ 레벨</dt><dd className="font-black text-blue-500">Lv. {levelOf(summary).level}</dd></div>
+          </dl>
+          <button type="button" role="menuitem" onClick={onLogout} className="w-full border-t border-slate-100 px-4 py-3 text-left text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">로그아웃</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 메인 화면 기본 크기 (1 = 100%) */
+const MAIN_ZOOM = 0.8;
+
+function StudioHeader({ summary }: { summary: UserSummary | null }) {
   const { user, logout } = useAuth();
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex min-h-[86px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
-        <button type="button" onClick={() => navigate("/")} className="flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm hover:border-blue-200 hover:text-blue-600">
-          <span aria-hidden="true">‹</span><span className="text-blue-500">DOROBUS</span><span className="hidden sm:inline">메인으로</span>
+        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="DOROBUS AI 화실" className="flex shrink-0 items-center gap-1.5 rounded-full px-2 py-3 text-xl font-black tracking-[-0.04em] text-[#64a5ff]">
+          <span className="text-2xl" aria-hidden="true">💨</span><span>DOROBUS</span><span className="hidden text-sm font-black text-slate-500 sm:inline">AI 화실</span>
         </button>
-        <nav className="absolute bottom-0 left-1/2 hidden -translate-x-1/2 gap-10 md:flex" aria-label="AI 화실 메뉴">
+        <nav className="absolute bottom-0 left-1/2 hidden -translate-x-1/2 gap-8 lg:flex" aria-label="AI 화실 메뉴">
           <button type="button" className="border-b-4 border-blue-500 px-1 pb-6 pt-7 font-black text-blue-500">연습</button>
           <button type="button" onClick={() => navigate("/character")} className="border-b-4 border-transparent px-1 pb-6 pt-7 font-black text-slate-600 hover:text-blue-500">자유 그리기</button>
           <button type="button" onClick={() => navigate("/leaderboard")} className="border-b-4 border-transparent px-1 pb-6 pt-7 font-black text-slate-600 hover:text-blue-500">랭킹</button>
+          <button type="button" onClick={() => navigate("/myroom")} className="border-b-4 border-transparent px-1 pb-6 pt-7 font-black text-slate-600 hover:text-blue-500">마이룸</button>
+          <button type="button" onClick={() => navigate("/shop")} className="border-b-4 border-transparent px-1 pb-6 pt-7 font-black text-slate-600 hover:text-blue-500">기프트샵</button>
           <button type="button" onClick={() => navigate("/settings")} className="border-b-4 border-transparent px-1 pb-6 pt-7 font-black text-slate-600 hover:text-blue-500">설정</button>
         </nav>
-        <div className="flex items-center gap-2 text-sm font-bold">
-          <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700 lg:inline">💠 1,000</span>
-          <span className="hidden rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-blue-500 sm:inline">Lv. 1</span>
-          {user && <button type="button" onClick={logout} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">🐇 {user.loginId}⌄</button>}
-        </div>
+        {user && <UserMenu loginId={user.loginId} onLogout={logout} summary={summary} />}
       </div>
     </header>
   );
@@ -52,13 +150,21 @@ function StudioHeader() {
 export default function StudioPage() {
   const [selectedId, setSelectedId] = useState<Mode["id"]>("character");
   const selected = modes.find((mode) => mode.id === selectedId) ?? modes[0];
+  const summary = useSummary();
+  const { level, progress, toNext } = levelOf(summary);
+  const stats = [
+    { icon: "🖼️", label: "완성 작품", value: summary ? `${summary.completedArtworks}개` : "…", tone: "bg-amber-50" },
+    { icon: "🎯", label: "최고 점수", value: !summary ? "…" : summary.bestScore === null ? "-" : formatScore(summary.bestScore), tone: "bg-blue-50" },
+    { icon: "📋", label: "수집 도감", value: summary ? `${summary.creatureCollected}개` : "…", tone: "bg-rose-50" },
+  ];
   const guideDecorationClass = selected.guide === "naty"
     ? "-bottom-4 -right-6 h-72 w-48"
     : "-bottom-16 -right-7 h-52 w-44";
 
   return (
-    <main className="min-h-screen bg-[#f4f8fc] text-[#151b2c]">
-      <StudioHeader />
+    // 메인 화면은 기본으로 80% 크기로 보여 준다 (CSS zoom). 줄어든 만큼 최소 높이를 늘려 바탕이 화면을 꽉 채우게 한다.
+    <main className="bg-[#f4f8fc] text-[#151b2c]" style={{ zoom: MAIN_ZOOM, minHeight: `calc(100vh / ${MAIN_ZOOM})` }}>
+      <StudioHeader summary={summary} />
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(330px,1fr)]">
           <section className="relative min-h-[370px] overflow-hidden rounded-[1.7rem] border border-blue-200 bg-[linear-gradient(120deg,#f5faff,#e4f2ff)] p-7 sm:p-10">
@@ -75,13 +181,13 @@ export default function StudioPage() {
           <section className="rounded-[1.7rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="flex items-center justify-between"><h2 className="text-2xl font-black tracking-[-0.04em]">내 그림 요약</h2><button type="button" onClick={() => navigate("/leaderboard")} className="text-sm font-black text-blue-500">상세 보기 →</button></div>
             <div className="mt-6 grid grid-cols-3 gap-3">
-              {[{ icon: "🖼️", label: "완성 작품", value: "0개", tone: "bg-amber-50" }, { icon: "🎯", label: "최고 점수", value: "-", tone: "bg-blue-50" }, { icon: "📋", label: "수집 도감", value: "0개", tone: "bg-rose-50" }].map((item) => (
+              {stats.map((item) => (
                 <div key={item.label} className={`rounded-2xl p-3 text-center sm:p-4 ${item.tone}`}><span className="text-2xl">{item.icon}</span><p className="mt-2 text-xs font-bold text-slate-400">{item.label}</p><strong className="mt-1 block text-xl font-black sm:text-2xl">{item.value}</strong></div>
               ))}
             </div>
             <div className="mt-5 border-t border-slate-100 pt-5">
-              <div className="flex justify-between text-sm font-bold"><span className="text-slate-500">화실 레벨 <strong className="text-slate-900">Lv. 1</strong></span><span>다음 레벨까지 <strong>5 EXP</strong></span></div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-[8%] rounded-full bg-blue-500" /></div>
+              <div className="flex justify-between text-sm font-bold"><span className="text-slate-500">화실 레벨 <strong className="text-slate-900">Lv. {level}</strong></span><span>다음 레벨까지 <strong>{toNext} EXP</strong></span></div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-500 transition-[width]" style={{ width: `${(progress / EXP_PER_LEVEL) * 100}%` }} /></div>
             </div>
           </section>
         </div>
@@ -113,12 +219,31 @@ export default function StudioPage() {
             <dl className="mt-5 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm font-bold">
               <div className="flex justify-between px-4 py-3"><dt className="text-slate-400">☆ 난이도</dt><dd>{selected.difficulty}</dd></div>
               <div className="flex justify-between px-4 py-3"><dt className="text-slate-400">◷ 추천 활동 시간</dt><dd>{selected.time}</dd></div>
-              <div className="flex justify-between px-4 py-3"><dt className="text-slate-400">♕ 완성 기록</dt><dd>기록 없음</dd></div>
+              <div className="flex justify-between px-4 py-3"><dt className="text-slate-400">♕ 완성 기록</dt><dd>{modeRecord(selected.id, summary)}</dd></div>
             </dl>
             <button type="button" onClick={() => navigate(selected.path)} className="relative z-10 mt-5 w-full rounded-2xl bg-blue-500 px-5 py-4 font-black text-white transition hover:bg-blue-600">{selected.id === "paint3d" ? "오브젝트 고르러 가기" : `${selected.title} 시작하기`} →</button>
             <div className={`pointer-events-none absolute opacity-35 ${guideDecorationClass}`}><DorobusMainCharacter character={selected.guide} label={`Dorobus ${selected.title} 안내 캐릭터`} className="h-full w-full" /></div>
           </section>
         </div>
+
+        <section className="mt-6 rounded-[1.7rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-label="더 둘러보기">
+          <h2 className="text-2xl font-black tracking-[-0.04em]">더 둘러보기</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-400">완성한 작품을 자랑하고, 꾸미고, 새 브러쉬도 구경해 보세요.</p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {extras.map((item) => (
+              <button key={item.path} type="button" onClick={() => navigate(item.path)} className="group flex items-center gap-4 rounded-2xl border-2 border-slate-100 p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-sm">
+                <span className={`grid size-16 shrink-0 place-items-center overflow-hidden rounded-2xl text-3xl ${item.tone}`}>{item.icon}</span>
+                <span className="min-w-0 flex-1">
+                  <strong className="block text-lg font-black">{item.title}</strong>
+                  <span className="mt-1 block text-sm font-semibold leading-snug text-slate-500">{item.description}</span>
+                </span>
+                <span className="text-lg font-black text-slate-300 transition group-hover:translate-x-1 group-hover:text-blue-500" aria-hidden="true">→</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <footer className="pb-2 pt-8 text-center text-xs font-semibold tracking-wide text-slate-400">윤태원, 구준영, 김상봉, 이찬영, 이준수</footer>
       </div>
     </main>
   );

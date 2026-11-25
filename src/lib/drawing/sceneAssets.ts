@@ -2,9 +2,14 @@
 // - loadScenePreview: 손질한 밑그림과 완성 예시 이미지 (장면 고르기 화면은 이것만 쓴다)
 // - loadSceneAssets: 위 이미지 + 채점용 마스크 (그리기 화면)
 // - loadSceneRegions: 색칠할 구역 (그리기 화면)
+// - renderDraftPreview: 그리던 그림을 그리기 화면처럼 겹친 미리보기 (장면 고르기 화면의 "이어 그리기" 카드)
 import type { Scene } from "../../data/scenes";
+import { loadBrushTextures } from "./brushPatterns";
 import { makeTracedExample, prepareGuide } from "./guideImage";
+import { makeCanvas, renderPaint } from "./paint";
+import { drawStroke } from "./penStroke";
 import { buildRegions, type Regions } from "./regions";
+import type { PaintStroke, Stroke } from "./strokes";
 import { buildGuideMasks, type GuideMasks } from "./traceScore";
 
 type ScenePreview = {
@@ -66,6 +71,55 @@ const regionCache = new Map<string, Promise<Regions>>();
 
 /** 색칠할 구역 (손질한 밑그림을 선으로 나눈 것) */
 export const loadSceneRegions = (scene: Scene) => cached(regionCache, scene, async () => buildRegions(await loadGuide(scene)));
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`이미지를 불러오지 못했습니다: ${src}`));
+    img.src = src;
+  });
+
+/**
+ * 그리던 그림 미리보기: 그리기 화면과 똑같이 (흰 바탕 → 밑그림 → 색칠 → 밑그림 선 → 펜 선) 겹친 이미지 주소.
+ * guideOpacity: 밑그림 진하기 (0~1, 0이면 밑그림을 넣지 않는다). 다 쓰면 URL.revokeObjectURL 로 놓아준다.
+ */
+export async function renderDraftPreview(scene: Scene, strokes: (Stroke | PaintStroke)[], guideOpacity: number) {
+  const { width, height } = scene;
+  // 색칠이나 지우개가 있을 때만 무거운 구역 나누기를 한다
+  const needsRegions = strokes.some((s) => s.type === "paint" || s.erase);
+  const [guide, regions] = await Promise.all([
+    guideOpacity > 0 ? loadScenePreview(scene).then((p) => loadImage(p.guideUrl)) : null,
+    needsRegions ? loadSceneRegions(scene) : null,
+    loadBrushTextures(strokes.flatMap((s) => (s.type === "paint" && s.pattern ? [s.pattern] : []))),
+  ]);
+
+  const out = makeCanvas(width, height);
+  const ctx = out.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  if (guide) {
+    ctx.globalAlpha = guideOpacity;
+    ctx.drawImage(guide, 0, 0, width, height);
+    ctx.globalAlpha = 1;
+  }
+  if (regions) {
+    const paint = makeCanvas(width, height);
+    renderPaint(paint.getContext("2d")!, strokes, regions);
+    ctx.drawImage(paint, 0, 0);
+    if (guide) {
+      ctx.globalAlpha = guideOpacity;
+      ctx.drawImage(regions.lines, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+  }
+  // 펜 선은 따로 그려야 지우개가 밑그림·색까지 지우지 않는다
+  const pen = makeCanvas(width, height);
+  const penCtx = pen.getContext("2d")!;
+  for (const s of strokes) if (s.type === "stroke") drawStroke(penCtx, s);
+  ctx.drawImage(pen, 0, 0);
+  return toUrl(out);
+}
 
 export async function loadSceneAssets(scene: Scene): Promise<SceneAssets> {
   const [preview, sceneMasks] = await Promise.all([loadScenePreview(scene), loadSceneMasks(scene)]);

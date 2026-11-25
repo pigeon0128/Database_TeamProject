@@ -32,16 +32,16 @@ const isStroke = (s: unknown): s is Stroke | PaintStroke =>
   (s as Stroke).points.length > 0;
 
 /** 저장된 그림. 없거나 깨졌으면 null. 서버에 연결하지 못하면 예외를 던진다. */
-async function loadDraft(key: string): Promise<Draft | null> {
+export async function loadDraft(key: string): Promise<Draft | null> {
   const { draft } = await api.getDraft(key);
   if (!draft || !draft.strokes.length || !draft.strokes.every(isStroke)) return null;
   return { strokes: draft.strokes, savedAt: new Date(draft.savedAt).getTime(), name: draft.name ?? undefined };
 }
 
-/** 그리던 그림이 있는 그림 이름들 (장면 고르기 화면의 "이어 그리기" 표시) */
-export async function draftKeys(): Promise<Set<string>> {
+/** 그리던 그림이 있는 그림 이름 → 마지막으로 저장한 시각(ms) (장면 고르기 화면의 "이어 그리기" 표시와 미리보기) */
+export async function draftKeys(): Promise<Map<string, number>> {
   const { drafts } = await api.drafts();
-  return new Set(drafts.filter((d) => d.strokeCount > 0).map((d) => d.key));
+  return new Map(drafts.filter((d) => d.strokeCount > 0).map((d) => [d.key, new Date(d.savedAt).getTime()]));
 }
 
 /** 그림이 바뀐 뒤 이만큼 기다렸다가 DB에 저장한다 (획을 연달아 그을 때 요청이 몰리지 않게) */

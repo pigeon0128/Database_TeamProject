@@ -1,10 +1,12 @@
 // 스토리 장면 고르기 화면 (#/story). scenes.ts의 장면들을 완성 예시 미리보기 카드로 보여 주고,
-// 누르면 그 장면의 그리기 화면(#/story/<id>)으로 이동한다. 그리던 그림이 저장된 장면은 "이어 그리기"로 표시한다.
+// 누르면 그 장면의 그리기 화면(#/story/<id>)으로 이동한다. 그리던 그림이 저장된 장면은 "이어 그리기"로 표시하고,
+// 미리보기에 선화 대신 그리던 그림을 그리기 화면처럼(밑그림 위에) 보여 준다.
 import { useEffect, useState } from "react";
 import PageLayout from "../components/PageLayout";
 import { scenes, storyChapters, type Scene } from "../data/scenes";
-import { draftKeys } from "../lib/drawingDraft";
-import { loadScenePreview } from "../lib/drawing/sceneAssets";
+import { draftKeys, loadDraft } from "../lib/drawingDraft";
+import { loadScenePreview, renderDraftPreview } from "../lib/drawing/sceneAssets";
+import { useSavedSetting } from "../lib/userSettings";
 import { navigate } from "../router";
 
 const chapterTabs = [
@@ -17,20 +19,78 @@ const chapterTabs = [
 
 type ChapterTabId = (typeof chapterTabs)[number]["id"];
 
-function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; inProgress: boolean }) {
-  const [preview, setPreview] = useState<string | null>(null);
+/**
+ * 그리던 그림 미리보기 캐시 (장면 id → 미리보기). 챕터를 바꾸거나 화면을 떠났다 와도 다시 만들지 않고 바로 보여 준다.
+ * sig(저장 시각과 밑그림 진하기)가 바뀌었을 때만 새로 만들고, 그동안은 이전 미리보기를 그대로 보여 준다.
+ */
+const draftPreviewCache = new Map<string, { sig: string; url: string | null; pending: Promise<string | null> | null }>();
+/** 마지막으로 불러온 그리던 그림 목록 (다시 들어왔을 때 "이어 그리기" 표시를 바로 보여 주려고) */
+let lastDrafts = new Map<string, number>();
+
+function loadDraftPreview(scene: Scene, savedAt: number, guideOpacity: number): Promise<string | null> {
+  const sig = `${savedAt}|${guideOpacity}`;
+  const previous = draftPreviewCache.get(scene.id);
+  if (previous?.sig === sig) return previous.pending ?? Promise.resolve(previous.url);
+  const entry = { sig, url: previous?.url ?? null, pending: null as Promise<string | null> | null };
+  entry.pending = loadDraft(`story:${scene.id}`)
+    .then((draft) => (draft ? renderDraftPreview(scene, draft.strokes, guideOpacity) : null))
+    .then(
+      (url) => {
+        // 그사이 더 새 요청이 들어왔으면 이 결과는 버린다
+        if (draftPreviewCache.get(scene.id) !== entry) {
+          if (url) URL.revokeObjectURL(url);
+          return entry.url;
+        }
+        if (entry.url && entry.url !== url) URL.revokeObjectURL(entry.url);
+        entry.url = url;
+        entry.pending = null;
+        return url;
+      },
+      (error) => {
+        // 실패하면 다음에 다시 시도한다 (이전 미리보기는 남겨 둔다)
+        if (draftPreviewCache.get(scene.id) === entry) {
+          if (previous) draftPreviewCache.set(scene.id, { ...previous, pending: null });
+          else draftPreviewCache.delete(scene.id);
+        }
+        throw error;
+      },
+    );
+  draftPreviewCache.set(scene.id, entry);
+  return entry.pending;
+}
+
+/** 다 그렸거나 지운 그림의 미리보기는 놓아준다 */
+function forgetDraftPreviews(keep: Map<string, number>) {
+  for (const [id, entry] of draftPreviewCache) {
+    if (keep.has(`story:${id}`)) continue;
+    if (entry.url) URL.revokeObjectURL(entry.url);
+    draftPreviewCache.delete(id);
+  }
+}
+
+/** 선화 미리보기 캐시 (새 챕터 장면은 이미지 주소가 바로 있으므로 처음부터 보여 준다) */
+const examplePreviewCache = new Map<string, string>();
+
+function SceneCard({ scene, index, inProgress, draftPreview }: { scene: Scene; index: number; inProgress: boolean; draftPreview: string | null }) {
+  const [preview, setPreview] = useState<string | null>(() => examplePreviewCache.get(scene.id) ?? scene.example ?? null);
 
   useEffect(() => {
+    if (preview) return;
     let cancelled = false;
     // 미리보기 이미지만 만든다 (채점용 계산은 그리기 화면에서)
     loadScenePreview(scene).then(
-      (a) => !cancelled && setPreview(a.exampleUrl),
+      (a) => {
+        examplePreviewCache.set(scene.id, a.exampleUrl);
+        if (!cancelled) setPreview(a.exampleUrl);
+      },
       () => {},
     );
     return () => {
       cancelled = true;
     };
-  }, [scene]);
+  }, [scene, preview]);
+
+  const shown = draftPreview ?? preview;
 
   return (
     <button
@@ -39,8 +99,8 @@ function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; 
       className="group overflow-hidden rounded-4xl border border-white/90 bg-white/80 text-left shadow-card transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-card-hover focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep"
     >
       <span className="relative block overflow-hidden bg-sky-haze" style={{ aspectRatio: `${scene.width} / ${scene.height}` }}>
-        {preview ? (
-          <img src={preview} alt={`${scene.title} 완성 예시`} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+        {shown ? (
+          <img src={shown} alt={draftPreview ? `${scene.title} 그리던 그림` : `${scene.title} 완성 예시`} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
         ) : (
           <span className="flex h-full items-center justify-center text-sm font-bold text-ink-muted">미리보기 만드는 중…</span>
         )}
@@ -64,10 +124,36 @@ function SceneCard({ scene, index, inProgress }: { scene: Scene; index: number; 
 export default function StorySelectPage() {
   const [selectedChapter, setSelectedChapter] = useState<ChapterTabId>("ch1");
   // 그리던 그림이 DB에 있는 장면들 (한 번에 불러온다. 못 불러오면 표시만 안 할 뿐 그리기에는 지장 없다)
-  const [drafts, setDrafts] = useState<Set<string>>(new Set());
+  const [drafts, setDrafts] = useState<Map<string, number>>(lastDrafts);
   useEffect(() => {
-    draftKeys().then(setDrafts, () => {});
+    draftKeys().then((next) => {
+      lastDrafts = next;
+      forgetDraftPreviews(next);
+      setDrafts(next);
+    }, () => {});
   }, []);
+
+  // 그리던 그림 미리보기는 챕터와 상관없이 모든 장면을 미리 만들어 둔다 (챕터를 바꿔도 기다리지 않게)
+  const [showGuide] = useSavedSetting("guideVisible");
+  const [guideOpacityPct] = useSavedSetting("guideOpacity");
+  const guideOpacity = showGuide ? guideOpacityPct / 100 : 0;
+  const [draftPreviews, setDraftPreviews] = useState<Map<string, string | null>>(
+    () => new Map([...draftPreviewCache].map(([id, entry]) => [id, entry.url])),
+  );
+  useEffect(() => {
+    let cancelled = false;
+    for (const scene of scenes) {
+      const savedAt = drafts.get(`story:${scene.id}`);
+      if (savedAt === undefined) continue;
+      loadDraftPreview(scene, savedAt, guideOpacity).then(
+        (url) => !cancelled && setDraftPreviews((prev) => (prev.get(scene.id) === url ? prev : new Map(prev).set(scene.id, url))),
+        () => {},
+      );
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [drafts, guideOpacity]);
 
   const chapterGroups = storyChapters
     .map((chapter) => ({ ...chapter, scenes: scenes.filter((scene) => scene.chapter === chapter.id) }))
@@ -137,7 +223,13 @@ export default function StorySelectPage() {
             </div>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {chapter.scenes.map((scene, index) => (
-                <SceneCard key={scene.id} scene={scene} index={index} inProgress={drafts.has(`story:${scene.id}`)} />
+                <SceneCard
+                  key={scene.id}
+                  scene={scene}
+                  index={index}
+                  inProgress={drafts.has(`story:${scene.id}`)}
+                  draftPreview={drafts.has(`story:${scene.id}`) ? (draftPreviews.get(scene.id) ?? null) : null}
+                />
               ))}
             </div>
           </section>

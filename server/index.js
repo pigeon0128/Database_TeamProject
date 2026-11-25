@@ -8,6 +8,7 @@
 //   routes/settings.js  /api/settings    그리기 설정·단축키
 //   routes/drafts.js    /api/drafts/*    그리던 그림 (이어서 그리기)
 //   routes/collection.js /api/collection 생물 도감과 내 수집 현황
+//   routes/summary.js   /api/summary     메인 화면의 내 그림 요약 (완성 작품·최고 점수·수집 도감·셀)
 import express from "express";
 import { pool } from "./db.js";
 import { UPLOAD_DIR } from "./storage.js";
@@ -20,6 +21,7 @@ import { drawingRoutes } from "./routes/drawings.js";
 import { recordRoutes } from "./routes/records.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { myroomRoutes } from "./routes/myroom.js";
+import { summaryRoutes } from "./routes/summary.js";
 
 const app = express();
 
@@ -50,6 +52,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/drafts", draftRoutes);
 app.use("/api/collection", collectionRoutes);
 app.use("/api/myroom", myroomRoutes);
+app.use("/api/summary", summaryRoutes);
 
 app.use("/api", notFound);
 app.use(errorHandler);

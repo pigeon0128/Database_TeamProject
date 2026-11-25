@@ -1,7 +1,9 @@
 // 기프트샵 (#/shop). 메인 화면 오른쪽 아래 상점 그림을 누르면 온다.
 // 화면 가운데 선을 기준으로 위에는 점원 캐릭터와 말풍선(뒤에 선물 가게 벽장 그림), 아래 나무 카운터 위에는 물건을 사는 칸이 있다.
 //   첫 화면: 왼쪽 인사말 칸 + 오른쪽 메뉴 "1. 특수 브러쉬"
-//   특수 브러쉬를 누르면 아래 칸이 왼쪽으로 밀려 나가고, 브러쉬 상자가 오른쪽에서 들어온다.
+//   특수 브러쉬를 누르면 오른쪽 메뉴가 종류 4개(무늬 / 반짝이 / 사이버틱 / 삼색반짝이)로 바뀐다.
+//   종류를 고르면 아래 칸이 왼쪽으로 밀려 나가고, 그 종류의 브러쉬 상자가 오른쪽에서 들어온다.
+//   상자에는 붓이 10개씩 담기고, 상자 옆의 "이전" / "다음" 버튼으로 그 종류의 이전·다음 붓 10개를 본다.
 //   붓을 누르면 말풍선이 가격을 알려 주고 거기서 산다 (lib/specialBrushes.ts → POST /api/brushes/<slug>/purchase).
 //   말풍선의 "체험해보기"를 누르면 말풍선이 캐릭터 왼쪽으로 옮겨 가고, 이젤 캔버스가 오른쪽에서 말풍선 자리로 들어와 그 붓으로 그려 볼 수 있다.
 //   캔버스는 카운터 뒤 이젤에 얹혀 있어 아랫부분이 카운터에 가린다.
@@ -9,7 +11,7 @@
 //   그리기 화면의 특수 브러쉬에서 오면(#/shop?from=<그리던 화면>&brush=<붓>) 브러쉬 상자와 그 붓부터 보여 주고,
 //   "그리기로 돌아가기"를 누르면 그리던 화면으로 돌아가 그림을 이어 그린다. 고른 붓을 가지고 있으면 그 붓을 쥐여 보낸다.
 import { useEffect, useRef, useState } from "react";
-import type { SpecialBrush } from "../lib/api";
+import { BRUSH_CATEGORIES, type BrushCategory, type SpecialBrush } from "../lib/api";
 import { useSpecialBrushes } from "../lib/specialBrushes";
 import { isAppPath, navigate, queryParam } from "../router";
 import { BrushBox, CounterBackdrop } from "../components/shop/ShopArt";
@@ -17,6 +19,10 @@ import { ShopWall } from "../components/shop/ShopWall";
 import EaselCanvas from "../components/shop/EaselCanvas";
 
 const GREETING = "무슨 상품을 찾고 있어요?";
+const PICK_KIND = "어떤 브러쉬가 좋아요? 종류를 골라 보세요!";
+/** 상자 하나에 담는 붓 수 */
+const PER_BOX = 10;
+const categoryLabel = (id: BrushCategory) => BRUSH_CATEGORIES.find((c) => c.id === id)?.label ?? id;
 
 /** 말풍선. brush 가 있으면 "체험해보기" 버튼을, buy 면 사기·그만두기 버튼도 붙인다 */
 type Bubble = { text: string; brush?: SpecialBrush; buy?: boolean };
@@ -75,24 +81,62 @@ function SpeechBubble({ bubble, side, cells, busy, onBuy, onTry, onCancel }: { b
 /** 중앙선 아래 칸 하나의 틀 (어두운 바탕에 크림색 테두리) */
 const panel = "rounded-2xl border-4 border-[#F3E2C4] bg-[#2A1C17]/75 text-[#FFF8EC] shadow-lg backdrop-blur-[1px]";
 
-/** 첫 화면: 왼쪽 인사말, 오른쪽 메뉴 */
-function MenuPanel({ cells, onBrushes }: { cells: number | null; onBrushes: () => void }) {
+/** 오른쪽 메뉴 칸의 한 줄: 마우스를 올리면 앞에 하트가 나온다 */
+function MenuItem({ label, sub, small, onClick }: { label: string; sub?: string; small?: boolean; onClick: () => void }) {
+  // small: 종류 4개가 스크롤 없이 한 칸에 들어가게 글자와 줄 간격을 줄인다 (창 높이에 따라 작아진다)
+  const text = small ? "text-[clamp(0.8rem,2vh,1.15rem)]" : "text-[clamp(1.05rem,2.6vh,1.45rem)]";
+  return (
+    <button type="button" onClick={onClick} className={`group flex w-full items-center gap-2 rounded-lg px-2 text-left transition hover:bg-white/10 ${small ? "py-[clamp(0rem,0.4vh,0.25rem)]" : "py-1.5"}`}>
+      <span className={`${text} text-[#E8473F] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100`} aria-hidden="true">♥</span>
+      <span className={`${text} font-black leading-tight`}>{label}</span>
+      {sub && <span className="ml-auto text-[clamp(0.7rem,1.6vh,0.95rem)] font-bold text-[#F3E2C4]/70">{sub}</span>}
+    </button>
+  );
+}
+
+/** 첫 화면: 왼쪽 인사말, 오른쪽 메뉴. 특수 브러쉬를 누르면 오른쪽 메뉴가 브러쉬 종류 4개로 바뀐다 */
+function MenuPanel({ cells, kinds, counts, onBrushes, onKind, onBack }: {
+  cells: number | null;
+  kinds: boolean;
+  counts: Partial<Record<BrushCategory, number>>;
+  onBrushes: () => void;
+  onKind: (id: BrushCategory) => void;
+  onBack: () => void;
+}) {
   return (
     <div className="grid h-full grid-cols-[1.4fr_1fr] gap-4">
       <div className={`${panel} space-y-3 p-[clamp(1rem,3vh,2rem)] text-[clamp(1rem,2.6vh,1.4rem)] font-bold leading-relaxed`}>
-        <p>* 어서 오세요! 도로 기프트샵이에요.</p>
-        <p>* 그림을 더 반짝이게 해 줄 물건을 팔고 있어요.</p>
+        {kinds ? (
+          <>
+            <p>* 특수 브러쉬는 네 가지 종류가 있어요.</p>
+            <p>* 종류를 고르면 붓 상자를 꺼내 줄게요.</p>
+          </>
+        ) : (
+          <>
+            <p>* 어서 오세요! 도로 기프트샵이에요.</p>
+            <p>* 그림을 더 반짝이게 해 줄 물건을 팔고 있어요.</p>
+          </>
+        )}
       </div>
-      <div className={`${panel} flex flex-col p-[clamp(1rem,3vh,2rem)]`}>
-        <button
-          type="button"
-          onClick={onBrushes}
-          className="group flex items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/10"
-        >
-          <span className="text-[clamp(1.1rem,2.8vh,1.5rem)] text-[#E8473F] opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true">♥</span>
-          <span className="text-[clamp(1.1rem,2.8vh,1.5rem)] font-black">1. 특수 브러쉬</span>
-        </button>
-        <p className="mt-auto text-right text-[clamp(0.9rem,2.2vh,1.15rem)] font-black text-[#FFD23F]">보유 셀 {cells === null ? "…" : cells.toLocaleString()}</p>
+      <div className={`${panel} flex min-h-0 flex-col p-[clamp(0.75rem,2.4vh,1.75rem)]`}>
+        {kinds ? (
+          BRUSH_CATEGORIES.map((c, i) => (
+            <MenuItem key={c.id} small label={`${i + 1}. ${c.label}`} sub={counts[c.id] !== undefined ? `${counts[c.id]}개` : undefined} onClick={() => onKind(c.id)} />
+          ))
+        ) : (
+          <MenuItem label="1. 특수 브러쉬" onClick={onBrushes} />
+        )}
+        {/* 맨 아래 줄: (종류 목록일 때) 처음으로 버튼과 보유 셀을 한 줄에 둔다 */}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+          {kinds ? (
+            <button type="button" onClick={onBack} className="rounded-full px-2 py-0.5 text-[clamp(0.75rem,1.8vh,0.9rem)] font-bold text-[#F3E2C4] transition hover:bg-white/10">
+              ← 처음으로
+            </button>
+          ) : (
+            <span />
+          )}
+          <p className="text-[clamp(0.85rem,2.1vh,1.15rem)] font-black text-[#FFD23F]">보유 셀 {cells === null ? "…" : cells.toLocaleString()}</p>
+        </div>
       </div>
     </div>
   );
@@ -107,6 +151,11 @@ export default function ShopPage() {
   });
   const [wanted] = useState(() => queryParam("brush"));
   const [view, setView] = useState<"menu" | "brushes">(from ? "brushes" : "menu");
+  // 첫 화면 오른쪽 메뉴가 브러쉬 종류 목록인지
+  const [kinds, setKinds] = useState(false);
+  // 상자에 꺼내 놓은 종류와 몇 번째 상자(10개씩)인지
+  const [category, setCategory] = useState<BrushCategory>("pattern");
+  const [page, setPage] = useState(0);
   const [bubble, setBubble] = useState<Bubble>({ text: from ? "마음에 드는 브러쉬를 골라 보세요!" : GREETING });
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -131,9 +180,21 @@ export default function ShopPage() {
   };
 
   const openBrushes = () => {
-    setView("brushes");
-    setBubble({ text: "마음에 드는 브러쉬를 골라 보세요!" });
+    setKinds(true);
+    setBubble({ text: PICK_KIND });
   };
+  const openKind = (id: BrushCategory) => {
+    setCategory(id);
+    setPage(0);
+    setSelected(null);
+    setView("brushes");
+    setBubble({ text: `${categoryLabel(id)} 브러쉬예요. 마음에 드는 붓을 골라 보세요!` });
+  };
+  const counts: Partial<Record<BrushCategory, number>> = {};
+  for (const b of brushes ?? []) counts[b.category] = (counts[b.category] ?? 0) + 1;
+  const inKind = brushes?.filter((b) => b.category === category) ?? [];
+  const pages = Math.max(1, Math.ceil(inKind.length / PER_BOX));
+  const boxBrushes = inKind.slice(page * PER_BOX, page * PER_BOX + PER_BOX);
   /** 이젤을 오른쪽 화면 밖 대기 자리로 돌려보낸다 */
   const closeEasel = () => {
     if (trying) setReturning(true);
@@ -153,10 +214,24 @@ export default function ShopPage() {
     if (easelBrush) setBubble(brushBubble(brushes?.find((b) => b.slug === easelBrush.slug) ?? easelBrush));
   };
 
+  /** 다른 상자로 넘긴다 (같은 종류의 이전·다음 붓 10개) */
+  const turnPage = (to: number) => {
+    closeEasel();
+    setSelected(null);
+    setPage(to);
+    setBubble({ text: `${categoryLabel(category)} 브러쉬 ${to + 1}번째 상자예요.` });
+  };
+  /** 브러쉬 상자에서 종류 고르기로 돌아간다 */
   const backToMenu = () => {
     closeEasel();
     setView("menu");
+    setKinds(true);
     setSelected(null);
+    setBubble({ text: PICK_KIND });
+  };
+  /** 종류 목록에서 첫 메뉴로 */
+  const backToTop = () => {
+    setKinds(false);
     setBubble({ text: GREETING });
   };
   const pick = (b: SpecialBrush) => {
@@ -171,6 +246,10 @@ export default function ShopPage() {
     pickedWanted.current = true;
     const b = brushes.find((x) => x.slug === wanted);
     if (b) {
+      // 그 붓이 든 종류와 상자를 꺼낸다
+      const index = brushes.filter((x) => x.category === b.category).findIndex((x) => x.slug === b.slug);
+      setCategory(b.category);
+      setPage(Math.floor(index / PER_BOX));
       setSelected(b.slug);
       setBubble(brushBubble(b));
     }
@@ -232,17 +311,36 @@ export default function ShopPage() {
         <div className={`relative flex h-full w-[200%] transition-transform duration-500 ease-out ${view === "brushes" ? "-translate-x-1/2" : "translate-x-0"}`}>
           <div className="h-full w-1/2 p-[clamp(0.75rem,3vh,2rem)]" inert={view !== "menu"}>
             <div className="mx-auto h-full max-w-6xl">
-              <MenuPanel cells={cells} onBrushes={openBrushes} />
+              <MenuPanel cells={cells} kinds={kinds} counts={counts} onBrushes={openBrushes} onKind={openKind} onBack={backToTop} />
             </div>
           </div>
           <div className="relative flex h-full w-1/2 flex-col items-center p-[clamp(0.5rem,2vh,1.5rem)]" inert={view !== "brushes"}>
             <button type="button" onClick={backToMenu} className="absolute left-5 top-3 z-10 rounded-full border-2 border-[#F3E2C4] bg-[#2A1C17]/85 px-4 py-1.5 text-sm font-bold text-[#FFF8EC] transition hover:bg-[#2A1C17] sm:left-8">
-              ← 메뉴로
+              ← 종류 고르기
             </button>
+            <div className="absolute right-5 top-3 z-10 flex items-center gap-2 rounded-full border-2 border-[#F3E2C4] bg-[#2A1C17]/85 px-4 py-1.5 text-sm font-black text-[#FFF8EC] sm:right-8">
+              {categoryLabel(category)}
+              {pages > 1 && (
+                <span className="font-bold text-[#FFD23F]">
+                  {page + 1} / {pages}
+                </span>
+              )}
+            </div>
             {error ? (
               <p className="m-auto font-bold text-red-300">{error}</p>
             ) : brushes ? (
-              <BrushBox brushes={brushes} selected={selected} onPick={pick} className="h-full w-full max-w-6xl" />
+              <>
+                <BrushBox
+                  key={`${category}-${page}`}
+                  brushes={boxBrushes}
+                  slots={PER_BOX}
+                  selected={selected}
+                  onPick={pick}
+                  prev={page > 0 ? { label: `${categoryLabel(category)} 이전 브러쉬 보기`, onClick: () => turnPage(page - 1) } : undefined}
+                  next={page < pages - 1 ? { label: `${categoryLabel(category)} 다음 브러쉬 보기`, onClick: () => turnPage(page + 1) } : undefined}
+                  className="h-full w-full max-w-6xl"
+                />
+              </>
             ) : (
               <p className="m-auto font-bold text-[#FFF8EC]">브러쉬를 꺼내는 중…</p>
             )}

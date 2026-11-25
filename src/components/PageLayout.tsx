@@ -1,12 +1,14 @@
-// 모든 하위 페이지가 같이 쓰는 틀: 배경, 가운데 정렬된 본문 폭, 상단의 "← 뒤로" 버튼과 제목.
+// 모든 하위 페이지가 같이 쓰는 틀: 배경, 가운데 정렬된 본문 폭, 상단의 "🏠 DOROBUS"(메인으로) 버튼, "← 뒤로" 버튼과 제목.
+// 뒤로 가기가 메인(#/)이면 🏠 DOROBUS와 겹치므로 "← 뒤로" 버튼은 보이지 않는다.
 import type { ReactNode } from "react";
 import { navigate } from "../router";
 import DorobusBackdrop from "./DorobusBackdrop";
+import HomeLogo from "./HomeLogo";
 
 type Props = {
   title: string;
   wide?: boolean;
-  /** 뒤로 가기 버튼이 갈 곳 (기본: 메인) */
+  /** 뒤로 가기 버튼이 갈 곳 (기본: 메인 → 버튼을 따로 보이지 않음) */
   back?: { path: string; label: string };
   children?: ReactNode;
 };
@@ -49,17 +51,19 @@ export default function PageLayout({ title, wide, back = { path: "/", label: "�
       )}
       <div className={`relative mx-auto w-full ${wide ? "max-w-7xl" : "max-w-5xl"}`}>
         <header className="mb-7 flex flex-wrap items-center gap-3 rounded-[1.75rem] border border-white bg-white/90 px-3 py-2 shadow-card backdrop-blur sm:px-5">
-          <button type="button" onClick={() => navigate("/studio")} className="flex items-center gap-1.5 px-2 text-lg font-black tracking-[-0.04em] text-[#64a5ff]">
-            <span className="text-xl">💨</span><span className="hidden sm:inline">DOROBUS</span>
-          </button>
-          <span className="h-7 w-px bg-slate-200" />
-          <button
-            type="button"
-            onClick={() => navigate(back.path)}
-            className="rounded-full px-4 py-2 text-sm font-bold text-sky-deep transition hover:bg-blue-50"
-          >
-            ← {back.label}
-          </button>
+          <HomeLogo />
+          {back.path !== "/" && (
+            <>
+              <span className="h-7 w-px bg-slate-200" />
+              <button
+                type="button"
+                onClick={() => navigate(back.path)}
+                className="rounded-full px-4 py-2 text-sm font-bold text-sky-deep transition hover:bg-blue-50"
+              >
+                ← {back.label}
+              </button>
+            </>
+          )}
           <h1 className="rounded-full bg-slate-50 px-5 py-2 text-lg font-black tracking-[-0.03em] sm:text-xl">{title}</h1>
           <span className="ml-auto hidden rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-500 sm:block">도로버스 미니게임 · AI 화실</span>
         </header>

@@ -7,15 +7,29 @@ import cactus from "../assets/creatures/cactus.png";
 import cat from "../assets/creatures/cat.png";
 import dandelion from "../assets/creatures/dandelion.png";
 import dog from "../assets/creatures/dog.png";
+import ankylosaurusColoring from "../assets/creatures/dinosaurs/ankylosaurus-coloring.webp";
+import ankylosaurusGuide from "../assets/creatures/dinosaurs/ankylosaurus-guide.webp";
+import brachiosaurusColoring from "../assets/creatures/dinosaurs/brachiosaurus-coloring.webp";
+import brachiosaurusGuide from "../assets/creatures/dinosaurs/brachiosaurus-guide.webp";
 import iguanodonColoring from "../assets/creatures/dinosaurs/iguanodon-coloring.webp";
-import iguanodonGuide from "../assets/creatures/dinosaurs/iguanodon-guide-no-bg.png";
+import iguanodonGuide from "../assets/creatures/dinosaurs/iguanodon-guide.webp";
 import iguanodonOriginal from "../assets/creatures/dinosaurs/iguanodon-original.webp";
+import pachycephalosaurusColoring from "../assets/creatures/dinosaurs/pachycephalosaurus-coloring.webp";
+import pachycephalosaurusGuide from "../assets/creatures/dinosaurs/pachycephalosaurus-guide.webp";
+import parasaurolophusColoring from "../assets/creatures/dinosaurs/parasaurolophus-coloring.webp";
+import parasaurolophusGuide from "../assets/creatures/dinosaurs/parasaurolophus-guide.webp";
+import spinosaurusColoring from "../assets/creatures/dinosaurs/spinosaurus-coloring.webp";
+import spinosaurusGuide from "../assets/creatures/dinosaurs/spinosaurus-guide.webp";
 import stegosaurusColoring from "../assets/creatures/dinosaurs/stegosaurus-coloring.webp";
 import stegosaurusGuide from "../assets/creatures/dinosaurs/stegosaurus-guide.webp";
 import stegosaurusOriginal from "../assets/creatures/dinosaurs/stegosaurus-original.webp";
 import triceratopsColoring from "../assets/creatures/dinosaurs/triceratops-coloring.webp";
 import triceratopsGuide from "../assets/creatures/dinosaurs/triceratops-guide.webp";
 import triceratopsOriginal from "../assets/creatures/dinosaurs/triceratops-original.webp";
+import tyrannosaurusColoring from "../assets/creatures/dinosaurs/tyrannosaurus-coloring.webp";
+import tyrannosaurusGuide from "../assets/creatures/dinosaurs/tyrannosaurus-guide.webp";
+import velociraptorColoring from "../assets/creatures/dinosaurs/velociraptor-coloring.webp";
+import velociraptorGuide from "../assets/creatures/dinosaurs/velociraptor-guide.webp";
 import lion from "../assets/creatures/lion.png";
 import playground from "../assets/creatures/playground.png";
 import robot from "../assets/creatures/robot.png";
@@ -72,8 +86,8 @@ const CREATURE_GUIDES: CreatureGuide[] = [
     guide: iguanodonGuide,
     example: iguanodonColoring,
     thumbnail: iguanodonOriginal,
-    width: 1536,
-    height: 1024,
+    width: 1677,
+    height: 938,
     lineWidth: 6,
   },
   {
@@ -96,6 +110,83 @@ const CREATURE_GUIDES: CreatureGuide[] = [
     guide: triceratopsGuide,
     example: triceratopsColoring,
     thumbnail: triceratopsOriginal,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
+  {
+    slug: "tyrannosaurus",
+    drawingId: 21,
+    name: "티라노사우루스",
+    category: "dinosaur",
+    guide: tyrannosaurusGuide,
+    example: tyrannosaurusColoring,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
+  {
+    slug: "brachiosaurus",
+    drawingId: 22,
+    name: "브라키오사우루스",
+    category: "dinosaur",
+    guide: brachiosaurusGuide,
+    example: brachiosaurusColoring,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
+  {
+    slug: "ankylosaurus",
+    drawingId: 23,
+    name: "안킬로사우루스",
+    category: "dinosaur",
+    guide: ankylosaurusGuide,
+    example: ankylosaurusColoring,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
+  {
+    slug: "parasaurolophus",
+    drawingId: 24,
+    name: "파라사우롤로푸스",
+    category: "dinosaur",
+    guide: parasaurolophusGuide,
+    example: parasaurolophusColoring,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
+  {
+    slug: "velociraptor",
+    drawingId: 25,
+    name: "벨로시랩터",
+    category: "dinosaur",
+    guide: velociraptorGuide,
+    example: velociraptorColoring,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
+  {
+    slug: "spinosaurus",
+    drawingId: 26,
+    name: "스피노사우루스",
+    category: "dinosaur",
+    guide: spinosaurusGuide,
+    example: spinosaurusColoring,
+    width: 1672,
+    height: 941,
+    lineWidth: 6,
+  },
+  {
+    slug: "pachycephalosaurus",
+    drawingId: 27,
+    name: "파키케팔로사우루스",
+    category: "dinosaur",
+    guide: pachycephalosaurusGuide,
+    example: pachycephalosaurusColoring,
     width: 1672,
     height: 941,
     lineWidth: 6,

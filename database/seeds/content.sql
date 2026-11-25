@@ -34,7 +34,14 @@ VALUES
     (17, 2, '놀이터', 'creatures/playground.png', 15),
     (18, 2, '이구아노돈', 'creatures/dinosaurs/iguanodon-guide.webp', 16),
     (19, 2, '스테고사우루스', 'creatures/dinosaurs/stegosaurus-guide.webp', 17),
-    (20, 2, '트리케라톱스', 'creatures/dinosaurs/triceratops-guide.webp', 18)
+    (20, 2, '트리케라톱스', 'creatures/dinosaurs/triceratops-guide.webp', 18),
+    (21, 2, '티라노사우루스', 'creatures/dinosaurs/tyrannosaurus-guide.webp', 19),
+    (22, 2, '브라키오사우루스', 'creatures/dinosaurs/brachiosaurus-guide.webp', 20),
+    (23, 2, '안킬로사우루스', 'creatures/dinosaurs/ankylosaurus-guide.webp', 21),
+    (24, 2, '파라사우롤로푸스', 'creatures/dinosaurs/parasaurolophus-guide.webp', 22),
+    (25, 2, '벨로시랩터', 'creatures/dinosaurs/velociraptor-guide.webp', 23),
+    (26, 2, '스피노사우루스', 'creatures/dinosaurs/spinosaurus-guide.webp', 24),
+    (27, 2, '파키케팔로사우루스', 'creatures/dinosaurs/pachycephalosaurus-guide.webp', 25)
 ON CONFLICT DO NOTHING;
 
 -- 도감 정보는 번호와 이름이 둘 다 맞는 그림에만 붙인다 (다른 내용의 그림이 같은 번호를 쓰고 있으면 건너뜀).
@@ -58,7 +65,14 @@ FROM (VALUES
     (17, '놀이터', 'playground', 'object', '그네·시소·미끄럼틀 같은 시설을 갖추고 안전하게 놀 수 있도록 따로 만든 곳이에요.'),
     (18, '이구아노돈', 'iguanodon', 'dinosaur', '엄지손가락에 뾰족한 가시가 있는 초식 공룡이에요.'),
     (19, '스테고사우루스', 'stegosaurus', 'dinosaur', '등에는 커다란 골판이 줄지어 있고 꼬리 끝에는 가시가 있는 초식 공룡이에요.'),
-    (20, '트리케라톱스', 'triceratops', 'dinosaur', '얼굴에 세 개의 뿔과 커다란 목 방패가 있는 초식 공룡이에요.')
+    (20, '트리케라톱스', 'triceratops', 'dinosaur', '얼굴에 세 개의 뿔과 커다란 목 방패가 있는 초식 공룡이에요.'),
+    (21, '티라노사우루스', 'tyrannosaurus', 'dinosaur', '튼튼한 뒷다리와 크고 강한 턱을 가진 육식 공룡이에요.'),
+    (22, '브라키오사우루스', 'brachiosaurus', 'dinosaur', '긴 목을 높이 뻗어 나무의 잎을 먹던 거대한 초식 공룡이에요.'),
+    (23, '안킬로사우루스', 'ankylosaurus', 'dinosaur', '온몸을 단단한 갑옷처럼 보호하고 꼬리 끝에 곤봉이 있는 초식 공룡이에요.'),
+    (24, '파라사우롤로푸스', 'parasaurolophus', 'dinosaur', '머리 뒤로 길게 뻗은 볏이 특징인 초식 공룡이에요.'),
+    (25, '벨로시랩터', 'velociraptor', 'dinosaur', '날렵한 몸과 발의 낫 모양 발톱이 특징인 작은 육식 공룡이에요.'),
+    (26, '스피노사우루스', 'spinosaurus', 'dinosaur', '등에 돛처럼 솟은 돌기가 있고 긴 주둥이를 가진 육식 공룡이에요.'),
+    (27, '파키케팔로사우루스', 'pachycephalosaurus', 'dinosaur', '머리 위의 두껍고 둥근 뼈가 특징인 공룡이에요.')
 ) AS v (drawing_id, name, slug, category, summary)
 JOIN drawings d ON d.drawing_id = v.drawing_id AND d.title = v.name
 ON CONFLICT DO NOTHING;

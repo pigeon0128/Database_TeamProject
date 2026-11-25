@@ -24,10 +24,18 @@
 | `creature_sources(drawing_id, source_order, citation, url)` | PK `(drawing_id, source_order)`, FK `drawing_id → creature_profiles` | 키 쌍 → 출처 표기·URL. 전역 `url → citation`은 별도 정책 가정 | — | 후보 업무 FD 채택 시 `K → url → citation` | 충족 / 충족 / 충족 / 충족. 전역 인용 정책 채택 시 3NF·BCNF 재판정 |
 | `special_brushes(brush_id, slug, name, price, brush_order, category)` | PK `brush_id`, 후보 `slug`, `brush_order` | 각 K → 이름·가격·카테고리 및 다른 K | — | — | 충족 / 충족 / 충족 / 충족 |
 | `user_brushes(user_id, brush_id, purchased_at)` | PK `(user_id, brush_id)`, FK `user_id → users`, `brush_id → special_brushes` | 키 쌍 → 구매시각 | — | — | 충족 / 충족 / 충족 / 충족 |
-| `user_myrooms(user_id, schema_version, revision, layout, updated_at)` | PK·FK `user_id → users` | `user_id` → revision·배치·갱신시각 | `∅ → schema_version` (항상 1) | `user_id → ∅ → schema_version` (상수에 의한 비키 결정) | 충족 / 엄격한 정의 위반 / 위반 / 위반 |
+| `user_myrooms(user_id, schema_version, revision, layout, updated_at)` | PK·FK `user_id → users` | `user_id` → revision·배치·갱신시각 | `∅ → schema_version` (항상 1) | — | 충족 / 공집합을 포함하는 정의에서 위반 / 위반 / 위반 |
 | `user_stored_objects(object_id, user_id, name, source_model, thumbnail, spec, created_at)` | PK `object_id`, FK `user_id → users` | `object_id` → 소유자·이름·모델·썸네일·스펙·생성시각 | — | — | 충족 / 충족 / 충족 / 충족 |
 
-`user_myrooms.schema_version`은 `NOT NULL CHECK (schema_version = 1)`로 고정된다. 예를 들어 사용자 12의 방이 revision 3, 사용자 27의 방이 revision 9여도 두 행의 버전은 모두 1이다. 비키 결정자 `∅` 때문에 형식상 3NF·BCNF 위반이다. 공집합을 부분 종속 정의에서 제외하는 교육용 관례에서는 이 테이블의 2NF를 충족으로 표기한다. 현재 CHECK는 버전 값이 갈라지는 일을 막는다. 버전 2를 도입할 때는 실제로 방별로 버전이 다른 전환 기간이 필요한지 먼저 확인한다. 방별 버전을 의미 있게 운영하면 `∅ → schema_version`이 성립하지 않는다. 서비스 전체가 하나의 버전을 쓰는 정책이라면 버전을 API에서 파생하거나 마이그레이션과 함께 관리하는 방식이 적합하다.
+`user_myrooms.schema_version`에는 `∅ → schema_version`이 성립한다. 임의의 두 행은 속성의 공집합에서 항상 일치하고, `NOT NULL`과 `CHECK (schema_version = 1)`가 두 행의 버전을 모두 1로 제한한다. `DEFAULT 1`은 생략한 값을 채운다.
+
+- **2NF**　`∅`는 후보키 `{user_id}`의 진부분집합이다. 비주요 속성 `schema_version`이 여기에 종속되므로 공집합을 포함하는 정의에서 2NF를 위반한다. 공집합을 생략하는 교육용 단축 규칙에서는 단일 열 후보키를 2NF로 분류할 수 있다.
+- **3NF**　`∅ → schema_version`은 비자명하다. `∅`는 슈퍼키가 아니고 우변은 비주요 속성이어서 두 허용 조건을 모두 충족하지 못한다.
+- **BCNF**　같은 비자명 종속에서 결정자 `∅`가 슈퍼키 조건을 충족하지 못한다.
+
+일반적인 이행 종속은 키에 종속된 별도 속성 집합이 다른 비주요 속성을 결정하는 경우다. 후보키의 부분집합을 제외하는 정의에서 `∅`는 이행 종속의 중간 결정자가 될 수 없다. 이 사례의 위반 근거는 상수 FD 자체다. [Elmasri·Navathe, Fundamentals of Database Systems 7판 §14.2–14.5](https://eecs.csuohio.edu/~sschung/cis430/Fundamentals-of-Database-Systems-Pearson-2015-Ramez-Elmasri-Shamkant-B.-Navathe.pdf)
+
+현행 열은 저장된 배치를 해석하는 버전을 행에 표시한다. 마이룸 API는 버전 1을 검증하고 저장 행의 버전을 응답으로 반환한다. CHECK가 값의 불일치를 막는 동안에는 이 계약과 데이터의 해석 정보를 유지하는 편이 실용적이다. 버전 2 도입 때 방별로 버전이 다른 전환 기간이 필요하면 방별 버전의 의미가 생겨 상수 FD가 사라진다. 서비스 전체가 단일 버전이면 응답에서 버전을 파생할 수 있다. 변경은 버전 정책과 호환성 합의 후 검토한다.
 
 업무 규칙으로 확인하거나 검토할 FD는 다음과 같다.
 
@@ -74,6 +82,8 @@
 ### 80% 완료 정책과 경계값
 
 `server/completion.js`의 `COMPLETE_SCORE = 80`을 기준으로 `GET /api/summary`는 작품 행이 존재하고 점수가 80 이상인 그림을 중복 제거하여 센다. `GET /api/collection`은 작품이 있는 기록 중 대표를 선정한 후 수집 불리언에만 기준을 적용한다. 수정한 독립 SQL 1·3번은 같은 불리언과 대표 메타데이터를 반환하며, 2번은 80 이상인 작품을 그림당 한 번 센다.
+
+현재 임계값은 서버 상수와 `queries/collection.sql`의 세 SELECT에 각각 정의되어 있다. 정책이 바뀌면 두 위치와 경계값 회귀 테스트를 한 변경으로 갱신한다. 독립 조회에 관리되는 호출자가 생기면 그 호출자가 공통 정책값을 각 SQL의 바인딩 매개변수로 전달하는 방식도 검토한다. [반복 검증](../tests/upgrade-and-queries.mjs)
 
 같은 그림에서 이미지 없는 95점 기록과 이미지가 남은 82점 기록이 있으면 기존 API는 82점을 도감 대표로 반환한다. 학년·전체 리더보드는 95점 최고 기록을 반환하며 그 기록의 이미지 키는 `NULL`이다. 마이룸은 실제 파일이 있는 소유 작품을 전시할 수 있고, 80 미만의 작품도 전시 대상이 될 수 있다. 이는 `server/routes/myroom.js`의 기존 전시 규칙이다. 완료 점수는 DB에 소수 둘째 자리로 저장된 값을 기준으로 한다.
 

@@ -11,11 +11,28 @@ PostgreSQL의 `public` 스키마가 사용자, 그림, 플레이 기록, 도감,
 | `seeds/dev_seed.sql` | 개발용 예시. 비어 있는 DB에서 `--seed`로 선택 |
 | `queries/` | 전체·학년별 리더보드, 도감, 설정, 초안 조회 예시 |
 | `tests/grade_leaderboard.sql` | 학년 제약 및 VIEW의 실 PostgreSQL SQL 테스트 |
+| `tests/upgrade-and-queries.mjs` | 023→025 업그레이드, 학년 조회 매개변수 및 도감 SQL/API 통합 테스트 |
 | `docs/` | ERD, 적용 설계, 정규화 및 개선 계획 |
 
 PostgreSQL 18과 프로젝트의 Node/pnpm 환경을 준비한다. 리포지터리 루트에서 테스트 DB를 가리키는 `DATABASE_URL`을 설정하고 `pnpm install --frozen-lockfile`, `pnpm db:migrate`를 실행한다. 로컬 .env 설정은 [루트 README](../README.md)를 참고한다. 완성 그림을 쓰는 테스트는 격리된 `UPLOAD_DIR`을 함께 사용한다. 재현 환경과 실행 결과는 [DB 프로젝트 상태](PROJECT_STATE.md)에 있다.
 
 실행기 `scripts/db-migrate.js`는 DB를 준비하고 파일명 정렬 순서로 미적용 SQL을 실행한 뒤 `schema_migrations`에 완료 파일을 기록한다. 각 신규 파일은 `BEGIN … COMMIT`을 사용한다. 새 변경은 다음 번호의 파일로 관리한다.
+
+학년 마이그레이션의 세션 잠금 대기 제한과 중단 복구는 [배포·복구 절차](docs/grade-migration-runbook.md)에 있다.
+
+## 학년·도감 회귀 테스트
+
+리포지터리 루트에서 실행한다. SQL 테스트에는 마이그레이션 025가 적용된 테스트 DB를 지정한다. 테스트 행은 롤백되며 시퀀스는 진행될 수 있다.
+
+```powershell
+psql $env:DATABASE_URL -X -v ON_ERROR_STOP=1 -f database/tests/grade_leaderboard.sql
+```
+
+통합 테스트에는 DB 생성 권한이 있는 별도 루프백 테스트 클러스터의 `postgres` 연결 URL을 `DOROLAND_TEST_ADMIN_URL`로 설정한다. 테스트가 접두어 `doro_grade_test_`의 새 DB와 임시 업로드 폴더를 만들고, 그 실행에서 생성한 두 자원만 종료 시 정리한다. 테스트 DB에 001–023 SQL과 콘텐츠 시드를 먼저 적용한 다음, 기존 API로 계정과 기록을 만들고 기존 실행기로 024·025를 적용한다.
+
+```powershell
+node --test database/tests/upgrade-and-queries.mjs
+```
 
 ## ERD
 

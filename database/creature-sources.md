@@ -206,3 +206,18 @@
 19. 놀이터, 『한국민족문화대백과사전』 — https://encykorea.aks.ac.kr/Article/E0013056 (집필 임재해, 1995 / 최종수정 2025-07-16)
 20. Atamian, H. S., Creux, N. M., Brown, R. I., Garner, A. G., Blackman, B. K., & Harmer, S. L. (2016). Circadian regulation of sunflower heliotropism, floral orientation, and pollinator visits. *Science*, 353(6299), 587–590. https://doi.org/10.1126/science.aaf9793 (초록 확인: https://pubmed.ncbi.nlm.nih.gov/27493185/)
 21. Andy Fell, "Sunflowers Move by the Clock", UC Davis News, 2016-08-04 — https://www.ucdavis.edu/news/sunflowers-move-clock
+
+## 공룡 도감 10종
+
+공룡 설명은 국립중앙과학관 공룡과학관의 2015년 전문가 감수 자료를 확인한 뒤 아이 눈높이에 맞게 다시 썼다. 사이트 안내대로 최신 연구와 다를 수 있으므로 행동이나 신체 기능에 관한 추정은 단정하지 않고, 시대·크기·발견 지역과 눈으로 관찰할 수 있는 생김새를 중심으로 사용했다. 앱에서는 `벨로시랩터`로 표시하지만 출처명은 원문 표기인 `벨로키랍토르`를 유지했다.
+
+22. 이구아노돈, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=17
+23. 스테고사우루스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=5
+24. 트리케라톱스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=12
+25. 티라노사우루스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=38
+26. 브라키오사우루스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=26
+27. 안킬로사우루스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=3
+28. 파라사우롤로푸스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=97
+29. 벨로키랍토르, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=45
+30. 스피노사우루스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=61
+31. 파키케팔로사우루스, 국립중앙과학관 공룡과학관 — https://www.science.go.kr/mps/scienceSubject/dinosaur/view.do?subjectSid=6

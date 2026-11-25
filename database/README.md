@@ -1,195 +1,85 @@
-# DOROLAND Story Drawing — Database
+# DOROLAND 데이터베이스
 
-## 1. Overview
+PostgreSQL의 `public` 스키마가 사용자, 그림, 플레이 기록, 도감, 상점과 마이룸 상태를 보관한다. 애플리케이션 테이블 15개, 마이그레이션 관리 테이블 1개, 학년별 리더보드 VIEW 1개가 있다. 이 문서와 ERD는 마이그레이션 025까지 적용한 상태를 설명한다.
 
-DOROLAND 스토리 드로잉 콘텐츠의 사용자 정보, 챕터별 원본 그림, 플레이 기록 및 사용자 작품을 관리하기 위한 PostgreSQL 데이터베이스입니다.
+## 구조와 실행
 
-### 주요 기능
-- 닉네임 기반 사용자 관리
-- 챕터 및 원본 그림 관리
-- 사용자별 플레이 기록 저장
-- 일치율과 소요 시간 기반 리더보드
-- 사용자 작품 메타데이터 저장
-- 사용자별 그리기 설정 보존 (브러쉬 굵기, 밑그림 보이기·진하기, 손떨림 보정, 선 끝 얇게)
-- 그리던 그림 보관 (이어서 그리기)
-- 사용자가 완성한 그림을 모아 보는 도감
-
-## 2. Environment
-
-| 항목 | 기술 |
+| 경로 | 내용 |
 |---|---|
-| DBMS | PostgreSQL 18 |
-| Development Database | doroland_drawing |
-| Management Tool | DBeaver |
-| Schema | public |
+| `migrations/` | 번호 순으로 적용하는 스키마 및 기존 콘텐츠 갱신 |
+| `seeds/content.sql` | 앱의 챕터·장면, 도감 및 49개 브러시 카탈로그. 실행기가 매번 멱등 적용 |
+| `seeds/dev_seed.sql` | 개발용 예시. 비어 있는 DB에서 `--seed`로 선택 |
+| `queries/` | 전체·학년별 리더보드, 도감, 설정, 초안 조회 예시 |
+| `tests/grade_leaderboard.sql` | 학년 제약 및 VIEW의 실 PostgreSQL SQL 테스트 |
+| `docs/` | ERD, 적용 설계, 정규화 및 개선 계획 |
 
-## 3. Entity Relationship Diagram
+PostgreSQL 18과 프로젝트의 Node/pnpm 환경을 준비한다. 리포지터리 루트에서 테스트 DB를 가리키는 `DATABASE_URL`을 설정하고 `pnpm install --frozen-lockfile`, `pnpm db:migrate`를 실행한다. 로컬 .env 설정은 [루트 README](../README.md)를 참고한다. 완성 그림을 쓰는 테스트는 격리된 `UPLOAD_DIR`을 함께 사용한다. 재현 환경과 실행 결과는 [DB 프로젝트 상태](PROJECT_STATE.md)에 있다.
 
-![Database ERD](docs/erd.png)
+실행기 `scripts/db-migrate.js`는 DB를 준비하고 파일명 정렬 순서로 미적용 SQL을 실행한 뒤 `schema_migrations`에 완료 파일을 기록한다. 각 신규 파일은 `BEGIN … COMMIT`을 사용한다. 새 변경은 다음 번호의 파일로 관리한다.
 
-> `docs/erd.png` 는 마이그레이션 010 까지 적용한 지금 구조입니다. `user_artworks` 에는 그림 경로(`image_key`)만 있고
-> 그림 파일은 서버 폴더에 둡니다.
+## ERD
 
-현재 구조(마이그레이션 001~010 적용 후)는 `docs/db_structure.svg` 입니다. 011 에서 더한 `creature_sources` 표는 아직 그림에 없습니다.
+![DOROLAND PostgreSQL ERD](docs/erd.png)
 
-![Current DB structure](docs/db_structure.svg)
+[확대용 SVG](docs/db_structure.svg) · [정규화 검토 및 별도 승인 설계안](docs/normalization-review.md)
 
-## 4. Database Schema
+각 FK는 자식 행에서 부모 1개를 요구한다. 부모의 참여는 모두 선택적이다. 사용자의 설정·방, 그림의 도감 프로필, 기록의 작품은 각각 0..1이다. 그 외 물리 FK는 각각 0..N이다. 사용자와 브러시는 `user_brushes`를 통한 N:M이다. 사용자와 그림은 여러 시도를 허용하는 `play_records`를 통해 연결된다.
 
-| 테이블 | 설명 |
+## 테이블과 애플리케이션 경로
+
+ERD에 전체 컬럼·타입 및 후보키가 있다. 아래 제약은 PK/FK와 함께 쓰기 경로를 설명한다. 기본키·대체 후보키와 ERD의 모든 물리 FK 컬럼은 `NOT NULL`이다. 애플리케이션 테이블에서 NULL을 허용하는 컬럼은 `users.password_hash`, `users.grade`, `drawing_drafts.name`이다.
+
+| 테이블 | 목적, 주요 제약 및 기본값 | 서버에서 읽거나 쓰는 코드 |
+|---|---|---|
+| `users` | `BIGINT` ID, 고유·비공백 닉네임, 선택적 해시, 셀 기본 10000·0 이상, 선택적 학년 1~9, 가입 시각 기본 현재 | `routes/auth.js`, `routes/records.js`, `routes/brushes.js`, `routes/summary.js`, `routes/myroom.js` |
+| `user_settings` | 사용자당 0..1, 굵기 2~48, 진하기 10~100, 보정·fade 0~100, 단축키 JSON 객체. 기본 6/true/80/50/0/`{}` | `routes/settings.js` |
+| `drawing_drafts` | 사용자·비공백 draft_key의 복합 키. 획은 JSON 배열. 이름 선택적 | `routes/drafts.js` |
+| `chapters` | 고유하고 양수인 챕터 순서 | `routes/drawings.js`, `routes/collection.js` |
+| `drawings` | 챕터 내 양수 순서 유일, 원본 키 비공백 | `routes/drawings.js`, `routes/collection.js`, `routes/myroom.js`, `routes/records.js`(FK) |
+| `play_records` | 사용자·그림 FK, 점수 `NUMERIC(5,2)` 0~100, 시간 ms 0 이상, 완료 시각 기본 현재 | `routes/records.js`, `routes/collection.js`, `routes/summary.js`, `routes/myroom.js` |
+| `user_artworks` | 기록당 최대 한 행, 비공백 파일 키, 생성 시각 기본 현재 | 위 네 라우트와 `storage.js`, `scripts/db-migrate.js`의 레거시 파일 이전 |
+| `creature_profiles` | 그림당 0..1, 고유 slug(소문자·숫자·하이픈), `animal/plant/dinosaur/object` | `routes/collection.js`, `routes/drawings.js`, `routes/summary.js`, `routes/myroom.js` |
+| `creature_facts` | 도감별 양수 순서로 라벨·설명 | `routes/collection.js` |
+| `creature_tips` | 도감별 양수 순서로 그리기 도움말 | `routes/collection.js` |
+| `creature_sources` | 도감별 양수 순서, 주소 접두사 `https://` | `routes/collection.js` |
+| `special_brushes` | `SMALLINT` ID, 고유 slug와 양수 표시 순서, 비공백 이름, 비음수 가격, 4개 카테고리 CHECK | `routes/brushes.js` |
+| `user_brushes` | 사용자·브러시 복합 키, 구매 시각 기본 현재 | `routes/brushes.js` |
+| `user_myrooms` | 사용자당 0..1, 버전 1, revision 0 이상(기본 0), `layout.objects` 배열 최대 40개(기본 빈 배열), 갱신 시각 | `routes/myroom.js`, `shared/myroom.js` |
+| `user_stored_objects` | 사용자별 3D 저장물, 이름 길이 1~20, 모델 코드 패턴, 썸네일 최대 80,000자, 스펙 JSONB | `routes/myroom.js`, `routes/summary.js`, `shared/colored.js` |
+| `schema_migrations` | 파일명 PK 및 실행 시각, 애플리케이션 스키마와 별도로 관리 | `scripts/db-migrate.js` |
+
+라우트 경로는 `server/`를 기준으로 표시했다. `schema_migrations`는 실행기가 생성한다. 실제 컬럼 선언과 이름 있는 CHECK는 해당 마이그레이션 및 `pg_dump --schema-only --schema=public`으로 확인할 수 있다.
+
+외래키의 `ON DELETE RESTRICT`는 `drawings → chapters`, `play_records → users/drawings`, `user_brushes → special_brushes`다. 나머지 FK는 `ON DELETE CASCADE`다. 원본·완성 이미지 파일, 초안 토큰 및 배치 JSON 내부 참조의 수명주기는 별도로 관리한다.
+
+PK·UNIQUE의 자동 B-tree 외에 아래 세 인덱스가 있다.
+
+| 인덱스 | 컬럼 |
 |---|---|
-| users | 사용자 ID 및 닉네임 |
-| chapters | 스토리 챕터 |
-| drawings | 챕터별 원본 그림 — 밑그림 이미지의 경로(`reference_image_key`)를 보관하고, 이미지 파일은 앱(`src/assets/<경로>`)에 있음 |
-| play_records | 사용자별 그림 플레이 기록 |
-| user_artworks | 사용자가 완성한 작품의 저장 경로(`image_key`) — 파일은 서버 폴더 `uploads/` (`migrations/010_artwork_files.sql`) |
-| user_settings | 사용자가 마지막으로 바꾼 그리기 설정과 단축키 (`migrations/003_user_settings.sql`, 단축키 `006_shortcut_settings.sql`) |
-| drawing_drafts | 다 그리기 전의 그림(획 목록, JSONB) — 이어서 그리기용 (`migrations/004_drawing_drafts.sql`) |
-| creature_profiles | 도감 생물 정보 — 그림(`drawings`) 하나에 분류·한 줄 소개를 붙임 (`migrations/007_creature_profiles.sql`) |
-| creature_facts | 도감 정보 항목 (분류, 사는 곳, 먹이 등 이름·내용) |
-| creature_tips | 그릴 때 살펴볼 점 |
-| creature_sources | 도감 정보의 출처 (출처 이름, 주소) — 도감 카드 아래에 보여 줌 (`migrations/011_creature_sources.sql`) |
-| special_brushes | 색칠하기 특수 브러쉬(무늬 브러쉬)와 가격(셀) (`migrations/018_special_brushes.sql`) |
-| user_brushes | 사용자가 셀로 산 특수 브러쉬. 행이 있으면 그 브러쉬를 쓸 수 있음 (`018`) |
-| schema_migrations | 실행한 마이그레이션 파일 목록 (`pnpm db:migrate` 가 만들고 관리) |
+| `idx_play_records_user_date` | `play_records(user_id, played_at DESC)` |
+| `idx_play_records_drawing_ranking` | `play_records(drawing_id, similarity_score DESC, duration_ms)` |
+| `idx_user_stored_objects_user` | `user_stored_objects(user_id, object_id DESC)` |
 
-### Relationships
+## 기존 업무 규칙
 
-- users (1) → (N) play_records
-- chapters (1) → (N) drawings
-- drawings (1) → (N) play_records
-- play_records (1) → (0..1) user_artworks
-- users (1) → (0..1) user_settings
-- users (1) → (N) drawing_drafts (그림 하나당 한 행: 키 `(user_id, draft_key)`)
-- drawings (1) → (0..1) creature_profiles (1) → (N) creature_facts, creature_tips, creature_sources
-- users (N) ↔ (M) special_brushes, 사이 표 user_brushes (키 `(user_id, brush_id)`)
+- **플레이 기록과 파일**　`POST /api/play-records`는 모든 유효 시도를 저장한다. 현재 최고 시도에 이미지가 첨부된 경우 새 파일을 쓰고 DB 완료 후 이전 이미지 파일을 정리한다. 더 높은 기록을 이미지 없이 저장하면 이전 작품이 남을 수 있다. 원본은 앱의 에셋, 완성 이미지는 `UPLOAD_DIR`의 `artworks/<user_id>/<record_id>.png`다. DB와 업로드 폴더는 한 쌍으로 백업한다.
+- **순위**　전체는 `GET /api/leaderboard`와 `queries/leaderboard.sql`의 기존 경로다. 학년은 `queries/grade_leaderboard.sql`로 조회한다. 두 경로의 최고 기록과 정렬 기준은 점수 내림차순, 시간·완료 시각·기록 ID 오름차순이다. [학년별 계약 및 조회 예시](docs/grade-leaderboard.md)
+- **도감과 요약**　이미지가 저장된 기록 중 대표를 골라 저장 점수가 80 이상이면 수집 완료로 표시한다. 80 미만도 대표 정보는 반환한다. 독립 SQL은 `queries/collection.sql`에 있으며 전체 장면별·챕터별·도감 생물별 결과를 제공한다. 출처 운영은 [도감 출처](creature-sources.md)를 참고한다.
+- **설정·초안**　변경된 단축키만 JSONB에 남긴다. 설정 행이 없으면 앱 기본값을 적용한다. 초안 키는 `story:<장면 토큰>` 또는 `character`이며, API가 전체 획 스냅샷을 저장·복원한다.
+- **특수 브러시**　시드의 `pattern` 21개, `glitter` 15개, `cyber` 3개, `tricolor` 10개는 현재 각 100셀이다. `price >= 0`이 DB 범위다. 구매 시 사용자 행 잠금 아래 잔액 차감과 소유권 기록을 함께 처리한다. 과거 결제 단가는 현 스키마에 저장되지 않는다. 클라이언트는 카탈로그 `slug`로 무늬 코드 또는 에셋을 찾는다.
+- **마이룸과 3D**　방 상태는 `layout` 스냅샷과 revision을 함께 저장한다. 배치 배열의 `artworkDrawingId`는 저장된 전시 그림의 대표 파일을, `storedObjectId`는 소유한 3D 저장물을 찾는다. 공간·충돌·소유권·동시 저장을 API가 검증한다. [마이룸 문서](../docs/myroom-architecture.md)
 
-## 5. Design Decisions
+## 마이그레이션 이력
 
-### Data Normalization
-사용자, 콘텐츠, 플레이 기록을 별도 테이블로 분리하여 중복 데이터를 최소화하고 외래키를 통해 참조 무결성을 유지합니다.
+| 번호 | 변경 |
+|---|---|
+| 001 | 사용자, 챕터, 그림, 플레이 기록, 작품 및 순위 인덱스 |
+| 002–004 | 인증 해시, 사용자 설정, 초안 |
+| 005–007 | 과거 작품/원본 이미지 DB 저장, 단축키, 도감 프로필·정보·팁 |
+| 009–010 | 원본 이미지는 앱 에셋, 완성 이미지는 파일 키로 복귀. 010 실행 전 레거시 작품 파일 추출 |
+| 011–017 | 도감 출처, 대관람차를 놀이터로 교체, 분류·해바라기·놀이터 문구 |
+| 018–020 | 셀과 특수 브러시 구매, 마이룸, 3D 수납 |
+| 021–023 | 공룡 도감 카테고리, 브러시 카테고리, 기존 브러시 가격 100셀 반영 |
+| 024–025 | NULL 허용 학년 제약, 학년별 리더보드 VIEW |
 
-### Image Storage
-이미지 파일 자체가 아니라 저장소의 파일 경로 또는 객체 키를 데이터베이스에 보관합니다 (`001_initial.sql` 의 처음 설계).
-
-- **밑그림** (`drawings.reference_image_key`): 앱의 `src/assets/<경로>` 파일. 앱과 함께 배포됩니다.
-- **완성 그림** (`user_artworks.image_key`): API 서버 폴더(`uploads/`, `.env` 의 `UPLOAD_DIR` 로 바꿀 수 있음)의
-  `artworks/<user_id>/<record_id>.png` 파일. 브라우저는 `/uploads/<image_key>` 로 받습니다 (`server/storage.js`).
-- 완성 그림은 사용자·그림마다 최고 기록 1개에만 남깁니다. 새 기록이 최고 기록이 되면 그 그림 파일을 저장하고
-  이전 최고 기록의 행과 파일을 지우며, 최고 기록이 아니면 기록(점수·시간)만 저장합니다 (`server/routes/records.js`,
-  최고 기록 규칙은 리더보드와 같음).
-- 파일과 DB는 한 트랜잭션으로 묶을 수 없어서 "새 파일 쓰기 → DB 커밋 → 이전 파일 지우기" 순서로 맞추고, DB 저장이 실패하면 새 파일을 지웁니다.
-- 한동안(`005_artwork_images.sql` ~ `009`) 완성 그림을 DB(`image_data`)에 저장했지만 `010_artwork_files.sql` 에서 처음 설계로 되돌렸습니다.
-  `pnpm db:migrate` 가 010 을 실행하기 전에 DB에 있던 그림을 파일로 꺼내 `image_key` 를 채웁니다.
-- `uploads/` 폴더는 DB와 한 쌍입니다. DB를 백업·복사할 때 폴더도 함께 챙겨야 하고, git 에는 올리지 않습니다.
-
-### Data Integrity
-일치율은 0~100 범위로 제한하고, 소요 시간에는 음수가 들어가지 않도록 CHECK 제약조건을 적용합니다.
-
-### User Settings
-그림을 새로 고를 때마다 설정이 기본값으로 초기화되지 않도록 사용자당 한 행으로 마지막 설정을 저장합니다.
-행이 없으면 앱의 기본값(굵기 6, 밑그림 보이기, 진하기 80%, 손떨림 보정 50%, 선 끝 얇게 끔)을 씁니다. 저장은 `ON CONFLICT ... DO UPDATE`(UPSERT)로 처리하고,
-값의 범위는 앱의 조절 범위와 같은 CHECK 제약조건으로 제한합니다. 조회·저장 SQL: `queries/user_settings.sql`
-앱은 로그인한 사용자의 설정을 API(`GET`/`PUT /api/settings`, `server/routes/settings.js`)로 불러오고 저장하며, 브라우저에는 저장하지 않습니다.
-불러오기에 실패한 동안에는 DB에 저장하지 않아서, 기본값이 DB의 설정을 덮어쓰지 않습니다.
-
-단축키(`shortcuts`, `006_shortcut_settings.sql`)는 사용자가 바꾼 동작만 JSONB 객체로 저장합니다 (예: `{"brush": "KeyP"}`).
-동작이 몇 개 안 되고 항상 통째로 읽고 쓰므로 표를 따로 나누지 않았습니다. 없는 동작은 앱의 기본 키를 쓰므로, 앱에 동작이 늘어나도 DB를 바꿀 필요가 없습니다.
-DB는 JSON 객체인지만 확인하고, 동작 이름과 키 형식은 API 서버가 검사합니다.
-
-### Drawing Drafts
-그림을 다 그리기 전에 화면을 나가거나 다른 기기에서 로그인해도 이어서 그릴 수 있도록, 그리던 획 목록을 사용자·그림마다 한 행으로 보관합니다.
-획 목록은 구조가 깊은 배열이라 정규화하지 않고 JSONB 한 칸에 저장합니다 (항상 통째로 읽고 쓰며, 내용으로 검색하지 않음).
-그림 이름(`draft_key`)은 `story:<장면 id>` 또는 `character` 입니다. 캐릭터 그리기처럼 `drawings` 표에 없는 그림도 있어서 `drawing_id` 대신 씁니다.
-완료(기록 저장)하거나 새로 그리기를 고르면 행을 지웁니다. 조회·저장·삭제 SQL: `queries/drawing_drafts.sql`
-
-### Content
-앱의 장면 목록(챕터·그림)과 도감 생물 15개(챕터 `생물 도감`, 그림 2~15번과 17번)와 그 도감 정보는 `seeds/content.sql` 에 있고, `pnpm db:migrate` 가 매번 넣습니다 (이미 있으면 건너뜀).
-앱(`src/data/scenes.ts`)의 `drawingId` 와 번호를 맞추므로 장면을 추가할 때 두 곳을 함께 고칩니다.
-그림 16번(대관람차)은 `012_playground.sql` 에서 빼고 놀이터(17번)로 바꿨습니다. 지운 번호는 다시 쓰지 않습니다.
-
-### Special Brushes
-색칠하기의 특수 브러쉬는 재화 '셀'로 사서 쓰므로, 누가 어떤 브러쉬를 샀는지를 DB에 둡니다 (`migrations/018_special_brushes.sql`).
-
-- **셀** (`users.cells`): 사용자당 값 하나라 표를 따로 두지 않고 `users` 의 칸으로 둡니다. 처음 가진 셀은 10000(기본값)이고, `CHECK (cells >= 0)` 로 음수가 되지 않습니다.
-- **브러쉬와 가격** (`special_brushes`): slug, 이름, 가격, 순서, 종류(`category`, `migrations/022_brush_categories.sql`). 목록은 `seeds/content.sql` 이 넣습니다.
-  종류는 기프트샵에서 나눠 파는 묶음입니다: 무늬 `pattern`(21개) / 반짝이 `glitter`(15개) / 사이버틱 `cyber`(3개) / 삼색반짝이 `tricolor`(10개).
-  가격은 종류와 상관없이 모두 100셀입니다 (`migrations/023_brush_price_100.sql`).
-  무늬를 그리는 방법은 앱 코드(`src/lib/drawing/brushPatterns.ts`)가 slug 로 찾습니다. 처음 10개(물결·하트 …)는 코드로 그리고,
-  나머지는 디자인 시안 그림(`public/assets/brushes/<slug>.webp`, 목록 `src/lib/drawing/textureBrushes.ts`)을 깔아 그립니다.
-- **산 브러쉬** (`user_brushes`): 기본 키 `(user_id, brush_id)` 로 같은 브러쉬를 두 번 살 수 없습니다.
-  사용자를 지우면 함께 지워지고(CASCADE), 누군가 산 브러쉬는 지울 수 없습니다(RESTRICT).
-- **구매** (`POST /api/brushes/<slug>/purchase`, `server/routes/brushes.js`): 한 트랜잭션 안에서 사용자 행을 잠그고(`FOR UPDATE`)
-  이미 샀는지·셀이 충분한지 확인한 뒤, 셀을 빼고 `user_brushes` 에 넣습니다. 둘 중 하나만 저장되는 일이 없고, 동시에 눌러도 셀이 두 번 빠지지 않습니다.
-- 일반 색 브러쉬(빨·주·노·초 …)는 누구나 쓰는 색 값이라 DB에 두지 않습니다 (`src/components/drawing/useDrawingTools.ts` 의 `BASIC_COLORS`).
-- 셀을 얻는 방법과 구매 내역(언제 몇 셀에 샀는지)은 아직 없습니다. 구매 시각은 `user_brushes.purchased_at` 에 남습니다.
-
-## 6. Leaderboard
-
-각 사용자에 대해 그림별 최고 기록 한 건을 선택합니다.
-
-정렬 우선순위:
-1. 일치율 내림차순
-2. 소요 시간 오름차순
-3. 완료 시각 오름차순
-4. 기록 ID 오름차순
-
-조회 SQL: `queries/leaderboard.sql`
-
-## 7. Collection
-
-사용자가 완성한 그림을 수집하고 조회하는 도감 기능입니다.
-
-### Collection Rules
-- `user_artworks`에 작품이 저장되면 수집 완료로 판단합니다.
-- 완성 작품은 사용자·그림마다 최고 기록 1개에만 남깁니다 (예전에는 같은 그림의 여러 작품을 보관할 수 있었음).
-- 대표 작품은 리더보드와 같은 규칙(일치율 내림차순, 소요시간 오름차순, 완료 시각 오름차순, 기록 ID 오름차순)으로 선정합니다.
-- 미수집 그림도 도감 목록에 포함됩니다.
-
-### Queries
-`queries/collection.sql`
-
-- 사용자별 도감 전체 조회
-- 대표 작품 및 최고 기록 조회
-- 챕터별 전체 그림 수와 수집된 그림 수 집계
-
-별도의 수집 테이블을 생성하지 않고 기존 테이블 간 JOIN으로 구현합니다.
-
-### 생물 도감
-도감 생물도 그림(`drawings` 한 행)으로 넣어서, 그리기 기록·완성 그림·리더보드·수집 판단을 스토리 장면과 같은 표로 처리합니다.
-생물마다 붙는 도감 설명만 `creature_profiles`(분류, 한 줄 소개), `creature_facts`(정보 항목), `creature_tips`(그릴 때 살펴볼 점)에 둡니다.
-정보 항목은 생물마다 달라서(동물은 먹이, 무생물은 생기는 곳 등) 칸을 고정하지 않고 (이름, 내용) 행으로 저장합니다.
-한 줄 소개와 정보 항목은 공신력 있는 출처에서 확인한 사실만 쓰고, 그 출처를 `creature_sources` 에 두어 도감 카드 아래에 보여 줍니다.
-어떤 출처를 왜 골랐는지, 사이트마다 이용 조건(출처 표시, 변경 금지 등)이 어떤지는 `creature-sources.md` 에 정리했습니다.
-앱은 `GET /api/collection`(`server/routes/collection.js`, `queries/collection.sql` 3번)으로 도감 정보와 내 수집 현황을 한 번에 받습니다.
-생물을 다 그리고 완료하면 `play_records`·`user_artworks` 에 저장되어 수집 완료가 됩니다.
-
-대표 작품 그림은 `image_key` 경로의 파일이며, 앱은 `/uploads/<image_key>` 로 불러옵니다.
-
-## 8. Local Setup
-
-1. PostgreSQL 서버를 준비하고, 프로젝트 폴더의 `.env` 에 `DATABASE_URL` 을 적습니다 (루트 README 4단계).
-2. `pnpm db:migrate` 를 실행합니다. DB가 없으면 만들고, `migrations/` 의 SQL 중 아직 실행하지 않은 것만 번호 순서대로 실행해
-   `schema_migrations` 표에 기록한 뒤, 장면 목록(`seeds/content.sql`)을 넣습니다.
-3. 개발용 예시 데이터가 필요하면 빈 DB에서 `pnpm db:migrate --seed` 로 실행합니다 (`seeds/dev_seed.sql`).
-4. `queries/leaderboard.sql`로 리더보드 결과를 확인합니다.
-5. `queries/collection.sql`로 도감 조회 결과를 확인합니다.
-
-새 마이그레이션은 다음 번호(`011_...sql`)로 `migrations/` 에 추가하고, 파일 안에서 `BEGIN; ... COMMIT;` 으로 감쌉니다.
-이미 실행한 마이그레이션 파일은 고치지 않습니다 (다른 사람 DB에는 다시 실행되지 않으므로 새 파일로 고칩니다).
-
-## 9. Verification
-
-현재 확인한 항목:
-- 5개 테이블 생성
-- 테스트 데이터 INSERT 및 SELECT
-- 사용자별 최고 기록 선택
-- 동점 시 소요 시간 기준 정렬
-- 일치율 CHECK 제약조건 위반 차단
-- 도감 전체 조회 및 챕터별 수집 현황 쿼리 실행
-
-## 10. Current Limitations
-
-- 닉네임만으로는 사용자 소유권이나 인증을 보장하지 않습니다.
-- 공용 PostgreSQL 배포는 별도 작업이 필요합니다.
-- 외부 이미지 파일 삭제는 DB의 ON DELETE CASCADE만으로 처리되지 않습니다.
+현행 파일 목록에는 008이 없다. 012의 대관람차 정리와 외부 파일 처리는 기존 실행기에 포함된다. 그림 16번은 콘텐츠 교체로 남겨 둔 공백이고, 후속 장면 ID는 앱의 카탈로그와 맞춘다.

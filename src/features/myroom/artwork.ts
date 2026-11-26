@@ -4,7 +4,8 @@ import { creatureGuide } from "../../data/creatures"
 export type RoomArtwork = {
   drawingId: number
   name: string
-  kind: "creature" | "story"
+  /** ai: AI 그림 연습실에서 마이룸에 추가한 그림 (drawingId = AI_ARTWORK_BASE + 번호) */
+  kind: "creature" | "story" | "ai"
   slug: string | null
   imageKey: string | null
   previewImageUrl?: string

@@ -1,13 +1,31 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 export type CoachMode = "trace" | "free" | "paint3d";
 export type CoachCharacter = "codex" | "rico" | "naty";
 
-const coaches: Record<CoachCharacter, { name: string; image: string; alt: string }> = {
-  codex: { name: "CODEX", image: "/assets/dorobus/drawing/codex-pose.png", alt: "캐릭터 그리기를 안내하는 코덱스" },
-  rico: { name: "RICO", image: "/assets/dorobus/drawing/rico-pose.png", alt: "스토리 장면 그리기를 안내하는 리코" },
-  naty: { name: "NATY", image: "/assets/dorobus/drawing/naty-pose.png", alt: "도감 생물 그리기를 안내하는 나티" },
+/**
+ * face: 접힌 도움말 버튼의 동그란 얼굴 아이콘을 포즈 그림에서 잘라 내는 위치.
+ *   x, y: 얼굴 가운데 (그림 너비·높이에 대한 비율), zoom: 아이콘 너비의 몇 배로 그림을 키울지, ratio: 그림 높이/너비
+ * 포즈 그림은 이젤·공책까지 들어 있는 넓은 그림이라 통째로 작게 줄이면 알아볼 수 없어서 얼굴만 보여 준다.
+ */
+const coaches: Record<CoachCharacter, { name: string; image: string; alt: string; face: { x: number; y: number; zoom: number; ratio: number } }> = {
+  codex: { name: "CODEX", image: "/assets/dorobus/drawing/codex-pose.png", alt: "캐릭터 그리기를 안내하는 코덱스", face: { x: 0.53, y: 0.32, zoom: 3.4, ratio: 1159 / 1357 } },
+  rico: { name: "RICO", image: "/assets/dorobus/drawing/rico-pose.png", alt: "스토리 장면 그리기를 안내하는 리코", face: { x: 0.53, y: 0.36, zoom: 3, ratio: 1145 / 1374 } },
+  naty: { name: "NATY", image: "/assets/dorobus/drawing/naty-pose.png", alt: "도감 생물 그리기를 안내하는 나티", face: { x: 0.66, y: 0.5, zoom: 2.8, ratio: 1024 / 1536 } },
 };
+
+/** 포즈 그림에서 얼굴만 동그랗게 보여 주는 배경 스타일 (배경 위치 % 는 "그림의 p% 지점을 상자의 p% 지점에 맞춘다"는 뜻) */
+function faceStyle({ image, face }: (typeof coaches)[CoachCharacter]) {
+  const height = face.zoom * face.ratio;
+  const pos = (center: number, scale: number) => `${(((center * scale - 0.5) / (scale - 1)) * 100).toFixed(1)}%`;
+  return {
+    backgroundImage: `url(${image})`,
+    backgroundSize: `${face.zoom * 100}% auto`,
+    backgroundPosition: `${pos(face.x, face.zoom)} ${pos(face.y, height)}`,
+    backgroundRepeat: "no-repeat",
+  };
+}
 
 const messages: Record<CoachMode, Array<{ title: string; body: string }>> = {
   trace: [
@@ -27,10 +45,50 @@ const messages: Record<CoachMode, Array<{ title: string; body: string }>> = {
   ],
 };
 
-export function DrawingCoach({ mode, character }: { mode: CoachMode; character: CoachCharacter }) {
+/**
+ * 도움말을 접었거나(closed) 완전히 닫았는지(dismissed) 그리기 종류마다 브라우저에 기억한다.
+ * 기억하지 않으면 상점에 다녀오거나 화면을 다시 열 때마다 도움말이 처음부터 다시 펼쳐진다.
+ * 처음 쓰는 사람에게만 펼쳐서 보여 주고, 접은 뒤에는 아래 "도움말" 버튼으로 언제든 다시 볼 수 있다.
+ */
+type CoachState = "open" | "closed" | "dismissed";
+const storageKey = (mode: CoachMode) => `drawingCoach:${mode}`;
+
+function readCoachState(mode: CoachMode): CoachState {
+  try {
+    const saved = localStorage.getItem(storageKey(mode));
+    return saved === "closed" || saved === "dismissed" ? saved : "open";
+  } catch {
+    return "open";
+  }
+}
+
+export function DrawingCoach({
+  mode,
+  character,
+  foldedSlot,
+  compact = false,
+}: {
+  mode: CoachMode;
+  character: CoachCharacter;
+  /** 접힌 도움말 버튼을 놓을 자리 (DrawingShell 이 그림판 오른쪽 위 바깥에 만든다). 없으면 화면 아래 가운데 */
+  foldedSlot?: HTMLElement | null;
+  /** 자리가 좁으면 얼굴 아이콘만 보여 준다 */
+  compact?: boolean;
+}) {
   const [step, setStep] = useState(0);
-  const [open, setOpen] = useState(true);
-  const [dismissed, setDismissed] = useState(false);
+  const [state, setState] = useState<CoachState>(() => readCoachState(mode));
+  const open = state === "open";
+  const dismissed = state === "dismissed";
+  const remember = (next: CoachState) => {
+    setState(next);
+    try {
+      localStorage.setItem(storageKey(mode), next);
+    } catch {
+      // 기억할 수 없으면 이 화면에서만 적용된다
+    }
+  };
+  const setOpen = (value: boolean) => remember(value ? "open" : "closed");
+  const setDismissed = (value: boolean) => remember(value ? "dismissed" : "closed");
   const item = messages[mode][step];
   const coach = coaches[character];
 
@@ -38,23 +96,47 @@ export function DrawingCoach({ mode, character }: { mode: CoachMode; character: 
   if (dismissed) return null;
 
   if (!open) {
-    return (
-      <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full border border-blue-100 bg-white text-xs font-black text-blue-600 shadow-lg">
+    const reopen = () => {
+      setStep(0);
+      setOpen(true);
+    };
+    const face = <span className="h-8 w-8 shrink-0 rounded-full bg-sky-100 ring-1 ring-blue-100" style={faceStyle(coach)} aria-hidden="true" />;
+    const folded = compact ? (
+      // 그림판 옆 빈자리가 좁을 때: 얼굴 아이콘만 (✕ 는 오른쪽 위 작은 배지)
+      <div className="relative z-20">
         <button
           type="button"
-          onClick={() => {
-            setStep(0);
-            setOpen(true);
-          }}
-          className="flex items-center gap-2 rounded-full py-2 pl-4 pr-2"
+          onClick={reopen}
+          title={`${coach.name} 도움말`}
+          aria-label={`${coach.name} 도움말`}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-100 bg-white shadow-lg"
         >
-          <img src={coach.image} alt="" className="h-10 w-10 object-contain" />
+          {face}
+        </button>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border border-blue-100 bg-white text-[9px] leading-none text-blue-400 shadow hover:text-blue-600"
+          aria-label={`${coach.name} 도움말 완전히 닫기`}
+          title="완전히 닫기"
+        >
+          ✕
+        </button>
+      </div>
+    ) : (
+      <div
+        className={`z-20 flex items-center whitespace-nowrap rounded-full border border-blue-100 bg-white text-xs font-black text-blue-600 shadow-lg ${
+          foldedSlot ? "" : "absolute bottom-3 left-1/2 -translate-x-1/2"
+        }`}
+      >
+        <button type="button" onClick={reopen} className="flex h-10 items-center gap-1.5 rounded-full pl-1 pr-1.5">
+          {face}
           {coach.name} 도움말
         </button>
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          className="mr-2 rounded-full px-2 py-1 text-base leading-none text-blue-300 hover:text-blue-600"
+          className="mr-1.5 flex h-6 w-6 items-center justify-center rounded-full text-sm leading-none text-blue-400 hover:bg-blue-50 hover:text-blue-600"
           aria-label={`${coach.name} 도움말 완전히 닫기`}
           title="완전히 닫기"
         >
@@ -62,6 +144,8 @@ export function DrawingCoach({ mode, character }: { mode: CoachMode; character: 
         </button>
       </div>
     );
+    // 그리기 화면에서는 그림판 오른쪽 위 바깥(확대·축소 버튼 아래)에 붙여 그림도 특수 브러쉬 패널도 가리지 않는다
+    return foldedSlot ? createPortal(folded, foldedSlot) : folded;
   }
 
   return (

@@ -3,6 +3,7 @@
 // 위쪽 메뉴와 아래 "더 둘러보기" 카드로 리더보드·마이룸·기프트샵·설정에 간다. 다른 화면의 DOROBUS 로고와 "메인으로"는 모두 여기로 돌아온다.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "../auth";
+import CellIcon from "../components/CellIcon";
 import DorobusMainCharacter, { type DorobusMainCharacterName } from "../components/DorobusMainCharacter";
 import GiftShopIcon from "../components/GiftShopIcon";
 import { api, type UserSummary } from "../lib/api";
@@ -210,6 +211,22 @@ export default function StudioPage() {
                 );
               })}
             </div>
+            {/* 그리기 모드 아래 가로 카드: AI 그림 연습실 (#/ai-studio) */}
+            <button
+              type="button"
+              onClick={() => navigate("/ai-studio")}
+              className="group mt-4 flex w-full items-center gap-4 rounded-2xl border-2 border-slate-100 bg-gradient-to-r from-violet-50 via-sky-50 to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-sm"
+            >
+              <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white text-3xl shadow-sm" aria-hidden="true">🪄</span>
+              <span className="min-w-0 flex-1">
+                <strong className="flex items-center gap-1.5 text-lg font-black">
+                  AI로 그림 생성하기 <CellIcon title="셀 사용" />
+                </strong>
+                <span className="mt-1 block text-sm font-semibold text-slate-500">원하는 그림을 글로 설명해 AI가 그리게 해 봐요. 프롬프트를 바꿔 가며 연습해요!</span>
+              </span>
+              <span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-black text-violet-700">프롬프트 연습</span>
+              <span className="shrink-0 text-xl font-black text-blue-500 transition group-hover:translate-x-1" aria-hidden="true">→</span>
+            </button>
           </section>
 
           <section className="relative overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white p-6 pb-32 shadow-sm sm:p-8 sm:pb-36">

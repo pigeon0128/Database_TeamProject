@@ -42,10 +42,10 @@ export const BASIC_COLORS = [
 /** 왼쪽 도구 막대의 도구 */
 export type Tool = "pen" | "fill" | "brush" | "special" | "eraser" | "picker";
 
-/** 방금 쓴 색: 이 브라우저에 최근 순서로 RECENT_MAX 개까지 저장한다 */
+/** 방금 쓴 색: 이 브라우저에 최근 순서로 RECENT_MAX 개까지 저장한다 (3D 색칠하기도 같은 목록을 쓴다) */
 const RECENT_KEY = "dorobus.recentColors";
-const RECENT_MAX = 5;
-function loadRecent(): string[] {
+export const RECENT_MAX = 5;
+export function loadRecent(): string[] {
   try {
     const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
     return Array.isArray(v) ? v.filter((c): c is string => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c)).slice(0, RECENT_MAX) : [];
@@ -53,7 +53,7 @@ function loadRecent(): string[] {
     return [];
   }
 }
-function saveRecent(colors: string[]) {
+export function saveRecent(colors: string[]) {
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(colors));
   } catch {

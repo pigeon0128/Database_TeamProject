@@ -9,7 +9,8 @@ import { serializeForRoom } from "./roomExport";
 
 export type ViewDirection = "front" | "back" | "left" | "right" | "top" | "bottom";
 
-export type PaintMode = "spray" | "fill" | "rotate";
+/** picker: 스포이드 (오브젝트를 누르면 그 자리의 색을 가져온다, onPick) */
+export type PaintMode = "spray" | "fill" | "rotate" | "picker";
 
 export type PaintState = {
   canUndo: boolean;
@@ -74,6 +75,11 @@ export class PaintScene {
   private part: string | null = null;
   private history: Snapshot[] = [];
   private painted = false;
+
+  /** 스포이드로 가져온 색 (#rrggbb). 화면(React)이 받아서 고른 색으로 쓴다 */
+  onPick: ((hex: string) => void) | null = null;
+  /** 한 번 칠하기(스프레이 한 획, 페인트 통 한 번)를 마치면 그 색 (#rrggbb). 화면이 "방금 쓴 색"에 넣는다 */
+  onPaint: ((hex: string) => void) | null = null;
 
   constructor(
     private container: HTMLElement,
@@ -383,6 +389,11 @@ export class PaintScene {
         return;
       }
     }
+    if (this.mode === "picker" && e.button === 0) {
+      const hex = this.colorAtPointer();
+      if (hex) this.onPick?.(hex);
+      return;
+    }
     if (this.mode === "fill" && e.button === 0) {
       const hit = this.pick();
       if (!hit) return;
@@ -393,6 +404,7 @@ export class PaintScene {
       this.painted = true;
       this.part = hit.target.mesh.name;
       this.emit();
+      this.onPaint?.(`#${this.color.getHexString()}`);
       return;
     }
     if (this.mode !== "spray" || e.button !== 0) return;
@@ -432,6 +444,7 @@ export class PaintScene {
     this.strokeTarget = null;
     // 아무 데도 칠하지 않았으면 되돌리기 기록을 남기지 않는다
     if (!this.strokeChanged) this.history.pop();
+    else this.onPaint?.(`#${this.color.getHexString()}`);
     this.emit();
   }
 
@@ -450,6 +463,31 @@ export class PaintScene {
 
   private emit() {
     this.onChange({ canUndo: this.history.length > 0, painted: this.painted, part: this.part });
+  }
+
+  /**
+   * 스포이드: 지금 포인터가 가리키는 자리의 색 (#rrggbb). 칠할 수 있는 부위 밖이면 null.
+   * 색은 꼭짓점에 있으므로, 맞은 삼각형의 세 꼭짓점 색을 닿은 점에 가까운 만큼 더 섞는다.
+   */
+  private colorAtPointer(): string | null {
+    this.turntable.updateMatrixWorld(true);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const hit = this.raycaster.intersectObjects(this.targets.map((t) => t.mesh), false)[0];
+    if (!hit?.face) return null;
+    const target = this.targets.find((t) => t.mesh === hit.object)!;
+    Object.assign(target, this.cacheTarget(target.mesh));
+    const p = target.positions;
+    const c = target.colors.array as Float32Array;
+    let total = 0;
+    const mixed = [0, 0, 0];
+    for (const v of [hit.face.a, hit.face.b, hit.face.c]) {
+      const d = Math.hypot(p[v * 3] - hit.point.x, p[v * 3 + 1] - hit.point.y, p[v * 3 + 2] - hit.point.z);
+      const w = 1 / Math.max(d, 1e-5);
+      total += w;
+      for (let k = 0; k < 3; k++) mixed[k] += c[v * 3 + k] * w;
+    }
+    // 색 버퍼는 THREE.Color 와 같은 (선형) 색 공간이라 getHexString 으로 화면 색(#rrggbb)으로 바꾼다
+    return `#${new THREE.Color(mixed[0] / total, mixed[1] / total, mixed[2] / total).getHexString()}`;
   }
 
   /** 지금 포인터가 가리키는 캐릭터 표면 (부위 + 점 + 바깥 방향) */

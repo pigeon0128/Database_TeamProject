@@ -50,14 +50,23 @@ type ToolbarMenuProps = {
   primary?: boolean;
   /** 세로 도구 막대 안의 아이콘형 버튼으로 보이고 메뉴는 오른쪽으로 펼쳐진다 */
   compact?: boolean;
+  /** true 가 되면 메뉴를 펼친다 */
+  autoOpen?: boolean;
+  /** 펼친 메뉴의 너비 (Tailwind 클래스, 기본 w-72) */
+  menuWidth?: string;
   /** 펼쳐진 메뉴 내용. close를 부르면 메뉴가 닫힌다 */
   children: (close: () => void) => ReactNode;
 };
 
 /** 누르면 아래로 펼쳐지는 툴바 메뉴. 바깥을 누르거나 Esc를 누르면 닫힌다. */
-export function ToolbarMenu({ label, title, alignRight, primary, compact, children }: ToolbarMenuProps) {
+export function ToolbarMenu({ label, title, alignRight, primary, compact, autoOpen, menuWidth = "w-72", children }: ToolbarMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // autoOpen 이 true 가 되면 한 번 펼친다 (다른 화면에서 이 메뉴를 바로 쓰라고 보냈을 때)
+  useEffect(() => {
+    if (autoOpen) setOpen(true);
+  }, [autoOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -85,7 +94,7 @@ export function ToolbarMenu({ label, title, alignRight, primary, compact, childr
           aria-expanded={open}
           aria-haspopup="menu"
           onClick={() => setOpen((v) => !v)}
-          className={`flex w-14 flex-col items-center gap-0.5 rounded-2xl py-2 text-[11px] font-bold transition ${open ? "bg-sky-haze text-sky-deep" : "text-ink-muted hover:bg-sky-soft"}`}
+          className={`flex w-[4.5rem] flex-col items-center gap-1 rounded-2xl py-3 text-xs font-bold transition ${open ? "bg-sky-haze text-sky-deep" : "text-ink-muted hover:bg-sky-soft"}`}
         >
           {label}
         </button>
@@ -100,7 +109,7 @@ export function ToolbarMenu({ label, title, alignRight, primary, compact, childr
       {open && (
         <div
           role="menu"
-          className={`absolute ${compact ? "left-full top-0 ml-2" : "top-full mt-2"} z-40 w-72 max-w-[calc(100vw-2rem)] rounded-3xl border border-white/90 bg-white p-4 text-ink shadow-card-hover ${
+          className={`absolute ${compact ? "left-full top-0 ml-2" : "top-full mt-2"} z-40 ${menuWidth} max-w-[calc(100vw-2rem)] rounded-3xl border border-white/90 bg-white p-4 text-ink shadow-card-hover ${
             compact ? "" : alignRight ? "right-0" : "left-0"
           }`}
         >

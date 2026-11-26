@@ -1,3 +1,5 @@
+/** AI 그림 연습실에서 마이룸에 추가한 그림의 작품 번호 시작값 (작품 번호 = AI_ARTWORK_BASE + ai_artwork_id) */
+export const AI_ARTWORK_BASE: number
 export type ObjectType = "frame" | "easel" | "chair" | "table" | "plant" | "colored"
 
 export type Wall = "back" | "left" | "right" | "front"

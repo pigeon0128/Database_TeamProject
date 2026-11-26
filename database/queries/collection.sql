@@ -1,4 +1,6 @@
 -- =========================================================
+-- 완성 기준 80%는 server/completion.js의 COMPLETE_SCORE와 일치한다.
+-- 대표 작품은 점수와 무관하게 고르고, 수집 여부와 집계에만 기준을 적용한다.
 -- 1. 사용자별 도감 전체 조회
 -- $1: user_id
 -- =========================================================
@@ -9,7 +11,6 @@ WITH ranked_artworks AS (
         pr.record_id,
         pr.similarity_score,
         pr.duration_ms,
-        ua.artwork_id,
         ua.image_key,
         ROW_NUMBER() OVER (
             PARTITION BY pr.drawing_id
@@ -30,7 +31,7 @@ SELECT
     d.title,
     d.reference_image_key,
     d.drawing_order,
-    (ra.artwork_id IS NOT NULL) AS is_collected,
+    COALESCE(ra.similarity_score >= 80, FALSE) AS is_collected,
     ra.image_key AS representative_image_key,
     -- 그림 파일은 서버 폴더에 있고 image_key 는 그 경로다 (010_artwork_files.sql). 앱은 /uploads/<image_key> 로 그림을 받는다.
     ra.record_id AS representative_record_id,
@@ -56,7 +57,7 @@ WITH collected_drawings AS (
     FROM play_records pr
     JOIN user_artworks ua
         ON pr.record_id = ua.record_id
-    WHERE pr.user_id = $1
+    WHERE pr.user_id = $1 AND pr.similarity_score >= 80
 )
 SELECT
     c.chapter_id,
@@ -77,7 +78,7 @@ ORDER BY c.chapter_order;
 
 -- =========================================================
 -- 3. 생물 도감 목록: 도감 정보 + 내 수집 현황
--- (1번과 같은 대표 작품 규칙. 앱의 GET /api/collection 이 쓰는 쿼리, server/routes/collection.js)
+-- (GET /api/collection과 같은 대표 작품 및 수집 완료 규칙)
 -- $1: user_id
 -- =========================================================
 
@@ -87,6 +88,7 @@ WITH ranked_artworks AS (
         pr.record_id,
         pr.similarity_score,
         pr.duration_ms,
+        ua.image_key,
         ROW_NUMBER() OVER (
             PARTITION BY pr.drawing_id
             ORDER BY
@@ -106,8 +108,9 @@ SELECT
     p.slug,
     p.category,
     p.summary,
-    (ra.record_id IS NOT NULL) AS is_collected,
+    COALESCE(ra.similarity_score >= 80, FALSE) AS is_collected,
     ra.record_id AS representative_record_id,
+    ra.image_key AS representative_image_key,
     ra.similarity_score AS best_score,
     ra.duration_ms AS best_duration_ms,
     COALESCE((

@@ -38,6 +38,12 @@ export const myroomApi = {
     request<{ objects: StoredSummary[] }>("GET", undefined, "/api/myroom/storage").then(
       (r) => r.objects,
     ),
+  /** 마이룸에 넣은 AI 그림 지우기 (drawingId = AI_ARTWORK_BASE + 번호). 저장된 방의 액자에 걸려 있으면 409 */
+  removeAiArtwork: (drawingId: number) =>
+    request<{ ok: true }>("DELETE", undefined, `/api/ai/artworks/${drawingId}`),
+  /** AI 그림 이름 바꾸기 (1~40자) */
+  renameAiArtwork: (drawingId: number, title: string) =>
+    request<{ title: string }>("PATCH", { title }, `/api/ai/artworks/${drawingId}`),
   removeStored: (id: number) =>
     request<{ ok: true }>("DELETE", undefined, `/api/myroom/storage/${id}`),
   stored: (id: number) =>

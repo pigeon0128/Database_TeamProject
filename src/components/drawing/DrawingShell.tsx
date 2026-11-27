@@ -123,7 +123,9 @@ export function DrawingShell({
   const side = sideCharacters[backgroundScene];
   /** 안내 캐릭터를 세울 만한 빈자리 폭 (px). 이보다 좁으면 숨긴다 */
   const SIDE_MIN = 90;
-  const slotContext = useMemo(() => ({ slot: zoomSlot, layout: slotLayout }), [zoomSlot, slotLayout]);
+  /** AI 조언 말풍선이 떠 있는 동안 코덱스 도움말을 잠근다 (말풍선이 같은 자리에 겹친다) */
+  const [coachLocked, setCoachLocked] = useState(false);
+  const slotContext = useMemo(() => ({ slot: zoomSlot, layout: slotLayout, lockCoach: setCoachLocked }), [zoomSlot, slotLayout]);
   const infoOpen = !!aside && showInfo;
   return (
     // 흰 바탕에 옅은 회색 점무늬(화이트보드 느낌), 그 위에 반투명 흰 카드와 진한 글자
@@ -228,7 +230,7 @@ export function DrawingShell({
             <ToolPanel tools={tools} />
           </aside>
         )}
-        {coachMode && <DrawingCoach mode={coachMode} character={coachCharacter} foldedSlot={coachSlot} compact={slotLayout !== "wide"} />}
+        {coachMode && <DrawingCoach mode={coachMode} character={coachCharacter} foldedSlot={coachSlot} compact={slotLayout !== "wide"} locked={coachLocked} />}
       </div>
 
       {footer && (

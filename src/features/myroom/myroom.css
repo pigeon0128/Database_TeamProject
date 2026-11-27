@@ -1030,3 +1030,139 @@
 .mr-item-delete:hover {
   background:#c9363b
 }
+
+/* 그린 그림 보기: 그림 칸 (버튼이 아니라 보기 전용) + AI 그림 지우기 버튼 */
+.mr-gallery-item {
+  position:relative;
+  padding:10px;
+  border:1px solid #e5eaf0;
+  border-radius:14px;
+  background:#fff;
+  display:flex;
+  flex-direction:column
+}
+
+.mr-gallery-item strong {
+  font-size:13px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.mr-gallery-item small {
+  font-size:11px;
+  color:#8a949f;
+  margin-top:5px
+}
+
+.mr-artwork-grid .mr-artwork-delete {
+  position:absolute;
+  padding:0;
+  top:4px;
+  right:4px;
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border:2px solid #fff;
+  border-radius:50%;
+  background:#e5484d;
+  box-shadow:0 2px 8px #0003;
+  cursor:pointer;
+  z-index:1;
+  transition:transform .12s,background .12s
+}
+
+.mr-artwork-grid .mr-artwork-delete:hover {
+  background:#c9363b;
+  transform:scale(1.08)
+}
+
+.mr-artwork-grid .mr-artwork-delete svg {
+  width:14px;
+  height:14px;
+  fill:none;
+  stroke:#fff;
+  stroke-width:3.2;
+  stroke-linecap:round
+}
+
+.mr-gallery-message {
+  margin:4px 28px 0;
+  padding:8px 12px;
+  border-radius:10px;
+  font-size:12px;
+  font-weight:700
+}
+
+.mr-gallery-message.ok {
+  background:#ecfdf3;
+  color:#167a46
+}
+
+.mr-gallery-message.error {
+  background:#fff1f2;
+  color:#c93b43
+}
+
+/* 그린 그림 보기: 이름 + 이름 바꾸기 */
+.mr-gallery-name {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  min-width:0
+}
+
+.mr-gallery-name strong {
+  flex:1;
+  min-width:0
+}
+
+.mr-artwork-grid .mr-gallery-name button {
+  flex-shrink:0;
+  padding:2px 4px;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  font-size:13px;
+  line-height:1;
+  cursor:pointer
+}
+
+.mr-artwork-grid .mr-gallery-name button:hover {
+  background:#eef4fb
+}
+
+.mr-gallery-rename {
+  display:flex;
+  gap:4px
+}
+
+.mr-gallery-rename input {
+  flex:1;
+  min-width:0;
+  height:30px;
+  padding:0 8px;
+  border:1px solid #2483ff;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:700;
+  outline:none
+}
+
+.mr-artwork-grid .mr-gallery-rename button {
+  flex-shrink:0;
+  padding:0 10px;
+  height:30px;
+  border:0;
+  border-radius:8px;
+  background:#2483ff;
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer
+}
+
+.mr-artwork-grid .mr-gallery-rename button:disabled {
+  opacity:.5
+}

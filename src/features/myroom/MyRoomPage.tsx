@@ -19,6 +19,7 @@ import { myRoomPreviewEnabled } from "./preview/enabled"
 import type { ObjectType, Placement, RoomObject } from "./types"
 import InventoryPanel from "./ui/InventoryPanel"
 import ArtworkPicker from "./ui/ArtworkPicker"
+import GalleryPanel from "./ui/GalleryPanel"
 import { Icon, Modal, ObjectThumbnail } from "./ui/RoomUI"
 import "./myroom.css"
 
@@ -96,7 +97,7 @@ function RoomPage({
 }) {
   const isPreview = import.meta.env.DEV && preview && myRoomPreviewEnabled
   const room = useMyRoom(isPreview, onUnauthorized)
-  const [panel, setPanel] = useState<"inventory" | "artwork" | "help" | null>(
+  const [panel, setPanel] = useState<"inventory" | "artwork" | "gallery" | "help" | null>(
     null,
   )
   const [selectedId, setSelected] = useState<string | null>(null),
@@ -274,6 +275,18 @@ function RoomPage({
           }}
         >
           <Icon name="inventory" />
+        </button>
+        <button
+          className={panel === "gallery" ? "active" : ""}
+          aria-label="그린 그림 보기"
+          title="그린 그림 보기"
+          disabled={busy}
+          onClick={() => {
+            setPlacement(null)
+            setPanel(panel === "gallery" ? null : "gallery")
+          }}
+        >
+          <Icon name="frame" />
         </button>
         <button
           aria-label="되돌리기"
@@ -577,6 +590,14 @@ function RoomPage({
             }))
             setPanel(null)
           }}
+        />
+      )}
+      {panel === "gallery" && (
+        <GalleryPanel
+          artworks={room.artworks}
+          onDelete={room.removeArtwork}
+          onRename={room.renameArtwork}
+          onClose={() => setPanel(null)}
         />
       )}
       {panel === "help" && (

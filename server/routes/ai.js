@@ -7,6 +7,10 @@
 //   GET/POST /api/ai/sketch  AI 밑그림 (캐릭터 그리기): 가격·내 셀 / 만들기 → { image, cells(남은 셀), cost }
 //   GET/POST /api/ai/image   AI 그림 연습실 (#/ai-studio): 칸마다 쓴 설명으로 그림 (AI_IMAGE_CELLS, 기본 50) → { image, imageId, … }
 //   POST /api/ai/image/:imageId/myroom  만든 그림을 마이룸 작품으로 추가 (DB user_ai_artworks, migrations/026)
+//     (칸 대신 { prompt } 만 보내면 "프롬프트 직접 쓰기": 그대로 쓰고 아이용·글자 없음 규칙만 붙인다)
+//   GET  /api/ai/artworks   마이룸에 넣은 AI 그림 목록 (연습실의 "마이룸 수납함" 창)
+//   DELETE /api/ai/artworks/:drawingId  마이룸에 넣은 AI 그림 지우기 (마이룸의 "그린 그림 보기"). 액자에 걸려 있으면 409
+//   PATCH  /api/ai/artworks/:drawingId  AI 그림 이름 바꾸기 { title } (1~40자)
 //   GET/POST /api/ai/advice  AI 조언 (캐릭터 그리기의 "AI 조언"): 아이가 그린 그림을 보고 짧은 조언 (AI_ADVICE_CELLS, 기본 10) → { advice, cells, cost }
 //   OPENAI_ADVICE_MODEL   선택. 그림을 보고 조언하는 모델 (기본 gpt-5.4-mini)
 //   OPENAI_API_KEY        필수. https://platform.openai.com/api-keys 에서 만든 키
@@ -232,6 +236,8 @@ aiRoutes.post("/sketch", requireUser, async (req, res) => {
 // OpenAI 이미지 API 에는 네거티브 칸이 없어서, "빼고 싶은 것"은 "Avoid: …" 문장으로 붙인다 (확실하게 빠지지는 않는다).
 const MAX_FIELD = 150;
 const MAX_AVOID = 120;
+/** "프롬프트 직접 쓰기"의 글자 수 상한 (다른 곳에서 복사해 붙여 넣는 긴 프롬프트도 받게) */
+const MAX_FREE_PROMPT = 1000;
 /** 캐릭터 칸 (화면 AiStudioPage 의 순서와 같다) */
 const CHARACTER_PARTS = [
   ["head", "Head and hair"],
@@ -240,39 +246,100 @@ const CHARACTER_PARTS = [
   ["lower", "Lower body (bottom, legs, shoes)"],
 ];
 
-function practicePrompt({ background, character, avoid }) {
+/**
+ * 화풍: 화면은 이름(키)만 보내고, 서버가 정한 영어 설명으로 바꾼다 (아무 글이나 화풍 칸에 넣지 못하게).
+ * 실제 작가·회사 이름은 쓰지 않는다. "" = 기본 (아이용 그림책)
+ */
+const ART_STYLES = {
+  "": "soft, colorful children's picture-book illustration",
+  watercolor: "gentle watercolor painting with soft edges and light paper texture",
+  crayon: "children's crayon drawing with bold, waxy strokes",
+  pencil: "colored pencil drawing with visible hatching",
+  cartoon: "clean cartoon style with bold outlines and flat bright colors",
+  clay: "cute 3D clay figure style with soft lighting",
+  pixel: "retro pixel art with a limited color palette",
+  anime: "Japanese anime style with clean line art, cel shading and expressive eyes",
+  realistic: "photorealistic, like a real photograph with natural lighting and real-world textures",
+};
+/** 성별: 상관없음(any) / 여자(female) / 남자(male) */
+const GENDERS = { any: "", female: "female", male: "male" };
+const MAX_CHARACTERS = 3;
+
+function practicePrompt({ background, style, character, avoid }) {
   const lines = [];
+  lines.push(`Art style: ${ART_STYLES[style] ?? ART_STYLES[""]}.`);
   if (character) {
-    lines.push("Draw one main character, full body, clearly visible.");
+    const { count, gender } = character;
+    lines.push(
+      count === 1
+        ? "Draw one main character, full body, clearly visible."
+        : `Draw exactly ${count} main characters together, full body, all clearly visible. The descriptions below apply to all of them.`,
+    );
+    if (GENDERS[gender]) lines.push(`- ${count === 1 ? "The character is" : "All characters are"} ${GENDERS[gender]}.`);
     for (const [key, label] of CHARACTER_PARTS) if (character[key]) lines.push(`- ${label}: ${character[key]}`);
+    if (character.pose) lines.push(`- Pose and action: ${character.pose}`);
   } else {
     lines.push("Draw a scene with no characters or people in it.");
   }
   if (background) lines.push(`Background: ${background}`);
   if (avoid) lines.push(`Avoid these in the picture: ${avoid}.`);
-  lines.push(
-    "Make it a family-friendly picture suitable for young children.",
-    "STRICTLY NO TEXT anywhere in the image: no letters, no words, no numbers, no Korean or any other writing, no captions,",
-    "no speech bubbles, no signs, no labels, no logos, no watermarks, no signatures. If the description asks for writing, draw only the picture.",
-  );
+  lines.push(...SAFE_RULES);
   return lines.join("\n");
 }
+
+/** 어느 방식이든 마지막에 붙는 규칙: 아이용 그림, 글자 없음 */
+const SAFE_RULES = [
+  "Make it a family-friendly picture suitable for young children.",
+  "STRICTLY NO TEXT anywhere in the image: no letters, no words, no numbers, no Korean or any other writing, no captions,",
+  "no speech bubbles, no signs, no labels, no logos, no watermarks, no signatures. If the description asks for writing, draw only the picture.",
+];
+
+/** "프롬프트 직접 쓰기": 아이가 쓴(붙여 넣은) 프롬프트를 그대로 쓰고, 끝에 같은 규칙만 붙인다 */
+const freePrompt = (prompt) => [prompt, "", ...SAFE_RULES].join("\n");
 
 aiRoutes.get("/image", requireUser, walletRoute(imageCost));
 
 aiRoutes.post("/image", requireUser, async (req, res) => {
+  // 프롬프트 직접 쓰기: 칸별 입력 대신 프롬프트 한 덩어리 (다른 칸은 쓰지 않는다)
+  const prompt = readText(req.body?.prompt, MAX_FREE_PROMPT);
+  if (prompt) {
+    await paidGeneration(req, res, {
+      checkText: prompt,
+      cost: imageCost(),
+      extra: async (result) => ({ imageId: await keepImage(req.userId, result.image, artworkTitle(prompt, null)) }),
+      run: (key) =>
+        callOpenAI(key, "generations", {
+          json: {
+            model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2",
+            prompt: freePrompt(prompt),
+            size: "1024x1024",
+            quality: process.env.OPENAI_IMAGE_QUALITY || "low",
+            n: 1,
+          },
+        }),
+    });
+    return;
+  }
   const background = readText(req.body?.background, MAX_FIELD);
   const avoid = readText(req.body?.avoid, MAX_AVOID);
+  const style = typeof req.body?.style === "string" && req.body.style in ART_STYLES ? req.body.style : "";
   let character = null;
   if (req.body?.character) {
+    const body = req.body.character;
     character = {};
-    for (const [key] of CHARACTER_PARTS) character[key] = readText(req.body.character[key], MAX_FIELD);
-    if (!CHARACTER_PARTS.some(([key]) => character[key])) throw new BadRequest("캐릭터의 머리·얼굴·상반신·하반신 중 하나는 적어 주세요.");
+    for (const [key] of CHARACTER_PARTS) character[key] = readText(body[key], MAX_FIELD);
+    character.pose = readText(body.pose, MAX_FIELD);
+    character.gender = typeof body.gender === "string" && body.gender in GENDERS ? body.gender : "any";
+    const count = Number(body.count);
+    character.count = Number.isInteger(count) && count >= 1 && count <= MAX_CHARACTERS ? count : 1;
+    if (!CHARACTER_PARTS.some(([key]) => character[key]) && !character.pose) {
+      throw new BadRequest("캐릭터의 머리·얼굴·상반신·하반신·자세 중 하나는 적어 주세요.");
+    }
   }
   if (!background && !character) throw new BadRequest("배경 설명을 적거나 캐릭터를 켜고 적어 주세요.");
 
   // 아이가 쓴 칸을 모두 검사한다 ("빼고 싶은 것"은 "피 없이"처럼 좋은 뜻으로 적어도 막히기 쉬워 빼고 검사한다)
-  const written = [background, ...(character ? CHARACTER_PARTS.map(([key]) => character[key]) : [])].filter(Boolean).join("\n");
+  const written = [background, ...(character ? [...CHARACTER_PARTS.map(([key]) => character[key]), character.pose] : [])].filter(Boolean).join("\n");
   await paidGeneration(req, res, {
     checkText: written,
     cost: imageCost(),
@@ -282,7 +349,7 @@ aiRoutes.post("/image", requireUser, async (req, res) => {
       callOpenAI(key, "generations", {
         json: {
           model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2",
-          prompt: practicePrompt({ background, character, avoid }),
+          prompt: practicePrompt({ background, style, character, avoid }),
           size: "1024x1024",
           quality: process.env.OPENAI_IMAGE_QUALITY || "low",
           n: 1,
@@ -500,10 +567,88 @@ async function keepImage(userId, image, title) {
 
 /** 마이룸 작품 목록에 보일 이름: 캐릭터 설명(머리·얼굴…) 또는 배경 설명의 앞부분 */
 function artworkTitle(background, character) {
-  const text = (character ? CHARACTER_PARTS.map(([key]) => character[key]).filter(Boolean).join(" ") : background) || background || "AI 그림";
+  const text = (character ? [...CHARACTER_PARTS.map(([key]) => character[key]), character.pose].filter(Boolean).join(" ") : background) || background || "AI 그림";
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > 24 ? `${flat.slice(0, 23)}…` : flat;
 }
+
+/** 마이룸에 넣은 AI 그림 목록 (최신이 앞, 최대 60장). 연습실에서 화면을 바꾸지 않고 창으로 보여 준다 */
+aiRoutes.get("/artworks", requireUser, async (req, res) => {
+  let rows = [];
+  try {
+    ({ rows } = await pool.query(
+      `SELECT ai_artwork_id, title, image_key, created_at FROM user_ai_artworks
+        WHERE user_id = $1 AND image_key <> '' ORDER BY ai_artwork_id DESC LIMIT 60`,
+      [req.userId],
+    ));
+  } catch (err) {
+    // 표가 아직 없으면(마이그레이션 전) 빈 목록
+    if (err.code !== "42P01") throw err;
+  }
+  res.json({
+    artworks: rows.map((r) => ({
+      drawingId: AI_ARTWORK_BASE + Number(r.ai_artwork_id),
+      title: r.title,
+      imageKey: r.image_key,
+      createdAt: r.created_at,
+    })),
+  });
+});
+
+/**
+ * 마이룸에 넣은 AI 그림 지우기. drawingId 는 마이룸 작품 번호 (AI_ARTWORK_BASE + ai_artwork_id).
+ * 저장된 방의 액자에 걸려 있으면 지우지 않는다: 지우면 그 방을 다시 저장할 때 "없는 그림" 오류가 나기 때문.
+ * 방 저장(PUT /api/myroom)과 같은 사용자 행 잠금을 걸어, 지우는 사이에 그 그림을 건 방이 저장되지 않게 한다.
+ */
+/** AI 그림 이름 바꾸기 (처음 이름은 쓴 설명의 앞부분이라 알아보기 어려워서). 이름은 1~40자 (DB 제약과 같다) */
+const MAX_ARTWORK_TITLE = 40;
+aiRoutes.patch("/artworks/:drawingId", requireUser, async (req, res) => {
+  const drawingId = Number(req.params.drawingId);
+  const aiArtworkId = drawingId - AI_ARTWORK_BASE;
+  if (!Number.isSafeInteger(drawingId) || aiArtworkId <= 0) throw new BadRequest("그림 번호가 올바르지 않아요.");
+  const title = readText(req.body?.title, MAX_ARTWORK_TITLE, "이름을 적어 주세요.").replace(/\s+/g, " ");
+  const { rows } = await pool.query("UPDATE user_ai_artworks SET title = $3 WHERE ai_artwork_id = $1 AND user_id = $2 RETURNING title", [
+    aiArtworkId,
+    req.userId,
+    title,
+  ]);
+  if (!rows.length) return res.status(404).json({ error: "이미 지워진 그림이에요." });
+  res.json({ title: rows[0].title });
+});
+
+aiRoutes.delete("/artworks/:drawingId", requireUser, async (req, res) => {
+  const drawingId = Number(req.params.drawingId);
+  const aiArtworkId = drawingId - AI_ARTWORK_BASE;
+  if (!Number.isSafeInteger(drawingId) || aiArtworkId <= 0) throw new BadRequest("지울 그림 번호가 올바르지 않아요.");
+
+  const client = await pool.connect();
+  let imageKey;
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT 1 FROM users WHERE user_id = $1 FOR UPDATE", [req.userId]);
+    const room = await client.query("SELECT layout FROM user_myrooms WHERE user_id = $1", [req.userId]);
+    const hung = (room.rows[0]?.layout?.objects ?? []).some((o) => o?.artworkDrawingId === drawingId);
+    if (hung) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "저장된 방의 액자에 걸려 있어요. 액자의 그림을 바꾸고 저장한 뒤 지워 주세요." });
+    }
+    const { rows } = await client.query("DELETE FROM user_ai_artworks WHERE ai_artwork_id = $1 AND user_id = $2 RETURNING image_key", [
+      aiArtworkId,
+      req.userId,
+    ]);
+    await client.query("COMMIT");
+    if (!rows.length) return res.status(404).json({ error: "이미 지워진 그림이에요." });
+    imageKey = rows[0].image_key;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+  // 파일은 DB 에서 지운 뒤에 지운다 (파일을 못 지워도 목록에서는 사라진다)
+  if (imageKey) await removeFile(imageKey).catch((err) => console.error("[ai] AI 그림 파일 삭제 실패:", err.message));
+  res.json({ ok: true });
+});
 
 aiRoutes.post("/image/:imageId/myroom", requireUser, async (req, res) => {
   const id = String(req.params.imageId ?? "");

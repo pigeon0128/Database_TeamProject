@@ -61,6 +61,13 @@ export function AiAdviceButton({
     api.aiAdviceInfo().then(setWallet, () => {});
   }, []);
   useEffect(loadWallet, [loadWallet]);
+  // 조언 말풍선이 떠 있는 동안 코덱스 도움말을 잠근다 (두 말풍선이 같은 자리에 겹친다)
+  const lockCoach = slot?.lockCoach;
+  const open = view !== null;
+  useEffect(() => {
+    lockCoach?.(open);
+    return () => lockCoach?.(false);
+  }, [lockCoach, open]);
 
   const loading = view?.kind === "loading";
   const short = wallet !== null && wallet.cells < wallet.cost;

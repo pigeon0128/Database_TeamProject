@@ -101,7 +101,7 @@ function BrushArt({ slug, color }: { slug: string; color: string }) {
   return <canvas ref={ref} width={BRUSH_W * 2} height={BRUSH_H * 2} style={{ width: BRUSH_W, height: BRUSH_H }} aria-hidden="true" />;
 }
 
-function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+export function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
     <section className="mt-5 first:mt-0">
       <h3 className="mb-2 text-sm font-extrabold">
@@ -114,7 +114,7 @@ function Section({ title, sub, children }: { title: string; sub?: string; childr
 }
 
 /** 동그란 색 버튼. 고른 색은 진한 테두리 */
-function Swatch({ color, name, selected, onPick }: { color: string; name: string; selected: boolean; onPick: (c: string) => void }) {
+export function Swatch({ color, name, selected, onPick }: { color: string; name: string; selected: boolean; onPick: (c: string) => void }) {
   return (
     <button
       type="button"

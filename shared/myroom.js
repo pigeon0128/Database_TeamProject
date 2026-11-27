@@ -1,4 +1,8 @@
 // Rendering and API share the same geometry/validation contract. No arbitrary models or URLs in saved layouts.
+// AI 그림 연습실에서 마이룸에 추가한 그림(DB user_ai_artworks)의 작품 번호 = AI_ARTWORK_BASE + ai_artwork_id.
+// 마이룸은 액자 그림을 번호(artworkDrawingId) 하나로 가리키므로, 장면 번호(drawings.drawing_id)와 겹치지 않게 큰 수부터 쓴다.
+export const AI_ARTWORK_BASE = 1000000000
+
 export const ROOM = Object.freeze({ halfWidth: 12, halfDepth: 12, height: 5 })
 export const MAX_OBJECTS = 40
 export const CATALOG = Object.freeze({

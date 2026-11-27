@@ -9,7 +9,7 @@ import { HistoryButtons, LineMenu, ShortcutList } from "../../components/drawing
 import { ResumeDialog } from "../../components/drawing/ResumeDialog";
 import { useDrawingTools } from "../../components/drawing/useDrawingTools";
 import PageLayout from "../../components/PageLayout";
-import { MenuItem, ToolbarButton, ToolbarDivider, ToolbarMenu } from "../../components/toolbar";
+import { HoldToConfirmButton, MenuItem, ToolbarButton, ToolbarDivider, ToolbarMenu } from "../../components/toolbar";
 import TracingCanvas, { type TracingCanvasHandle } from "../../components/TracingCanvas";
 import { findScene, type Scene } from "../../data/scenes";
 import { downloadImage } from "../../lib/download";
@@ -182,9 +182,9 @@ function SceneDrawing({ scene, back = BACK_TO_LIST, aside, onRetry }: SceneProps
                 </>
               )}
             </ToolbarMenu>
-            <ToolbarButton title="전체 지우기" onClick={tools.clearAll} disabled={!tools.hasDrawing}>
+            <HoldToConfirmButton title="전체 지우기" hintText="꾹 누르고 있으면 다 지워져요" onConfirm={tools.clearAll} disabled={!tools.hasDrawing}>
               🗑️ <span className="hidden md:inline">전체 지우기</span>
-            </ToolbarButton>
+            </HoldToConfirmButton>
             <ToolbarMenu title="그림 저장" label="💾 저장" alignRight primary>
               {(close) => (
                 <>

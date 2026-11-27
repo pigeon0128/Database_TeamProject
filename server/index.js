@@ -9,7 +9,9 @@
 //   routes/drafts.js    /api/drafts/*    그리던 그림 (이어서 그리기)
 //   routes/collection.js /api/collection 생물 도감과 내 수집 현황
 //   routes/summary.js   /api/summary     메인 화면의 내 그림 요약 (완성 작품·최고 점수·수집 도감·셀)
+//   routes/ai.js        /api/ai/sketch   글로 AI 밑그림 만들기 (OpenAI 이미지 생성, .env 의 OPENAI_API_KEY)
 import express from "express";
+import { aiRoutes } from "./routes/ai.js";
 import { pool } from "./db.js";
 import { UPLOAD_DIR } from "./storage.js";
 import { errorHandler, notFound } from "./errors.js";
@@ -30,7 +32,8 @@ const smallJson = express.json({ limit: "100kb" });
 const largeJson = express.json({ limit: "5mb" });
 // 색칠 오브젝트(수납하기)는 부위별 색 샘플이 들어가 가장 크다.
 const hugeJson = express.json({ limit: "8mb" });
-const carriesImage = (path) => path.startsWith("/api/drafts/") || path === "/api/play-records";
+// /api/ai/advice: AI 조언에 보내는 그림 (화면이 512px 로 줄여 보낸다)
+const carriesImage = (path) => path.startsWith("/api/drafts/") || path === "/api/play-records" || path === "/api/ai/advice";
 app.use((req, res, next) =>
   (req.path === "/api/myroom/storage" ? hugeJson : carriesImage(req.path) ? largeJson : smallJson)(req, res, next),
 );
@@ -53,6 +56,7 @@ app.use("/api/drafts", draftRoutes);
 app.use("/api/collection", collectionRoutes);
 app.use("/api/myroom", myroomRoutes);
 app.use("/api/summary", summaryRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.use("/api", notFound);
 app.use(errorHandler);

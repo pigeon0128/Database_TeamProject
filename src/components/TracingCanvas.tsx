@@ -7,7 +7,9 @@
 //   층 순서: 밑그림 → 색칠 → 밑그림 선 → 펜 선
 // - 지우개는 펜 선은 구역과 상관없이 지우고, 색은 칠하기처럼 처음 댄 구역 안에서만 지운다.
 // - 채우기(paintBrush.fill): 누른 자리의 구역 전체를 한 번에 칠한다. 스포이드(picking): 누른 자리에 칠해진 색을 onPick 으로 알려 준다.
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { CanvasControlsSlot } from "./drawing/canvasSlots";
 import { useBrushTextures } from "../lib/drawing/brushPatterns";
 import { applyClipped, drawMarks, eraseMarks, makeCanvas, regionOf, renderPaint } from "../lib/drawing/paint";
 import type { Region, Regions } from "../lib/drawing/regions";
@@ -81,6 +83,11 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   ref,
 ) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  /** 확대·축소 버튼을 놓을 자리 (DrawingShell 이 그림판 오른쪽 위 바깥에 만든다) */
+  const controls = useContext(CanvasControlsSlot);
+  const controlsSlot = controls?.slot ?? null;
+  /** 빈자리가 좁으면 세로로 좁게 ("+ / 100% / −") */
+  const vertical = !!controlsSlot && controls?.layout !== "wide";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const guideRef = useRef<HTMLImageElement>(null);
   /** 색칠 층 (보이는 캔버스)과 밑그림 선 층 */
@@ -473,6 +480,20 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
   };
 
   const zoomButton = "flex h-8 w-8 items-center justify-center rounded-full text-lg font-black text-ink hover:bg-sky-haze disabled:opacity-30";
+  // 확대·축소 버튼: 그리기 화면 틀이 만든 자리(그림판 오른쪽 위 바깥)가 있으면 거기에, 없으면 그림판 안 오른쪽 아래에
+  const zoomControls = (
+    <div className={`flex items-center gap-0.5 whitespace-nowrap rounded-full bg-white/90 p-1 shadow-card backdrop-blur ${vertical ? "flex-col-reverse" : ""} ${controlsSlot ? "" : "absolute bottom-3 right-3"}`}>
+      <button type="button" title="축소 (Ctrl -)" aria-label="축소" onClick={() => zoomAt(1 / ZOOM_STEP)} disabled={view.z <= MIN_ZOOM} className={zoomButton}>
+        −
+      </button>
+      <button type="button" title="원래 크기 (Ctrl 0)" onClick={resetZoom} className={`rounded-full py-1 font-black tabular-nums text-ink hover:bg-sky-haze ${vertical ? "w-8 text-[10px]" : "min-w-14 px-2 text-xs"}`}>
+        {Math.round(view.z * 100)}%
+      </button>
+      <button type="button" title="확대 (Ctrl +)" aria-label="확대" onClick={() => zoomAt(ZOOM_STEP)} disabled={view.z >= MAX_ZOOM} className={zoomButton}>
+        +
+      </button>
+    </div>
+  );
 
   return (
     <div ref={viewportRef} className="relative w-full overflow-hidden rounded-3xl bg-white shadow-card" style={{ aspectRatio: `${width} / ${height}` }}>
@@ -510,23 +531,21 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
           onPointerCancel={handleUp}
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 h-full w-full touch-none"
-          style={{ cursor: panning ? "grabbing" : idle ? "not-allowed" : picking || paintBrush?.fill ? "pointer" : "crosshair" }}
+          style={{ cursor: panning ? "grabbing" : idle ? "not-allowed" : picking || paintBrush?.fill ? "pointer" : CROSSHAIR_CURSOR }}
         />
       </div>
 
-      <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-full bg-white/90 p-1 shadow-card backdrop-blur">
-        <button type="button" title="축소 (Ctrl -)" aria-label="축소" onClick={() => zoomAt(1 / ZOOM_STEP)} disabled={view.z <= MIN_ZOOM} className={zoomButton}>
-          −
-        </button>
-        <button type="button" title="원래 크기 (Ctrl 0)" onClick={resetZoom} className="min-w-14 rounded-full px-2 py-1 text-xs font-black tabular-nums text-ink hover:bg-sky-haze">
-          {Math.round(view.z * 100)}%
-        </button>
-        <button type="button" title="확대 (Ctrl +)" aria-label="확대" onClick={() => zoomAt(ZOOM_STEP)} disabled={view.z >= MAX_ZOOM} className={zoomButton}>
-          +
-        </button>
-      </div>
+      {controlsSlot ? createPortal(zoomControls, controlsSlot) : zoomControls}
     </div>
   );
 });
+
+/**
+ * 그리기 커서: 검은 십자에 흰 테두리. 운영체제 기본 십자(crosshair)는 흰 도화지 위에서 하얗게 보여 위치를 알기 어렵다.
+ * 흰 바탕에서는 검은 십자로, 어두운 색 위에서는 흰 테두리로 보인다. 가운데 점이 그려지는 자리다.
+ */
+const CROSSHAIR_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g stroke-linecap="round"><path d="M12 2v7M12 15v7M2 12h7M15 12h7" stroke="#fff" stroke-width="4"/><path d="M12 2v7M12 15v7M2 12h7M15 12h7" stroke="#111" stroke-width="2"/></g><circle cx="12" cy="12" r="2" fill="#111" stroke="#fff" stroke-width="1.5"/></svg>',
+)}") 12 12, crosshair`;
 
 export default TracingCanvas;

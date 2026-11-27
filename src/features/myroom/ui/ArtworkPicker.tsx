@@ -57,7 +57,7 @@ export default function ArtworkPicker({
               <strong>{a.name}</strong>
               {!preview && (
                 <small>
-                  {a.kind === "story" ? "스토리 완성작" : "도감 완성작"}
+                  {a.kind === "story" ? "스토리 완성작" : a.kind === "ai" ? "AI 그림" : "도감 완성작"}
                 </small>
               )}
               <small>

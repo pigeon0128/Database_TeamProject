@@ -1,7 +1,7 @@
 // 완성 그림 파일 저장소 (서버 폴더). DB에는 이 폴더 안의 경로(user_artworks.image_key)만 저장한다
 // (database/migrations/001_initial.sql 의 원래 설계). 폴더는 .env 의 UPLOAD_DIR, 없으면 프로젝트의 uploads/.
 // 서버(routes/records.js)와 pnpm db:migrate(예전에 DB에 넣었던 그림을 파일로 옮길 때)가 같이 쓴다.
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +12,32 @@ export const UPLOAD_DIR = resolve(process.env.UPLOAD_DIR || join(projectRoot, "u
 
 /** 기록 하나의 완성 그림 경로: artworks/<사용자 번호>/<기록 번호>.png (기록마다 하나라 겹치지 않는다) */
 export const artworkKey = (userId, recordId) => `artworks/${userId}/${recordId}.png`;
+
+/** 마이룸에 추가한 AI 그림 경로: ai-artworks/<사용자 번호>/<AI 그림 번호>.png */
+export const aiArtworkKey = (userId, aiArtworkId) => `ai-artworks/${userId}/${aiArtworkId}.png`;
+
+/** AI 그림 연습실에서 방금 만든 그림을 "마이룸에 추가"할 때까지 잠시 두는 폴더: ai-temp/<사용자 번호>/ */
+export const aiTempDir = (userId) => `ai-temp/${userId}`;
+
+/** 저장소의 파일 내용 (없으면 null) */
+export async function loadFile(key) {
+  try {
+    return await readFile(fileFor(key));
+  } catch {
+    return null;
+  }
+}
+
+/** 저장소 폴더 안의 파일 이름과 바뀐 시각 (폴더가 없으면 빈 목록) */
+export async function listFiles(dirKey) {
+  try {
+    const dir = fileFor(dirKey);
+    const names = await readdir(dir);
+    return await Promise.all(names.map(async (name) => ({ name, mtime: (await stat(join(dir, name))).mtimeMs })));
+  } catch {
+    return [];
+  }
+}
 
 /** 경로를 폴더 안의 실제 파일 위치로. 폴더 밖을 가리키는 경로(../ 등)는 거부한다 */
 function fileFor(key) {

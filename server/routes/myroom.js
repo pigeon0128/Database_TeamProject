@@ -2,7 +2,7 @@ import { Router } from "express"
 import { requireUser } from "../auth.js"
 import { pool } from "../db.js"
 import { BadRequest } from "../errors.js"
-import { validateLayout } from "../../shared/myroom.js"
+import { AI_ARTWORK_BASE, validateLayout } from "../../shared/myroom.js"
 import { artworkFileExists } from "../storage.js"
 import {
   validateColoredSpec,
@@ -36,13 +36,43 @@ async function roomArtworks(client, userId, ids = null) {
   const available = await Promise.all(
     rows.map((r) => artworkFileExists(r.image_key)),
   )
-  return rows
+  const drawings = rows
     .filter((_, i) => available[i])
     .map((r) => ({
       drawingId: Number(r.drawing_id),
       name: r.title,
       kind: r.kind,
       slug: r.slug,
+      imageKey: r.image_key,
+    }))
+  return [...drawings, ...(await roomAiArtworks(client, userId, ids))]
+}
+
+// AI 그림 연습실에서 "마이룸에 추가"한 그림 (DB user_ai_artworks, migrations/026).
+// 작품 번호는 AI_ARTWORK_BASE + ai_artwork_id 라 장면 번호와 겹치지 않는다. 표가 아직 없으면(마이그레이션 전) 빈 목록.
+async function roomAiArtworks(client, userId, ids) {
+  const aiIds = ids?.filter((id) => id > AI_ARTWORK_BASE).map((id) => id - AI_ARTWORK_BASE) ?? null
+  if (aiIds && !aiIds.length) return []
+  let rows
+  try {
+    ;({ rows } = await client.query(
+      `SELECT ai_artwork_id, title, image_key FROM user_ai_artworks
+        WHERE user_id = $1 AND ($2::bigint[] IS NULL OR ai_artwork_id = ANY($2::bigint[]))
+        ORDER BY ai_artwork_id`,
+      [userId, aiIds],
+    ))
+  } catch (err) {
+    if (err.code === "42P01") return []
+    throw err
+  }
+  const available = await Promise.all(rows.map((r) => artworkFileExists(r.image_key)))
+  return rows
+    .filter((_, i) => available[i])
+    .map((r) => ({
+      drawingId: AI_ARTWORK_BASE + Number(r.ai_artwork_id),
+      name: r.title,
+      kind: "ai",
+      slug: null,
       imageKey: r.image_key,
     }))
 }

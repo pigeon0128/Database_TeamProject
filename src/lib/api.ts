@@ -3,6 +3,10 @@ import type { PaintStroke, Stroke } from "./drawing/strokes";
 
 export type User = { id: number; loginId: string };
 
+/** AI 그림 연습실에 쓰는 칸 (서버 server/routes/ai.js 의 POST /api/ai/image) */
+export type AiCharacterParts = { head: string; face: string; upper: string; lower: string };
+export type AiImageInput = { background: string; character: AiCharacterParts | null; avoid: string };
+
 export type Drawing = {
   id: number;
   title: string;
@@ -116,9 +120,12 @@ export const artworkUrl = (imageKey: string) => `/uploads/${imageKey}`;
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** 서버가 붙인 오류 종류 (예: "blocked" = 내용 검사에 걸림) */
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -141,7 +148,7 @@ async function request<T>(method: string, path: string, body?: unknown, { keepal
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     // API 서버가 꺼져 있으면 Vite 프록시가 JSON 이 아닌 오류를 돌려준다.
-    throw new ApiError(data?.error ?? SERVER_DOWN, res.status);
+    throw new ApiError(data?.error ?? SERVER_DOWN, res.status, data?.code);
   }
   return data as T;
 }
@@ -179,4 +186,21 @@ export const api = {
   collection: () => request<{ creatures: CreatureEntry[] }>("GET", "/collection"),
   summary: () => request<UserSummary>("GET", "/summary"),
   deleteDraft: (key: string) => request<{ ok: true }>("DELETE", `/drafts/${encodeURIComponent(key)}`),
+  /** 글로 AI 밑그림(선화) 만들기. image 는 PNG data URL, cells 는 셀을 내고 남은 셀 */
+  aiSketch: (prompt: string) => request<{ image: string; cells: number; cost: number }>("POST", "/ai/sketch", { prompt }),
+  /** AI 밑그림 한 장의 가격(셀)과 내 셀 */
+  aiSketchInfo: () => request<{ cost: number; cells: number }>("GET", "/ai/sketch"),
+  /** AI 그림 연습실: 칸마다 쓴 설명으로 그림 만들기 (character 가 null 이면 캐릭터 없이, avoid 는 문장으로 붙는다) */
+  aiImage: (input: AiImageInput) => request<{ image: string; imageId: string; cells: number; cost: number }>("POST", "/ai/image", input),
+  /** 연습실에서 만든 그림을 마이룸 작품으로 추가 (imageId: 만들 때 받은 번호, 서버가 2시간 보관) */
+  aiImageToMyRoom: (imageId: string) =>
+    request<{ artwork: { drawingId: number; name: string; imageKey: string } }>("POST", `/ai/image/${encodeURIComponent(imageId)}/myroom`),
+  /** AI 그림 연습실 한 장의 가격(셀)과 내 셀 */
+  aiImageInfo: () => request<{ cost: number; cells: number }>("GET", "/ai/image"),
+  /** AI 조언: 아이가 그린 그림(작게 줄인 data URL)을 보고 잘한 점·해 볼 것·색 팁. 부적절한 그림이면 code "blocked" 오류 */
+  aiAdvice: (image: string, title: string) => request<{ advice: AiAdvice; cells: number; cost: number }>("POST", "/ai/advice", { image, title }),
+  /** AI 조언 한 번의 가격(셀)과 내 셀 */
+  aiAdviceInfo: () => request<{ cost: number; cells: number }>("GET", "/ai/advice"),
 };
+
+export type AiAdvice = { praise: string; tip: string; color: string };

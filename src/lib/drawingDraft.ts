@@ -171,5 +171,5 @@ export function useDrawingDraft(
     api.deleteDraft(key).catch(() => {});
   }, [key]);
 
-  return { pending, resume, startNew, finish };
+  return { pending, loaded, resume, startNew, finish };
 }

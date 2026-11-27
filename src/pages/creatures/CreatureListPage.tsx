@@ -115,6 +115,23 @@ export default function CreatureListPage() {
           })}
         </div>
       )}
+
+      {/* 목록 맨 아래: 도감에 없는 그림은 직접 만든다 */}
+      {/* 캐릭터 그리기의 "AI 밑그림"으로 간다 (?ai=1 이면 입력 칸이 바로 열린다) */}
+      <button
+        type="button"
+        onClick={() => navigate("/character?ai=1")}
+        className="mt-8 flex w-full items-center justify-between gap-3 rounded-3xl border-2 border-dashed border-sky-deep/40 bg-white/80 px-5 py-4 text-left shadow-card transition hover:-translate-y-0.5 hover:border-sky-deep hover:bg-white focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-deep"
+      >
+        <span className="flex items-center gap-3">
+          <span className="text-3xl" aria-hidden="true">🪄</span>
+          <span>
+            <strong className="block text-base font-black">원하는 그림이 없나요? 직접 만들어보세요!</strong>
+            <span className="text-sm font-medium text-ink-muted">그리고 싶은 것을 글로 적으면 AI가 따라 그릴 밑그림을 만들어 줘요.</span>
+          </span>
+        </span>
+        <span className="shrink-0 rounded-full bg-sky-deep px-4 py-2 text-sm font-extrabold text-white">만들러 가기 →</span>
+      </button>
     </PageLayout>
   );
 }

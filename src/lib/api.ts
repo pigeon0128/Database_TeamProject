@@ -5,7 +5,13 @@ export type User = { id: number; loginId: string };
 
 /** AI 그림 연습실에 쓰는 칸 (서버 server/routes/ai.js 의 POST /api/ai/image) */
 export type AiCharacterParts = { head: string; face: string; upper: string; lower: string };
-export type AiImageInput = { background: string; character: AiCharacterParts | null; avoid: string };
+/** 성별: 상관없음 / 여자 / 남자 */
+export type AiGender = "any" | "female" | "male";
+/** 캐릭터 칸: 부위별 설명 + 성별·인원(1~3)·자세 */
+export type AiCharacter = AiCharacterParts & { gender: AiGender; count: number; pose: string };
+/** style: 화풍 이름 ("" = 기본 그림책, 서버 ART_STYLES) */
+/** prompt: "프롬프트 직접 쓰기"로 쓴 글 (있으면 서버가 다른 칸은 쓰지 않는다) */
+export type AiImageInput = { background: string; style: string; character: AiCharacter | null; avoid: string; prompt?: string };
 
 export type Drawing = {
   id: number;
@@ -195,6 +201,8 @@ export const api = {
   /** 연습실에서 만든 그림을 마이룸 작품으로 추가 (imageId: 만들 때 받은 번호, 서버가 2시간 보관) */
   aiImageToMyRoom: (imageId: string) =>
     request<{ artwork: { drawingId: number; name: string; imageKey: string } }>("POST", `/ai/image/${encodeURIComponent(imageId)}/myroom`),
+  /** 마이룸에 넣은 AI 그림 목록 (최신이 앞) */
+  aiArtworks: () => request<{ artworks: { drawingId: number; title: string; imageKey: string; createdAt: string }[] }>("GET", "/ai/artworks"),
   /** AI 그림 연습실 한 장의 가격(셀)과 내 셀 */
   aiImageInfo: () => request<{ cost: number; cells: number }>("GET", "/ai/image"),
   /** AI 조언: 아이가 그린 그림(작게 줄인 data URL)을 보고 잘한 점·해 볼 것·색 팁. 부적절한 그림이면 code "blocked" 오류 */

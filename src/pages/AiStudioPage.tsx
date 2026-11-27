@@ -9,14 +9,26 @@ import { useCallback, useEffect, useState } from "react";
 import CellIcon from "../components/CellIcon";
 import DorobusBackdrop from "../components/DorobusBackdrop";
 import HomeLogo from "../components/HomeLogo";
-import { api, type AiCharacterParts, type AiImageInput } from "../lib/api";
+import { api, artworkUrl, type AiCharacterParts, type AiGender, type AiImageInput } from "../lib/api";
 import { downloadImage } from "../lib/download";
-import { navigate } from "../router";
 
 const MAX_FIELD = 150;
 const MAX_AVOID = 120;
+/** 프롬프트 직접 쓰기 글자 수 (서버 MAX_FREE_PROMPT 와 같다) */
+const MAX_FREE_PROMPT = 1000;
+/** 쓰는 방식: 칸별로 나눠 쓰기 / 프롬프트 한 덩어리로 직접 쓰기(복사·붙여넣기) */
+type WriteMode = "fields" | "free";
+const MODES: { value: WriteMode; label: string }[] = [
+  { value: "fields", label: "칸별로 쓰기" },
+  { value: "free", label: "프롬프트 직접 쓰기" },
+];
 /** 그림 오른쪽 기록 막대에 남기는 그림 수 */
-const HISTORY = 5;
+const HISTORY = 6;
+/**
+ * 기록 칸 한 개의 크기: 막대 안쪽 폭과 (막대 안쪽 높이 - "기록 n/6" 줄 16 - 칸 사이 간격 8씩) / 칸 수 중 작은 쪽.
+ * 막대가 크기 기준(container)이라 cqw·cqh 는 막대 안쪽(여백 뺀) 폭·높이다.
+ */
+const SLOT_SIZE = `min(100cqw, (100cqh - ${16 + HISTORY * 8}px) / ${HISTORY})`;
 
 /** 캐릭터 칸: 위에서 아래로 (서버 CHARACTER_PARTS 와 같은 순서) */
 const PARTS: { key: keyof AiCharacterParts; label: string; icon: string; placeholder: string }[] = [
@@ -28,11 +40,34 @@ const PARTS: { key: keyof AiCharacterParts; label: string; icon: string; placeho
 
 const EMPTY_PARTS: AiCharacterParts = { head: "", face: "", upper: "", lower: "" };
 
+/** 화풍 (서버 ART_STYLES 의 이름과 같다. "" = 기본) */
+const STYLES: { value: string; label: string }[] = [
+  { value: "", label: "그림책 (기본)" },
+  { value: "watercolor", label: "수채화" },
+  { value: "crayon", label: "크레파스" },
+  { value: "pencil", label: "색연필" },
+  { value: "cartoon", label: "만화" },
+  { value: "clay", label: "점토 인형" },
+  { value: "pixel", label: "픽셀 아트" },
+  { value: "anime", label: "애니메이션" },
+  { value: "realistic", label: "실사" },
+];
+const GENDERS: { value: AiGender; label: string }[] = [
+  { value: "any", label: "상관없음" },
+  { value: "female", label: "여자" },
+  { value: "male", label: "남자" },
+];
+const COUNTS = [1, 2, 3];
+const styleLabel = (value: string) => STYLES.find((s) => s.value === value)?.label ?? STYLES[0].label;
+const genderLabel = (value: AiGender) => GENDERS.find((g) => g.value === value)?.label ?? "상관없음";
+
 /** 이번에 만든 그림. imageId: 마이룸에 추가할 때 쓰는 서버 보관 번호, inRoom: 마이룸에 추가했는지 */
 type Made = { id: number; image: string; imageId: string; input: AiImageInput; inRoom: boolean };
 
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-sky-deep focus:ring-2 focus:ring-sky-deep/20";
+/** 캐릭터 칸·화풍처럼 줄이 많은 곳은 조금 낮게 (한 화면에 들어오게) */
+const rowInputClass = inputClass.replace("py-2", "py-1.5");
 
 /** 켜기·끄기 스위치 */
 function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
@@ -50,18 +85,44 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
+/** 여러 개 중 하나 고르기 (성별·인원). 붙어 있는 작은 버튼 묶음 */
+function Segmented<T extends string | number>({ value, options, onChange, label }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex shrink-0 rounded-xl border border-slate-200 bg-white p-0.5">
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          type="button"
+          role="radio"
+          aria-checked={o.value === value}
+          onClick={() => onChange(o.value)}
+          className={`whitespace-nowrap rounded-lg px-2 py-1 text-xs font-bold transition ${o.value === value ? "bg-sky-deep text-white" : "text-ink-muted hover:bg-sky-soft"}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** 만든 그림에 쓴 설명을 칸 이름과 함께 한 줄씩 (짧게) */
 function InputSummary({ input }: { input: AiImageInput }) {
   const rows: [string, string][] = [];
+  if (input.prompt) return <p className="line-clamp-4 text-xs font-bold leading-snug" title={input.prompt}>📝 {input.prompt}</p>;
+  rows.push(["🖌️", styleLabel(input.style)]);
   if (input.background) rows.push(["🏞️", input.background]);
   if (input.character) {
-    for (const p of PARTS) if (input.character[p.key]) rows.push([p.icon, input.character[p.key]]);
+    const c = input.character;
+    rows.push(["🧑", `${c.count}명 · ${genderLabel(c.gender)}`]);
+    for (const p of PARTS) if (c[p.key]) rows.push([p.icon, c[p.key]]);
+    if (c.pose) rows.push(["🤸", c.pose]);
   } else rows.push(["🧑", "캐릭터 없음"]);
   if (input.avoid) rows.push(["🚫", input.avoid]);
   return (
-    <ul className="min-w-0 space-y-0.5">
+    // 두 줄로 나눠 칸이 많아도(화풍·인원·자세…) 아래 상자 안에 다 보이게
+    <ul className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-0.5">
       {rows.map(([icon, text]) => (
-        <li key={icon + text} className="flex gap-1.5 text-xs font-bold leading-snug" title={text}>
+        <li key={icon + text} className="flex min-w-0 gap-1.5 text-xs font-bold leading-snug" title={text}>
           <span aria-hidden="true">{icon}</span>
           <span className="truncate">{text}</span>
         </li>
@@ -74,6 +135,12 @@ export default function AiStudioPage() {
   const [background, setBackground] = useState("");
   const [characterOn, setCharacterOn] = useState(true);
   const [parts, setParts] = useState<AiCharacterParts>(EMPTY_PARTS);
+  const [style, setStyle] = useState("");
+  const [gender, setGender] = useState<AiGender>("any");
+  const [count, setCount] = useState(1);
+  const [pose, setPose] = useState("");
+  const [mode, setMode] = useState<WriteMode>("fields");
+  const [prompt, setPrompt] = useState("");
   const [avoid, setAvoid] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -83,6 +150,8 @@ export default function AiStudioPage() {
   const shown = made.find((m) => m.id === shownId) ?? made[0] ?? null;
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  /** 마이룸 수납함 창 (화면을 바꾸지 않아 이번에 만든 그림 기록이 그대로 남는다) */
+  const [shelfOpen, setShelfOpen] = useState(false);
 
   /** 한 장의 가격과 내 셀 (GET /api/ai/image) */
   const [wallet, setWallet] = useState<{ cost: number; cells: number } | null>(null);
@@ -92,16 +161,22 @@ export default function AiStudioPage() {
   useEffect(loadWallet, [loadWallet]);
   const short = wallet !== null && wallet.cells < wallet.cost;
 
-  const hasCharacter = characterOn && PARTS.some((p) => parts[p.key].trim());
+  const hasCharacter = characterOn && (PARTS.some((p) => parts[p.key].trim()) || !!pose.trim());
   /** 만들 수 있는지: 배경을 적었거나, 캐릭터를 켜고 한 칸 이상 적었으면 */
-  const ready = !!background.trim() || hasCharacter;
-  const missing = !ready ? (characterOn ? "배경이나 캐릭터 칸을 하나 이상 적어 주세요." : "배경 설명을 적어 주세요.") : "";
+  const free = mode === "free";
+  const ready = free ? !!prompt.trim() : !!background.trim() || hasCharacter;
+  const missing = ready ? "" : free ? "프롬프트를 적거나 붙여 넣어 주세요." : characterOn ? "배경이나 캐릭터 칸을 하나 이상 적어 주세요." : "배경 설명을 적어 주세요.";
 
   const generate = async () => {
     if (!ready || loading || short) return;
-    const input: AiImageInput = {
+    const input: AiImageInput = free
+      ? { background: "", style: "", character: null, avoid: "", prompt: prompt.trim() }
+      : {
       background: background.trim(),
-      character: characterOn ? { head: parts.head.trim(), face: parts.face.trim(), upper: parts.upper.trim(), lower: parts.lower.trim() } : null,
+      style,
+      character: characterOn
+        ? { head: parts.head.trim(), face: parts.face.trim(), upper: parts.upper.trim(), lower: parts.lower.trim(), gender, count, pose: pose.trim() }
+        : null,
       avoid: avoid.trim(),
     };
     // 캐릭터를 켰지만 한 칸도 안 적었으면 캐릭터 없이 보낸다 (배경만 있는 경우)
@@ -126,9 +201,20 @@ export default function AiStudioPage() {
 
   /** 만든 그림의 설명을 다시 칸에 넣는다 (조금 바꿔서 다시 만들어 비교) */
   const reuse = (m: Made) => {
+    if (m.input.prompt) {
+      setMode("free");
+      setPrompt(m.input.prompt);
+      return;
+    }
+    setMode("fields");
     setBackground(m.input.background);
     setCharacterOn(!!m.input.character);
-    setParts(m.input.character ?? EMPTY_PARTS);
+    setStyle(m.input.style);
+    const c = m.input.character;
+    setParts(c ? { head: c.head, face: c.face, upper: c.upper, lower: c.lower } : EMPTY_PARTS);
+    setGender(c?.gender ?? "any");
+    setCount(c?.count ?? 1);
+    setPose(c?.pose ?? "");
     setAvoid(m.input.avoid);
   };
 
@@ -140,7 +226,7 @@ export default function AiStudioPage() {
     try {
       await api.aiImageToMyRoom(m.imageId);
       setMade((list) => list.map((x) => (x.id === m.id ? { ...x, inRoom: true } : x)));
-      setNotice({ ok: true, text: "마이룸에 추가했어요. 마이룸에서 액자를 골라 걸 수 있어요." });
+      setNotice({ ok: true, text: "마이룸 수납함에 넣었어요. 마이룸에서 액자를 골라 걸 수 있어요." });
     } catch (err) {
       setNotice({ ok: false, text: err instanceof Error ? err.message : "마이룸에 추가하지 못했어요." });
     } finally {
@@ -168,18 +254,59 @@ export default function AiStudioPage() {
         <span className="h-7 w-px bg-slate-200" />
         <h1 className="text-lg font-black tracking-[-0.03em]">🪄 AI 그림 연습실</h1>
         <p className="hidden text-sm font-semibold text-ink-muted md:block">칸마다 직접 설명해 보세요. 자세히 적을수록 원하는 그림에 가까워져요.</p>
-        {wallet && <span className="ml-auto rounded-full bg-sky-soft px-3 py-1 text-sm font-black"><CellIcon /> 내 셀 {wallet.cells.toLocaleString()}</span>}
+        <button
+          type="button"
+          onClick={() => setShelfOpen(true)}
+          className="ml-auto rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-black text-ink transition hover:border-sky-deep hover:text-sky-deep"
+        >
+          🏠 마이룸 수납함
+        </button>
+        {wallet && <span className="rounded-full bg-sky-soft px-3 py-1 text-sm font-black"><CellIcon /> 내 셀 {wallet.cells.toLocaleString()}</span>}
       </header>
 
-      <div className="relative z-10 grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
+      <div className="relative z-10 grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(390px,440px)_minmax(0,1fr)]">
         {/* 왼쪽: 설명 쓰기 */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void generate();
           }}
-          className={`flex min-h-0 flex-col gap-5 overflow-y-auto p-5 ${card}`}
+          className={`flex min-h-0 flex-col gap-3 overflow-y-auto px-5 py-4 ${card}`}
         >
+          {/* 쓰는 방식 전환: 칸별로 나눠 연습하기 / 프롬프트 한 덩어리로 직접 쓰기 (다른 곳에서 복사해 붙여 넣기) */}
+          <div role="radiogroup" aria-label="쓰는 방식" className="grid shrink-0 grid-cols-2 rounded-xl bg-slate-100 p-1">
+            {MODES.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                role="radio"
+                aria-checked={mode === m.value}
+                onClick={() => setMode(m.value)}
+                className={`rounded-lg py-1.5 text-xs font-black transition ${mode === m.value ? "bg-white text-sky-deep shadow-sm" : "text-ink-muted hover:text-ink"}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {free ? (
+            <label className="flex min-h-0 flex-1 flex-col">
+              <span className="flex items-baseline justify-between gap-2">
+                {label("프롬프트")}
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {prompt.length}/{MAX_FREE_PROMPT}
+                </span>
+              </span>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                maxLength={MAX_FREE_PROMPT}
+                placeholder="원하는 그림을 자유롭게 적거나, 다른 곳에서 복사한 프롬프트를 붙여 넣어 보세요."
+                className={`${inputClass} mt-1.5 min-h-40 flex-1 resize-none leading-relaxed`}
+              />
+            </label>
+          ) : (
+            <>
           <label className="block">
             {label("배경")}
             <input
@@ -192,14 +319,36 @@ export default function AiStudioPage() {
             />
           </label>
 
-          {/* 캐릭터: 스위치 하나 + 켜면 부위별 칸이 한 줄씩 (이름 | 칸) */}
+          {/* 화풍: 정해진 것 중에서 고른다 (서버가 영어 설명으로 바꾼다) */}
+          <label className="flex items-center gap-2">
+            <span className="shrink-0">{label("화풍")}</span>
+            <select value={style} onChange={(e) => setStyle(e.target.value)} className={`${rowInputClass} cursor-pointer`}>
+              {STYLES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* 캐릭터: 스위치 하나 + 켜면 성별·인원, 부위별 칸, 자세가 한 줄씩 (이름 | 칸) */}
           <div>
             <div className="flex items-center justify-between">
               {label("캐릭터", characterOn ? undefined : "끄면 배경만 그려요")}
               <Switch on={characterOn} onChange={setCharacterOn} label="캐릭터 넣기" />
             </div>
             {characterOn && (
-              <div className="mt-1.5 space-y-1.5">
+              <div className="mt-1.5 space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-12 shrink-0 text-xs font-bold text-ink-muted">성별</span>
+                    <Segmented label="성별" value={gender} options={GENDERS} onChange={setGender} />
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <span className="shrink-0 text-xs font-bold text-ink-muted">인원</span>
+                    <Segmented label="인원" value={count} options={COUNTS.map((n) => ({ value: n, label: `${n}명` }))} onChange={setCount} />
+                  </div>
+                </div>
                 {PARTS.map((p) => (
                   <label key={p.key} className="flex items-center gap-2">
                     <span className="w-12 shrink-0 text-xs font-bold text-ink-muted">{p.label}</span>
@@ -209,10 +358,21 @@ export default function AiStudioPage() {
                       onChange={(e) => setParts((prev) => ({ ...prev, [p.key]: e.target.value }))}
                       maxLength={MAX_FIELD}
                       placeholder={p.placeholder}
-                      className={inputClass}
+                      className={rowInputClass}
                     />
                   </label>
                 ))}
+                <label className="flex items-center gap-2">
+                  <span className="w-12 shrink-0 text-xs font-bold text-ink-muted">자세</span>
+                  <input
+                    type="text"
+                    value={pose}
+                    onChange={(e) => setPose(e.target.value)}
+                    maxLength={MAX_FIELD}
+                    placeholder="손을 흔들며 뛰어오는"
+                    className={rowInputClass}
+                  />
+                </label>
               </div>
             )}
           </div>
@@ -228,6 +388,9 @@ export default function AiStudioPage() {
               className={`${inputClass} mt-1.5`}
             />
           </label>
+
+            </>
+          )}
 
           <div className="mt-auto pt-1">
             <button
@@ -284,17 +447,18 @@ export default function AiStudioPage() {
             <p className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold ${notice.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600"}`}>
               {notice.text}
               {notice.ok && (
-                <button type="button" onClick={() => navigate("/myroom")} className="ml-auto underline">
-                  마이룸 열기 →
+                <button type="button" onClick={() => setShelfOpen(true)} className="ml-auto underline">
+                  넣은 그림 보기
                 </button>
               )}
             </p>
           )}
           {error && <p className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600">{error}</p>}
 
-          {/* 남은 높이에 맞춘 정사각형 그림 + 오른쪽 기록 막대 */}
-          <div className="flex min-h-[18rem] flex-1 gap-3">
-            <div className="flex min-w-0 flex-1 items-center justify-center [container-type:size]">
+          {/* 왼쪽: 남은 높이에 맞춘 정사각형 그림 + 그 아래 쓴 설명 / 오른쪽: 기록 막대 (아래 끝까지) */}
+          <div className="flex min-h-0 flex-1 gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div className="flex min-h-0 flex-1 items-center justify-center [container-type:size]">
               <div className="relative flex items-center justify-center overflow-hidden rounded-2xl bg-sky-soft" style={{ width: "min(100cqw, 100cqh)", height: "min(100cqw, 100cqh)" }}>
                 {shown ? (
                   <img src={shown.image} alt="AI가 그린 그림" className="h-full w-full object-contain" />
@@ -310,8 +474,17 @@ export default function AiStudioPage() {
               </div>
             </div>
 
+            {/* 지금 보는 그림에 쓴 설명 */}
+            {shown && (
+              <div className="h-20 shrink-0 overflow-hidden rounded-2xl bg-slate-50 p-2">
+                <InputSummary input={shown.input} />
+              </div>
+            )}
+            </div>
+
             {/* 오른쪽 기록 막대: 이번에 만든 그림 최근 HISTORY 장 (최신이 위, 화면을 나가면 사라진다) */}
-            <div className="flex w-20 shrink-0 flex-col gap-2 rounded-2xl bg-slate-50 p-2" aria-label="이번에 만든 그림">
+            {/* 칸 크기는 막대 높이에 맞춰 줄어든다 (창이 낮거나 위에 안내 줄이 생겨도 아래 설명 칸으로 넘치지 않게) */}
+            <div className="flex min-h-0 w-20 shrink-0 flex-col items-center gap-2 overflow-hidden rounded-2xl bg-slate-50 p-2 [container-type:size]" aria-label="이번에 만든 그림">
               <span className="text-center text-[11px] font-bold text-ink-muted">기록 {made.length}/{HISTORY}</span>
               {Array.from({ length: HISTORY }, (_, i) => made[i] ?? null).map((m, i) =>
                 m ? (
@@ -320,26 +493,85 @@ export default function AiStudioPage() {
                     type="button"
                     onClick={() => setShownId(m.id)}
                     title="이 그림 보기"
-                    className={`relative aspect-square w-full shrink-0 overflow-hidden rounded-xl border-2 bg-white ${m.id === shown?.id ? "border-sky-deep" : "border-transparent hover:border-sky-haze"}`}
+                    style={{ width: SLOT_SIZE, height: SLOT_SIZE }}
+                    className={`relative shrink-0 overflow-hidden rounded-xl border-2 bg-white ${m.id === shown?.id ? "border-sky-deep" : "border-transparent hover:border-sky-haze"}`}
                   >
                     <img src={m.image} alt="" className="h-full w-full object-cover" />
                     {m.inRoom && <span className="absolute bottom-0 right-0 rounded-tl-lg bg-white/90 px-1 text-[10px]">🏠</span>}
                   </button>
                 ) : (
-                  <div key={`empty-${i}`} className="aspect-square w-full shrink-0 rounded-xl border-2 border-dashed border-slate-200" />
+                  <div key={`empty-${i}`} style={{ width: SLOT_SIZE, height: SLOT_SIZE }} className="shrink-0 rounded-xl border-2 border-dashed border-slate-200" />
                 ),
               )}
             </div>
           </div>
-
-          {/* 아래: 지금 보는 그림에 쓴 설명 */}
-          {shown && (
-            <div className="h-20 shrink-0 overflow-hidden rounded-2xl bg-slate-50 p-2">
-              <InputSummary input={shown.input} />
-            </div>
-          )}
         </section>
       </div>
+      {shelfOpen && <RoomShelf onClose={() => setShelfOpen(false)} />}
     </main>
+  );
+}
+
+/**
+ * 마이룸 수납함 창: 마이룸에 넣은 AI 그림을 화면을 바꾸지 않고 보여 준다 (마이룸으로 가면 이번에 만든 그림 기록이 사라지므로).
+ * 열 때마다 서버에서 다시 받는다. Esc 나 바깥을 누르면 닫힌다.
+ */
+function RoomShelf({ onClose }: { onClose: () => void }) {
+  const [list, setList] = useState<{ drawingId: number; title: string; imageKey: string; createdAt: string }[] | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api.aiArtworks().then(
+      (r) => setList(r.artworks),
+      (err) => setError(err instanceof Error ? err.message : "목록을 불러오지 못했어요."),
+    );
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const date = (iso: string) => new Date(iso).toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="마이룸 수납함"
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85dvh] w-[min(760px,100%)] flex-col gap-3 rounded-3xl border border-white/90 bg-white p-5 shadow-card"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black">🏠 마이룸 수납함{list ? ` · ${list.length}장` : ""}</h2>
+            <p className="text-xs font-semibold text-ink-muted">마이룸에 넣은 AI 그림이에요. 마이룸에서 액자를 골라 걸 수 있어요.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기" className="rounded-full px-2 text-2xl font-bold leading-none text-ink-muted hover:text-ink">
+            ×
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {error ? (
+            <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm font-bold text-rose-600">{error}</p>
+          ) : !list ? (
+            <p className="py-10 text-center text-sm font-bold text-ink-muted">불러오는 중…</p>
+          ) : !list.length ? (
+            <p className="py-10 text-center text-sm font-bold text-ink-muted">아직 넣은 그림이 없어요. 마음에 드는 그림에서 🏠 마이룸에 추가를 눌러 보세요.</p>
+          ) : (
+            <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {list.map((a) => (
+                <li key={a.drawingId} className="min-w-0">
+                  <img src={artworkUrl(a.imageKey)} alt={a.title} loading="lazy" className="aspect-square w-full rounded-2xl border border-slate-100 bg-sky-soft object-cover" />
+                  <p className="mt-1 truncate text-xs font-bold" title={a.title}>
+                    {a.title}
+                  </p>
+                  <p className="text-[11px] font-semibold text-ink-muted">{date(a.createdAt)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }

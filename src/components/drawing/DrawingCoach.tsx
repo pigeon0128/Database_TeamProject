@@ -51,6 +51,8 @@ const messages: Record<CoachMode, Array<{ title: string; body: string }>> = {
  * 처음 쓰는 사람에게만 펼쳐서 보여 주고, 접은 뒤에는 아래 "도움말" 버튼으로 언제든 다시 볼 수 있다.
  */
 type CoachState = "open" | "closed" | "dismissed";
+/** 잠겨 있을 때 도움말 버튼에 보이는 설명 */
+const LOCKED_TITLE = "AI 조언을 보는 동안은 도움말을 열 수 없어요";
 const storageKey = (mode: CoachMode) => `drawingCoach:${mode}`;
 
 function readCoachState(mode: CoachMode): CoachState {
@@ -67,6 +69,7 @@ export function DrawingCoach({
   character,
   foldedSlot,
   compact = false,
+  locked = false,
 }: {
   mode: CoachMode;
   character: CoachCharacter;
@@ -74,6 +77,8 @@ export function DrawingCoach({
   foldedSlot?: HTMLElement | null;
   /** 자리가 좁으면 얼굴 아이콘만 보여 준다 */
   compact?: boolean;
+  /** 잠시 쓸 수 없게 한다 (AI 조언 말풍선이 같은 자리에 떠 있는 동안). 펼쳐 둔 안내도 그동안 접어 둔다 (기억한 상태는 바꾸지 않는다) */
+  locked?: boolean;
 }) {
   const [step, setStep] = useState(0);
   const [state, setState] = useState<CoachState>(() => readCoachState(mode));
@@ -95,8 +100,9 @@ export function DrawingCoach({
   // 접어 둔 도움말 버튼이 확대·축소 버튼을 가릴 수 있어서, ✕로 완전히 없앨 수 있다.
   if (dismissed) return null;
 
-  if (!open) {
+  if (!open || locked) {
     const reopen = () => {
+      if (locked) return;
       setStep(0);
       setOpen(true);
     };
@@ -107,9 +113,10 @@ export function DrawingCoach({
         <button
           type="button"
           onClick={reopen}
-          title={`${coach.name} 도움말`}
-          aria-label={`${coach.name} 도움말`}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-100 bg-white shadow-lg"
+          disabled={locked}
+          title={locked ? LOCKED_TITLE : `${coach.name} 도움말`}
+          aria-label={locked ? LOCKED_TITLE : `${coach.name} 도움말`}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-100 bg-white shadow-lg transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
         >
           {face}
         </button>
@@ -129,7 +136,13 @@ export function DrawingCoach({
           foldedSlot ? "" : "absolute bottom-3 left-1/2 -translate-x-1/2"
         }`}
       >
-        <button type="button" onClick={reopen} className="flex h-10 items-center gap-1.5 rounded-full pl-1 pr-1.5">
+        <button
+          type="button"
+          onClick={reopen}
+          disabled={locked}
+          title={locked ? LOCKED_TITLE : undefined}
+          className="flex h-10 items-center gap-1.5 rounded-full pl-1 pr-1.5 transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+        >
           {face}
           {coach.name} 도움말
         </button>

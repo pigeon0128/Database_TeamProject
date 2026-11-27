@@ -8,7 +8,8 @@ import { createContext } from "react";
 
 export type SlotLayout = "wide" | "narrow" | "inside";
 
-export const CanvasControlsSlot = createContext<{ slot: HTMLElement | null; layout: SlotLayout } | null>(null);
+// lockCoach: AI 조언 말풍선이 떠 있는 동안 코덱스 도움말을 잠근다 (두 말풍선이 같은 자리에 겹치므로)
+export const CanvasControlsSlot = createContext<{ slot: HTMLElement | null; layout: SlotLayout; lockCoach?: (locked: boolean) => void } | null>(null);
 
 /** 가로 버튼이 들어가는 빈자리 폭 (px, 버튼 폭 + 여백) */
 export const WIDE_SLOT = 150;

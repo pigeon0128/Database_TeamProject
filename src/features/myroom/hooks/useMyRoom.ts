@@ -154,6 +154,37 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
       return e instanceof Error ? e.message : "삭제하지 못했어요."
     }
   }
+  /**
+   * AI 그림을 지운다 ("그린 그림 보기"). 지금 방(저장 전 포함)의 액자에 걸려 있으면 지우지 않는다:
+   * 지우면 그 방을 저장할 때 "없는 그림" 오류가 나기 때문. 못 지우면 이유(한국어), 지웠으면 null
+   */
+  async function removeArtwork(drawingId: number): Promise<string | null> {
+    if (layout.objects.some((o) => o.artworkDrawingId === drawingId))
+      return "방의 액자에 걸려 있어요. 액자의 그림을 바꾸거나 액자를 치운 뒤 지워 주세요."
+    if (isPreview) return "Preview 에서는 지울 수 없어요."
+    try {
+      await myroomApi.removeAiArtwork(drawingId)
+      setArtworks((list) => list.filter((a) => a.drawingId !== drawingId))
+      return null
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) expire()
+      if (e instanceof ApiError && e.status === 404)
+        setArtworks((list) => list.filter((a) => a.drawingId !== drawingId))
+      return e instanceof Error ? e.message : "지우지 못했어요."
+    }
+  }
+  /** AI 그림 이름 바꾸기. 못 바꾸면 이유(한국어), 바꿨으면 null */
+  async function renameArtwork(drawingId: number, title: string): Promise<string | null> {
+    if (isPreview) return "Preview 에서는 이름을 바꿀 수 없어요."
+    try {
+      const result = await myroomApi.renameAiArtwork(drawingId, title)
+      setArtworks((list) => list.map((a) => (a.drawingId === drawingId ? { ...a, name: result.title } : a)))
+      return null
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) expire()
+      return e instanceof Error ? e.message : "이름을 바꾸지 못했어요."
+    }
+  }
   function acceptRemote() {
     if (!remote) return
     setBackup(layout)
@@ -181,6 +212,8 @@ export function useMyRoom(preview = false, expire = ignoreUnauthorized) {
     beginEditGroup,
     endEditGroup,
     artworks,
+    removeArtwork,
+    renameArtwork,
     stored,
     removeStored,
     revision,

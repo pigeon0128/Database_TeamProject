@@ -16,10 +16,7 @@ const scenes: Record<DrawingSceneDecorMode, SceneAsset[]> = {
   paint3d: [
     { src: "/assets/dorobus/drawing/codex-pose.png", className: "bottom-14 -left-6 w-64 opacity-[0.30] xl:w-80 xl:opacity-[0.40]", glow: "bg-lime-200/45" },
   ],
-  creature: [
-    { src: "/assets/dorobus/drawing/naty-pose.png", className: "bottom-20 left-10 w-48 opacity-[0.30] xl:left-14 xl:w-64 xl:opacity-[0.42]", glow: "bg-sky-200/55" },
-    { src: "/assets/dorobus/drawing/codex-pose.png", className: "bottom-16 right-64 w-40 opacity-[0.08] xl:w-52 xl:opacity-[0.14]", glow: "bg-emerald-200/40" },
-  ],
+  creature: [],
 };
 
 /**
@@ -30,6 +27,7 @@ const scenes: Record<DrawingSceneDecorMode, SceneAsset[]> = {
 export const sideCharacters: Partial<Record<DrawingSceneDecorMode, { src: string; glow: string; size: string; faceX: number }>> = {
   free: { src: "/assets/dorobus/drawing/codex-pose.png", glow: "bg-lime-200/45", size: "w-64 xl:w-80", faceX: 0.53 },
   story: { src: "/assets/dorobus/drawing/xylo-pose.png", glow: "bg-amber-200/40", size: "w-52 xl:w-64", faceX: 0.6 },
+  creature: { src: "/assets/dorobus/drawing/gochalseu-drawing-pose.png", glow: "bg-emerald-200/40", size: "w-56 xl:w-72", faceX: 0.58 },
   // 3D 색칠하기는 DrawingShell 을 쓰지 않아 Paint3DPage 가 직접 그린다
   paint3d: { src: "/assets/dorobus/drawing/jero-pose.png", glow: "bg-cyan-200/40", size: "w-44 xl:w-56", faceX: 0.5 },
 };

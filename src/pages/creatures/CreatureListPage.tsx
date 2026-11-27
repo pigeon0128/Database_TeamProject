@@ -71,6 +71,21 @@ export default function CreatureListPage() {
 
   return (
     <PageLayout title="도감 생물 그리기" wide>
+      <section className="mb-5 grid overflow-hidden rounded-3xl border border-emerald-100 bg-white/85 shadow-card sm:grid-cols-[1fr_180px]">
+        <div className="p-5 sm:p-7">
+          <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">고찰스의 생태 연구 임무</span>
+          <h2 className="mt-3 text-2xl font-black tracking-[-0.03em]">관찰한 생물을 그림으로 기록해 주세요!</h2>
+          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-ink-muted">
+            생물 지식은 풍부하지만 그림에는 자신 없는 고찰스를 도와 동물·식물·공룡의 특징을 생생하게 그려 주세요. 완성한 그림은 도로랜드 생태도감에 차곡차곡 수집됩니다.
+          </p>
+          <p className="mt-3 text-sm font-black text-emerald-700">“내 완벽한 관찰 도감에는 너희의 생생한 그림이 꼭 필요해!”</p>
+        </div>
+        <div className="relative hidden min-h-44 overflow-hidden bg-emerald-50 sm:block" aria-hidden="true">
+          <span className="absolute inset-8 rounded-full bg-emerald-200/50 blur-2xl" />
+          <img src="/assets/dorobus/drawing/gochalseu-drawing-pose.png" alt="" className="relative h-full w-full object-contain object-bottom p-2 drop-shadow-lg" />
+        </div>
+      </section>
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-ink-muted">생물을 골라 따라 그리고 완료하면 내 도감에 등록돼요!</p>
         {creatures && (

@@ -531,7 +531,7 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
           onPointerCancel={handleUp}
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 h-full w-full touch-none"
-          style={{ cursor: panning ? "grabbing" : idle ? "not-allowed" : picking || paintBrush?.fill ? "pointer" : "crosshair" }}
+          style={{ cursor: panning ? "grabbing" : idle ? "not-allowed" : picking || paintBrush?.fill ? "pointer" : CROSSHAIR_CURSOR }}
         />
       </div>
 
@@ -539,5 +539,13 @@ const TracingCanvas = forwardRef<TracingCanvasHandle, Props>(function TracingCan
     </div>
   );
 });
+
+/**
+ * 그리기 커서: 검은 십자에 흰 테두리. 운영체제 기본 십자(crosshair)는 흰 도화지 위에서 하얗게 보여 위치를 알기 어렵다.
+ * 흰 바탕에서는 검은 십자로, 어두운 색 위에서는 흰 테두리로 보인다. 가운데 점이 그려지는 자리다.
+ */
+const CROSSHAIR_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g stroke-linecap="round"><path d="M12 2v7M12 15v7M2 12h7M15 12h7" stroke="#fff" stroke-width="4"/><path d="M12 2v7M12 15v7M2 12h7M15 12h7" stroke="#111" stroke-width="2"/></g><circle cx="12" cy="12" r="2" fill="#111" stroke="#fff" stroke-width="1.5"/></svg>',
+)}") 12 12, crosshair`;
 
 export default TracingCanvas;

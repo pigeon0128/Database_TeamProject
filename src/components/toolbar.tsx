@@ -41,6 +41,135 @@ export function ToolbarButton({ onClick, title, children, active, disabled, prim
   );
 }
 
+/** 꾹 누르고 있어야 하는 시간 (ms) */
+const HOLD_MS = 1000;
+
+/**
+ * 꾹 눌러야 실행되는 버튼 (전체 지우기처럼 되돌리기 어려운 동작의 안전장치).
+ * 누르고 있으면 버튼 안에 빨간 게이지가 왼쪽부터 차고, 다 차면 onConfirm. 중간에 떼면 게이지가 빠르게 비워진다.
+ * 짧게 누르면 "꾹 눌러요" 안내를 잠깐 보여 준다. 키보드는 Space/Enter 를 누르고 있으면 된다.
+ */
+export function HoldToConfirmButton({
+  onConfirm,
+  title,
+  children,
+  disabled,
+  holdMs = HOLD_MS,
+  hintText = "꾹 누르고 있으면 실행돼요",
+}: {
+  onConfirm: () => void;
+  title: string;
+  children: ReactNode;
+  disabled?: boolean;
+  holdMs?: number;
+  /** 짧게 눌렀을 때 잠깐 보여 주는 안내 */
+  hintText?: string;
+}) {
+  // 게이지는 CSS 전환(transition)으로 움직이고, 실행은 타이머로 정한다 (화면 새로 그리기가 느려도 시간은 정확하게).
+  //   누르는 중: 남은 시간 동안 100% 까지 일정한 속도로
+  //   뗐을 때: 지금 위치에서 0% 까지 빠르게 (채우는 속도의 4배). 다시 누르면 남은 만큼만 더 누르면 된다
+  const [gauge, setGauge] = useState<{ to: number; ms: number }>({ to: 0, ms: 0 });
+  const [hint, setHint] = useState(false);
+  const holding = useRef(false);
+  /** 눌렀을 때의 게이지 위치(0~1)와 시각: 뗐을 때 지금 위치를 계산한다 */
+  const holdFrom = useRef({ progress: 0, at: 0 });
+  /** 뗀 뒤 비워지는 중의 시작 위치와 시각 */
+  const drainFrom = useRef({ progress: 0, at: 0 });
+  const confirmTimer = useRef(0);
+  const hintTimer = useRef(0);
+  useEffect(() => () => (window.clearTimeout(confirmTimer.current), window.clearTimeout(hintTimer.current)), []);
+
+  /** 지금 게이지 위치 (0~1) */
+  const current = () => {
+    const now = performance.now();
+    if (holding.current) return Math.min(1, holdFrom.current.progress + (now - holdFrom.current.at) / holdMs);
+    return Math.max(0, drainFrom.current.progress - ((now - drainFrom.current.at) / holdMs) * 4);
+  };
+
+  const start = () => {
+    if (disabled || holding.current) return;
+    const from = current();
+    holding.current = true;
+    holdFrom.current = { progress: from, at: performance.now() };
+    setHint(false);
+    const left = (1 - from) * holdMs;
+    setGauge({ to: 1, ms: left });
+    confirmTimer.current = window.setTimeout(() => {
+      holding.current = false;
+      drainFrom.current = { progress: 0, at: performance.now() };
+      setGauge({ to: 0, ms: 0 });
+      onConfirm();
+    }, left);
+  };
+
+  const cancel = () => {
+    if (!holding.current) return;
+    const now = current();
+    holding.current = false;
+    window.clearTimeout(confirmTimer.current);
+    drainFrom.current = { progress: now, at: performance.now() };
+    setGauge({ to: 0, ms: (now * holdMs) / 4 });
+    // 거의 바로 뗐으면 꾹 눌러야 한다고 알려 준다
+    if (now < 0.25) {
+      setHint(true);
+      window.clearTimeout(hintTimer.current);
+      hintTimer.current = window.setTimeout(() => setHint(false), 1600);
+    }
+  };
+  const active = gauge.to > 0;
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        title={`${title} (꾹 누르기)`}
+        aria-label={`${title}: 꾹 누르고 있으면 실행돼요`}
+        disabled={disabled}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          // 누른 채 버튼 밖으로 나가도 떼기 전까지는 계속 센다
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // 잡을 수 없는 포인터면 그냥 센다
+          }
+          start();
+        }}
+        onPointerUp={cancel}
+        onPointerCancel={cancel}
+        onLostPointerCapture={cancel}
+        onKeyDown={(e) => {
+          if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+            e.preventDefault();
+            start();
+          }
+        }}
+        onKeyUp={(e) => {
+          if (e.key === " " || e.key === "Enter") cancel();
+        }}
+        onBlur={cancel}
+        onContextMenu={(e) => e.preventDefault()}
+        className={`relative flex h-10 touch-none select-none items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full px-4 text-sm font-bold transition-colors disabled:opacity-40 ${
+          active ? "text-rose-700" : "text-ink enabled:hover:bg-rose-50"
+        }`}
+      >
+        {/* 빨간 게이지 */}
+        <span
+          className="pointer-events-none absolute inset-y-0 left-0 bg-rose-400/45"
+          style={{ width: `${gauge.to * 100}%`, transition: `width ${gauge.ms}ms linear` }}
+          aria-hidden="true"
+        />
+        <span className="relative flex items-center gap-1.5">{children}</span>
+      </button>
+      {hint && (
+        <span role="status" className="absolute left-1/2 top-full z-50 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-3 py-1 text-xs font-bold text-white shadow-lg">
+          {hintText}
+        </span>
+      )}
+    </span>
+  );
+}
+
 type ToolbarMenuProps = {
   /** 툴바에 보이는 버튼 내용 */
   label: ReactNode;

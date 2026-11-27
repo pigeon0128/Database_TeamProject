@@ -32,7 +32,8 @@ const smallJson = express.json({ limit: "100kb" });
 const largeJson = express.json({ limit: "5mb" });
 // 색칠 오브젝트(수납하기)는 부위별 색 샘플이 들어가 가장 크다.
 const hugeJson = express.json({ limit: "8mb" });
-const carriesImage = (path) => path.startsWith("/api/drafts/") || path === "/api/play-records";
+// /api/ai/advice: AI 조언에 보내는 그림 (화면이 512px 로 줄여 보낸다)
+const carriesImage = (path) => path.startsWith("/api/drafts/") || path === "/api/play-records" || path === "/api/ai/advice";
 app.use((req, res, next) =>
   (req.path === "/api/myroom/storage" ? hugeJson : carriesImage(req.path) ? largeJson : smallJson)(req, res, next),
 );

@@ -120,9 +120,12 @@ export const artworkUrl = (imageKey: string) => `/uploads/${imageKey}`;
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** 서버가 붙인 오류 종류 (예: "blocked" = 내용 검사에 걸림) */
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -145,7 +148,7 @@ async function request<T>(method: string, path: string, body?: unknown, { keepal
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     // API 서버가 꺼져 있으면 Vite 프록시가 JSON 이 아닌 오류를 돌려준다.
-    throw new ApiError(data?.error ?? SERVER_DOWN, res.status);
+    throw new ApiError(data?.error ?? SERVER_DOWN, res.status, data?.code);
   }
   return data as T;
 }
@@ -194,4 +197,10 @@ export const api = {
     request<{ artwork: { drawingId: number; name: string; imageKey: string } }>("POST", `/ai/image/${encodeURIComponent(imageId)}/myroom`),
   /** AI 그림 연습실 한 장의 가격(셀)과 내 셀 */
   aiImageInfo: () => request<{ cost: number; cells: number }>("GET", "/ai/image"),
+  /** AI 조언: 아이가 그린 그림(작게 줄인 data URL)을 보고 잘한 점·해 볼 것·색 팁. 부적절한 그림이면 code "blocked" 오류 */
+  aiAdvice: (image: string, title: string) => request<{ advice: AiAdvice; cells: number; cost: number }>("POST", "/ai/advice", { image, title }),
+  /** AI 조언 한 번의 가격(셀)과 내 셀 */
+  aiAdviceInfo: () => request<{ cost: number; cells: number }>("GET", "/ai/advice"),
 };
+
+export type AiAdvice = { praise: string; tip: string; color: string };

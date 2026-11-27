@@ -69,6 +69,8 @@ type DrawingShellProps = {
   coachCharacter?: CoachCharacter;
   /** 도화지 바깥의 Dorobus 캐릭터 배경 */
   backgroundScene?: DrawingSceneDecorMode;
+  /** 그림판 오른쪽 위 바깥 버튼 자리에 더할 버튼 (확대·축소 아래, 접힌 도움말 위. 예: AI 조언) */
+  canvasExtra?: ReactNode;
 };
 
 /**
@@ -89,6 +91,7 @@ export function DrawingShell({
   coachMode,
   coachCharacter = "codex",
   backgroundScene = "free",
+  canvasExtra,
 }: DrawingShellProps) {
   const { tool, setTool, paintable, paintColor } = tools;
   /** 오른쪽에 도구 패널 대신 정보 패널(도감 설명)을 보이는지 */
@@ -193,6 +196,7 @@ export function DrawingShell({
               }`}
             >
               <div ref={setZoomSlot} />
+              {canvasExtra && <CanvasControlsSlot.Provider value={slotContext}>{canvasExtra}</CanvasControlsSlot.Provider>}
               <div ref={setCoachSlot} />
             </div>
             {side && slotLayout !== "inside" && sideGap >= SIDE_MIN && (

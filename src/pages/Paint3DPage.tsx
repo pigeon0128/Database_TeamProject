@@ -10,7 +10,7 @@ import { RailButton } from "../components/drawing/DrawingShell";
 import DrawingSceneDecor, { sideCharacters } from "../components/drawing/DrawingSceneDecor";
 import { Section, Swatch } from "../components/drawing/ToolPanel";
 import { BASIC_COLORS, RECENT_MAX, loadRecent, saveRecent } from "../components/drawing/useDrawingTools";
-import { ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
+import { HoldToConfirmButton, ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
 import { downloadImage } from "../lib/download";
 import { navigate } from "../router";
 import { RoomError, storeInRoom } from "../features/paint3d/room";
@@ -188,9 +188,9 @@ export default function Paint3DPage({ modelId }: { modelId: ModelId }) {
               </ul>
             )}
           </ToolbarMenu>
-          <ToolbarButton title="전체 지우기" onClick={() => sceneRef.current?.clear()} disabled={!state.painted}>
+          <HoldToConfirmButton title="전체 지우기" hintText="꾹 누르고 있으면 다 지워져요" onConfirm={() => sceneRef.current?.clear()} disabled={!state.painted}>
             🗑️ <span className="hidden md:inline">전체 지우기</span>
-          </ToolbarButton>
+          </HoldToConfirmButton>
           <ToolbarButton title="마이룸 수납함에 보관 (저장하지 않아도 돼요)" onClick={store} disabled={!state.painted || storing}>
             📦 <span className="hidden md:inline">{storing ? "수납 중…" : "수납하기"}</span>
           </ToolbarButton>

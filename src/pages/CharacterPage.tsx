@@ -3,12 +3,13 @@
 // 툴바의 "AI 밑그림"으로 글로 밑그림을 만들면, 도감 그리기처럼 흰 선 안쪽 구역만 칠해진다 (components/drawing/AiSketchMenu.tsx).
 import { useEffect, useMemo, useRef, useState } from "react";
 import TracingCanvas, { type TracingCanvasHandle } from "../components/TracingCanvas";
+import { AiAdviceButton } from "../components/drawing/AiAdvice";
 import { AiSketchMenu, EMPTY_SKETCH, useAiSketch } from "../components/drawing/AiSketchMenu";
 import { DrawingShell } from "../components/drawing/DrawingShell";
 import { HistoryButtons, LineMenu, ShortcutList } from "../components/drawing/menus";
 import { ResumeDialog } from "../components/drawing/ResumeDialog";
 import { useDrawingTools } from "../components/drawing/useDrawingTools";
-import { ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
+import { HoldToConfirmButton, ToolbarButton, ToolbarDivider, ToolbarMenu } from "../components/toolbar";
 import { downloadImage } from "../lib/download";
 import { useDrawingDraft } from "../lib/drawingDraft";
 import { wholeCanvasRegions } from "../lib/drawing/regions";
@@ -60,6 +61,8 @@ export default function CharacterPage() {
         coachCharacter="codex"
         backgroundScene="free"
         aspect={1}
+        // 코덱스 도움말 위: 지금 그림을 보고 코덱스가 조언 (components/drawing/AiAdvice.tsx)
+        canvasExtra={<AiAdviceButton getImage={() => canvasRef.current?.exportImage(false) ?? null} title={name} strokes={tools.canvasProps.actions.length} />}
         toolbarStart={
           <>
             {/* 캐릭터 이름 = 저장할 파일 이름 */}
@@ -95,9 +98,9 @@ export default function CharacterPage() {
                 </>
               )}
             </ToolbarMenu>
-            <ToolbarButton title="전체 지우기" onClick={tools.clearAll} disabled={!tools.hasDrawing}>
+            <HoldToConfirmButton title="전체 지우기" hintText="꾹 누르고 있으면 다 지워져요" onConfirm={tools.clearAll} disabled={!tools.hasDrawing}>
               🗑️ <span className="hidden md:inline">전체 지우기</span>
-            </ToolbarButton>
+            </HoldToConfirmButton>
             <ToolbarButton title="그림 저장 (PNG)" onClick={save} disabled={!tools.hasDrawing} primary>
               💾 저장
             </ToolbarButton>

@@ -7,6 +7,8 @@
 //   GET/POST /api/ai/sketch  AI 밑그림 (캐릭터 그리기): 가격·내 셀 / 만들기 → { image, cells(남은 셀), cost }
 //   GET/POST /api/ai/image   AI 그림 연습실 (#/ai-studio): 칸마다 쓴 설명으로 그림 (AI_IMAGE_CELLS, 기본 50) → { image, imageId, … }
 //   POST /api/ai/image/:imageId/myroom  만든 그림을 마이룸 작품으로 추가 (DB user_ai_artworks, migrations/026)
+//   GET/POST /api/ai/advice  AI 조언 (캐릭터 그리기의 "AI 조언"): 아이가 그린 그림을 보고 짧은 조언 (AI_ADVICE_CELLS, 기본 10) → { advice, cells, cost }
+//   OPENAI_ADVICE_MODEL   선택. 그림을 보고 조언하는 모델 (기본 gpt-5.4-mini)
 //   OPENAI_API_KEY        필수. https://platform.openai.com/api-keys 에서 만든 키
 //   OPENAI_IMAGE_MODEL    선택. 기본 gpt-image-2
 //   OPENAI_IMAGE_QUALITY  선택. low / medium / high (기본 low: 밑그림은 선만 있으면 돼서 싸고 빠르게)
@@ -118,9 +120,10 @@ const sketchPrompt = (subject) =>
   ].join(" ");
 
 /** 그림 한 장에 드는 셀 (.env 의 envName, 기본 50셀. 특수 브러쉬 하나가 100셀) */
-function cellCost(envName) {
-  const n = Number(process.env[envName]);
-  return Number.isInteger(n) && n >= 0 ? n : 50;
+function cellCost(envName, fallback = 50) {
+  const raw = process.env[envName];
+  const n = Number(raw);
+  return raw !== undefined && raw !== "" && Number.isInteger(n) && n >= 0 ? n : fallback;
 }
 const sketchCost = () => cellCost("AI_SKETCH_CELLS");
 const imageCost = () => cellCost("AI_IMAGE_CELLS");
@@ -138,24 +141,26 @@ const walletRoute = (cost) => async (req, res) => {
  *   3. 만들기 (run). 실패하면(예상 못 한 오류 포함) 낸 셀을 돌려준다
  * 응답: 성공 { image, cells(남은 셀), cost } / 실패 { error, cells? }
  */
-async function paidGeneration(req, res, { checkText, cost, run, extra }) {
+async function paidGeneration(req, res, { checkText, check, blockedMessage, rateKey, cost, run, extra }) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return res.status(503).json({ error: "AI 그림을 쓰려면 서버 .env 에 OPENAI_API_KEY 를 넣어 주세요." });
-  const releaseRate = takeRate(req.userId);
+  // 1분 횟수: 그림 만들기(밑그림·연습실)는 함께, 조언은 따로 센다 (rateKey)
+  const releaseRate = takeRate(rateKey ? `${rateKey}:${req.userId}` : req.userId);
   if (!releaseRate) return res.status(429).json({ error: `잠시 뒤에 다시 만들어 주세요. (1분에 ${PER_MINUTE}번까지)` });
 
   let blocked;
   try {
-    blocked = await moderate(key, checkText);
+    // check: 글 대신 다른 것(그림)을 검사할 때
+    blocked = check ? await check(key) : await moderate(key, checkText);
   } catch (err) {
     console.error("[ai] 요청 글 검사 실패:", err.message);
     releaseRate();
     return res.status(502).json({ error: "지금은 그림을 만들 수 없어요. 잠시 뒤 다시 해 주세요." });
   }
   if (blocked.length) {
-    console.warn(`[ai] 요청 글 차단 (사용자 ${req.userId}): "${checkText}" ${blocked.join(" ")}`);
+    console.warn(`[ai] 요청 차단 (사용자 ${req.userId}): "${checkText ?? "(그림)"}" ${blocked.join(" ")}`);
     releaseRate();
-    return res.status(400).json({ error: "이 내용으로는 그림을 만들 수 없어요. 다른 말로 적어 주세요." });
+    return res.status(400).json({ error: blockedMessage ?? "이 내용으로는 그림을 만들 수 없어요. 다른 말로 적어 주세요.", code: "blocked" });
   }
 
   let paid;
@@ -181,14 +186,16 @@ async function paidGeneration(req, res, { checkText, cost, run, extra }) {
   if (result.error) {
     releaseRate();
     const refund = await pool.query("UPDATE users SET cells = cells + $2 WHERE user_id = $1 RETURNING cells", [req.userId, cost]);
-    return res.status(result.status).json({ error: `${result.error} (셀은 돌려드렸어요)`, cells: refund.rows[0]?.cells });
+    // plain: 안내 문구를 그대로 보여 준다 (예: 조언 모델이 부적절한 그림이라고 판단했을 때)
+    const error = result.plain ? result.error : `${result.error} (셀은 돌려드렸어요)`;
+    return res.status(result.status).json({ error, code: result.code, cells: refund.rows[0]?.cells });
   }
   // 덧붙일 값을 못 만들어도(보관 실패 등) 그림은 돌려준다 (셀은 이미 그림 값으로 냈다)
   const more = await Promise.resolve(extra?.(result)).catch((err) => {
     console.error("[ai] 그림 보관 실패:", err.message);
     return {};
   });
-  res.json({ image: result.image, cells: paid.rows[0].cells, cost, ...(more ?? {}) });
+  res.json({ ...result, cells: paid.rows[0].cells, cost, ...(more ?? {}) });
 }
 
 const readText = (value, max, emptyMessage) => {
@@ -315,6 +322,154 @@ async function callOpenAI(key, endpoint, { body, json }) {
   if (!b64) return { status: 502, error: "AI가 그림을 돌려주지 않았어요." };
   return { image: `data:image/png;base64,${b64}` };
 }
+
+// ── AI 조언 (캐릭터 그리기의 "AI 조언") ─────────────────────────────
+// 아이가 그린 그림을 보고 잘한 점·더 해 볼 것·색 팁을 짧게 돌려준다. 고친 그림을 그려 주지는 않는다 (아이 그림을 대신 그리지 않게).
+// 음란하거나 잔인한 그림은 세 겹으로 거른다. 걸리면 조언 대신 UNSAFE_MESSAGE 만 보여 주고, 셀과 1분 횟수는 쓰지 않은 것으로 한다.
+//   1. 그림 검사 (omni-moderation, 무료): 조언 모델에 보내기 전에. IMAGE_LIMITS 이상이면 막는다
+//   2. 조언 모델의 판단: 부적절한 그림이면 조언 대신 safe=false 로 답하게 한다 (1단계가 아이 그림의 거친 선을 놓칠 때를 대비)
+//   3. 조언 글 검사: 받은 조언 글을 다시 검사해서 이상하면 버리고 기본 문구를 준다
+// 서버에는 그림을 저장하지 않는다 (걸린 항목과 점수만 로그에 남긴다).
+const adviceCost = () => cellCost("AI_ADVICE_CELLS", 10);
+const adviceModel = () => process.env.OPENAI_ADVICE_MODEL || "gpt-5.4-mini";
+const UNSAFE_MESSAGE = "좀 더 건전한 내용으로 그려보아요. 🌈";
+const FALLBACK_ADVICE = { praise: "멋지게 그리고 있어요!", tip: "생각나는 걸 하나 더 그려 넣어 볼까요?", color: "좋아하는 색으로 칠해 봐요." };
+/** 받는 그림 크기 상한 (data URL 글자 수). 화면이 512px JPEG 로 줄여 보내므로 보통 100KB 안쪽 */
+const MAX_ADVICE_IMAGE = 1_500_000;
+
+/**
+ * 그림 검사 기준 (그림에서 점수가 나오는 항목만: 음란·폭력·자해). 처음에는 엄격하게 두고 로그를 보며 푼다.
+ * 일반 폭력(violence)은 거의 막지 않는다: 시험해 보니 "칼 든 용사와 용" 그림이 0.77 이 나왔다 (2026-11-27).
+ * 싸우는 그림은 아이들이 자주 그리므로 조언 모델의 판단(2단계)에 맡기고,
+ * 피·훼손 같은 잔인한 묘사(violence/graphic, "칼에 찔려 피 흘리는 사람" 0.20)와 음란(sexual)을 엄격하게 막는다.
+ */
+const IMAGE_LIMITS = {
+  sexual: 0.2,
+  violence: 0.95,
+  "violence/graphic": 0.15,
+  "self-harm": 0.1,
+  "self-harm/intent": 0.1,
+  "self-harm/instructions": 0.05,
+};
+
+/** 그림 검사: 기준을 넘은 항목 목록 (빈 배열이면 통과). 검사를 못 하면 예외 (검사 없이 조언하지 않는다) */
+async function moderateImage(key, image) {
+  const response = await fetch("https://api.openai.com/v1/moderations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "omni-moderation-latest", input: [{ type: "image_url", image_url: { url: image } }] }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const data = await response.json().catch(() => null);
+  const scores = data?.results?.[0]?.category_scores;
+  if (!response.ok || !scores) throw new Error(data?.error?.message ?? `moderation ${response.status}`);
+  const over = Object.entries(IMAGE_LIMITS).filter(([category, limit]) => (scores[category] ?? 0) >= limit);
+  return over.map(([category]) => `${category}=${scores[category].toFixed(3)}`);
+}
+
+const ADVICE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["safe", "praise", "tip", "color"],
+  properties: {
+    safe: { type: "boolean" },
+    praise: { type: "string" },
+    tip: { type: "string" },
+    color: { type: "string" },
+  },
+};
+
+const adviceInstructions = (title) =>
+  [
+    "You are CODEX, a warm drawing coach for children aged 6-12 in a Korean drawing app.",
+    "Look at the child's drawing and reply ONLY in Korean, in friendly 해요체, with short sentences a child can read.",
+    title ? `The child named this character "${title}". Use the name only as a hint about what they tried to draw.` : "",
+    "Return JSON with:",
+    "- praise: one specific thing they did well (one sentence, under 40 Korean characters).",
+    "- tip: ONE gentle idea to add or try next, phrased as a suggestion like '~해 볼까요?' (one sentence, under 50 characters).",
+    "- color: one coloring or background tip (one sentence, under 40 characters).",
+    "Never criticize harshly, never give scores, never compare with other children, never mention that you are an AI.",
+    "Do not tell them to erase or redo their work. Respect their own idea.",
+    "If the drawing is almost empty, encourage them to start with one big shape.",
+    "- safe: false ONLY if the drawing shows sexual content, nudity, or gory, bloody or cruel violence, or self-harm.",
+    "  Normal kid themes such as knights with swords, monsters, dinosaurs fighting or superheroes are safe=true.",
+    "  When safe is false, leave praise, tip and color as empty strings.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+/** 2·3단계: 조언 모델에 묻고, 받은 조언 글을 검사한다 → { advice } 또는 { status, error, plain?, code? } */
+async function askAdvice(key, image, title) {
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: adviceModel(),
+        messages: [
+          { role: "system", content: adviceInstructions(title) },
+          { role: "user", content: [{ type: "image_url", image_url: { url: image, detail: "low" } }] },
+        ],
+        response_format: { type: "json_schema", json_schema: { name: "drawing_advice", strict: true, schema: ADVICE_SCHEMA } },
+        reasoning_effort: "low",
+        max_completion_tokens: 2000,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch (err) {
+    console.error("[ai] 조언 연결 실패:", err.message);
+    return { status: 502, error: "AI 서버에 연결하지 못했어요. 잠시 뒤 다시 해 주세요." };
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    console.error(`[ai] 조언 오류 ${response.status}:`, data?.error?.message ?? response.statusText);
+    if (response.status === 429) return { status: 429, error: "AI 사용량이 많거나 크레딧이 부족해요. 잠시 뒤 다시 해 주세요." };
+    return { status: 502, error: "AI가 조언을 주지 못했어요. 잠시 뒤 다시 해 주세요." };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(data?.choices?.[0]?.message?.content ?? "");
+  } catch {
+    return { status: 502, error: "AI가 조언을 주지 못했어요. 잠시 뒤 다시 해 주세요." };
+  }
+  if (!parsed.safe) {
+    console.warn("[ai] 조언 모델이 부적절한 그림으로 판단");
+    return { status: 400, error: UNSAFE_MESSAGE, plain: true, code: "blocked" };
+  }
+  const clip = (text, max) => String(text ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+  const advice = { praise: clip(parsed.praise, 80), tip: clip(parsed.tip, 100), color: clip(parsed.color, 80) };
+  if (!advice.praise || !advice.tip) return { advice: FALLBACK_ADVICE };
+  // 3. 조언 글 검사: 이상하면 버리고 기본 문구 (셀은 조언 값으로 이미 냈으므로 기본 문구라도 준다)
+  try {
+    const bad = await moderate(key, [advice.praise, advice.tip, advice.color].join("\n"));
+    if (bad.length) {
+      console.warn("[ai] 조언 글 차단:", bad.join(" "));
+      return { advice: FALLBACK_ADVICE };
+    }
+  } catch (err) {
+    console.error("[ai] 조언 글 검사 실패:", err.message);
+    return { advice: FALLBACK_ADVICE };
+  }
+  return { advice };
+}
+
+aiRoutes.get("/advice", requireUser, walletRoute(adviceCost));
+
+aiRoutes.post("/advice", requireUser, async (req, res) => {
+  const image = typeof req.body?.image === "string" ? req.body.image : "";
+  if (image.length > MAX_ADVICE_IMAGE || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image)) {
+    throw new BadRequest("그림을 읽지 못했어요.");
+  }
+  const title = readText(req.body?.title, 20);
+  await paidGeneration(req, res, {
+    rateKey: "advice",
+    check: (key) => moderateImage(key, image),
+    blockedMessage: UNSAFE_MESSAGE,
+    cost: adviceCost(),
+    run: (key) => askAdvice(key, image, title),
+  });
+});
 
 // ── 만든 그림을 마이룸에 추가 ────────────────────────────────────────
 // 브라우저가 보낸 그림을 그대로 받으면 아무 그림이나 마이룸에 올릴 수 있으므로, 서버가 만든 그림을 서버 폴더에 잠시(KEEP_MS) 두고

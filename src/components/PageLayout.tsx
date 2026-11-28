@@ -17,7 +17,7 @@ export default function PageLayout({ title, wide, back = { path: "/", label: "�
   const backgroundCharacter: { image: string; label: string; tone: string } | null = title.includes("스토리")
     ? { image: "/assets/dorobus/drawing/rico-pose.png", label: "스토리보드를 그리는 리코", tone: "bg-violet-200/35" }
     : title.includes("도감")
-      ? { image: "/assets/dorobus/drawing/naty-pose.png", label: "자연 관찰 그림을 그리는 네이티", tone: "bg-sky-200/40" }
+      ? { image: "/assets/dorobus/drawing/gochalseu-drawing-pose.png", label: "생태도감을 그리는 고찰스", tone: "bg-emerald-200/35" }
       : title.includes("리더보드")
         ? { image: "/assets/dorobus/drawing/xylo-pose.png", label: "그림을 검토하는 자일로", tone: "bg-amber-200/35" }
         : title.includes("설정")
@@ -34,19 +34,6 @@ export default function PageLayout({ title, wide, back = { path: "/", label: "�
         >
           <span className={`absolute bottom-8 right-3 h-[72%] w-[85%] rounded-full blur-3xl ${backgroundCharacter.tone}`} />
           <img src={backgroundCharacter.image} alt={backgroundCharacter.label} className="relative h-full w-full object-contain drop-shadow-2xl" />
-        </div>
-      )}
-      {wide && title.includes("도감") && (
-        <div
-          className="pointer-events-none absolute bottom-[180px] left-4 z-0 hidden h-[min(50vh,460px)] w-[min(14vw,270px)] min-[1900px]:block"
-          aria-hidden="true"
-        >
-          <span className="absolute bottom-4 left-2 h-[72%] w-[90%] rounded-full bg-emerald-200/30 blur-3xl" />
-          <img
-            src="/assets/dorobus/decorations/codex-field-guide.png"
-            alt=""
-            className="relative h-full w-full object-contain object-bottom drop-shadow-2xl"
-          />
         </div>
       )}
       <div className={`relative mx-auto w-full ${wide ? "max-w-7xl" : "max-w-5xl"}`}>

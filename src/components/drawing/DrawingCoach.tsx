@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 
 export type CoachMode = "trace" | "free" | "paint3d";
-export type CoachCharacter = "codex" | "rico" | "naty";
+export type CoachCharacter = "codex" | "rico" | "naty" | "gochalseu";
 
 /**
  * face: 접힌 도움말 버튼의 동그란 얼굴 아이콘을 포즈 그림에서 잘라 내는 위치.
@@ -13,6 +13,7 @@ const coaches: Record<CoachCharacter, { name: string; image: string; alt: string
   codex: { name: "CODEX", image: "/assets/dorobus/drawing/codex-pose.png", alt: "캐릭터 그리기를 안내하는 코덱스", face: { x: 0.53, y: 0.32, zoom: 3.4, ratio: 1159 / 1357 } },
   rico: { name: "RICO", image: "/assets/dorobus/drawing/rico-pose.png", alt: "스토리 장면 그리기를 안내하는 리코", face: { x: 0.53, y: 0.36, zoom: 3, ratio: 1145 / 1374 } },
   naty: { name: "NATY", image: "/assets/dorobus/drawing/naty-pose.png", alt: "도감 생물 그리기를 안내하는 나티", face: { x: 0.66, y: 0.5, zoom: 2.8, ratio: 1024 / 1536 } },
+  gochalseu: { name: "고찰스", image: "/assets/dorobus/drawing/gochalseu-drawing-pose.png", alt: "생태도감 그리기를 안내하는 고찰스", face: { x: 0.58, y: 0.34, zoom: 3, ratio: 1 } },
 };
 
 /** 포즈 그림에서 얼굴만 동그랗게 보여 주는 배경 스타일 (배경 위치 % 는 "그림의 p% 지점을 상자의 p% 지점에 맞춘다"는 뜻) */
